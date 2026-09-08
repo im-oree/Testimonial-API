@@ -13,6 +13,7 @@ import type { PlatformStaffMember, RoleTemplateSummary } from '../../lib/types';
 import { Button } from '../../components/ui';
 import { Field, PasswordInput, SelectField } from '../../components/fields';
 import Modal from '../../components/Modal';
+import { ConfirmDialog } from '../../components/menu';
 import { ROLE_LABEL } from './PlatformStaffPage';
 
 /** Human-readable permission catalogue (label + section) for the matrix view. */
@@ -78,6 +79,7 @@ export default function ManageStaffModal({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   useEffect(() => {
     if (member) {
@@ -286,12 +288,30 @@ export default function ManageStaffModal({
                 They immediately lose console access and the audit log records it. Super admin only.
               </p>
             </div>
-            <Button variant="danger" className="btn-xs" disabled={busy !== null} onClick={() => void act('remove', {})}>
+            <Button variant="danger" className="btn-xs" disabled={busy !== null} onClick={() => setConfirmRemove(true)}>
               {busy === 'remove' ? 'Removing…' : 'Remove account'}
             </Button>
           </div>
         )}
       </div>
+      {/* Removing an account is destructive — it always confirms first. */}
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove this account?"
+        body={
+          <p className="muted" style={{ margin: 0 }}>
+            <strong>{member.name}</strong> ({member.email}) immediately loses platform console access. The action is
+            recorded in the audit log.
+          </p>
+        }
+        confirmLabel="Remove account"
+        busy={busy === 'remove'}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          void act('remove', {});
+        }}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </Modal>
   );
 }

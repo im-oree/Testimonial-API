@@ -24,7 +24,7 @@ import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager, Rating
 import { Field, SelectField, TextAreaInput, TextInput } from '../components/fields';
 import { ConfirmDialog, KebabMenu, type MenuAction } from '../components/menu';
 import Modal from '../components/Modal';
-import { IconCheck, IconEye, IconEyeOff, IconLayers, IconPlus, IconTrash, IconX } from '../components/icons';
+import { IconCheck, IconEdit, IconEye, IconEyeOff, IconLayers, IconPlus, IconTrash, IconX } from '../components/icons';
 
 type Filter = 'all' | 'pending' | 'approved' | 'rejected' | 'archived';
 
@@ -247,7 +247,7 @@ export default function TestimonialsPage() {
       actions.push({
         id: 'edit',
         label: 'Edit testimonial',
-        icon: <IconCheck size={14} />,
+        icon: <IconEdit size={14} />,
         onSelect: () =>
           setDraft({
             id: t.id,

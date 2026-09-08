@@ -554,20 +554,26 @@ function EditOverlay({ el, onGestureStart }: { el: StudioElement; onGestureStart
     }
   };
 
+  const fieldId = boundFieldId(el);
+
   return (
     <div
-      className={`studio-el-hit ${selected ? 'selected' : ''} ${hovered && !selected ? 'hovered' : ''}`}
+      className={`studio-el-hit ${selected ? 'selected' : ''} ${hovered && !selected ? 'hovered' : ''} ${fieldId ? 'is-bound' : ''}`}
       style={{ ...css, pointerEvents: 'auto', cursor: 'move' }}
       data-element-hit={el.id}
       onPointerDown={beginMove}
     >
-      {selected && (
+      {selected ? (
         <>
-          <div className="studio-el-tag">{boundFieldId(el) ? `${boundFieldId(el)} · ${fieldDefOf(boundFieldId(el)).label}` : el.name}</div>
+          <div className="studio-el-tag">{fieldId ? `${fieldId} · ${fieldDefOf(fieldId).label}` : el.name}</div>
           {HANDLES.map((h) => (
             <div key={h} className="studio-handle" style={handleStyle(h)} onPointerDown={beginResize(h)} />
           ))}
         </>
+      ) : (
+        // Bound elements always show the template field id they carry, so the
+        // canvas reads as "this is a live field" even at a glance.
+        fieldId && <div className="studio-el-badge" title={`${fieldDefOf(fieldId).label} — filled from the live review record`}>{fieldId}</div>
       )}
     </div>
   );
