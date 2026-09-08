@@ -108,12 +108,27 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-brand">
-          <IconZojatechMark size={30} />
-          <span>Zojatech</span>
-        </div>
-        <h1>{cfg.title}</h1>
+      <div className="auth-shell">
+        {/* Brand panel — hidden on small screens (the card shows the mark then). */}
+        <aside className="auth-side" aria-hidden>
+          <div className="auth-side-brand">
+            <IconZojatechMark size={40} color="#ffffff" />
+            <span>Zojatech</span>
+          </div>
+          <h2 className="auth-side-line">Customer voices, beautifully displayed.</h2>
+          <ul className="auth-side-points">
+            <li>Collect reviews from any product</li>
+            <li>Curate them in moderation</li>
+            <li>Embed the widget anywhere</li>
+          </ul>
+          <span className="auth-side-foot">Zojatech · Testimonials</span>
+        </aside>
+        <div className="auth-card">
+          <div className="auth-brand">
+            <IconZojatechMark size={30} />
+            <span>Zojatech</span>
+          </div>
+          <h1>{cfg.title}</h1>
         <p className="muted">{cfg.subtitle}</p>
 
         <ErrorBanner message={error} />
@@ -159,6 +174,7 @@ export default function LoginPage() {
             ))}
           </div>
         </details>
+        </div>
       </div>
     </div>
   );

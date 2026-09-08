@@ -3,9 +3,9 @@
    ========================================================================== */
 
 :root {
-  /* Mance/Zojatech palette (spec §1.1): deep navy primary, soft lavender accent */
-  --navy: #1b2559;
-  --navy-2: #232e6e;
+  /* Zojatech palette: the mark's navy (see zojatech-logo.svg) + lavender */
+  --navy: #002986;
+  --navy-2: #0d3aa8;
   --lav: #9b9fea;
   --lav-soft: #eef0fc;
   --brand: var(--navy);
@@ -20,8 +20,13 @@
   --teal: #0ea5a0;
   --star: #f5b400;
   --sidebar-w: 236px;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(27, 37, 89, 0.05), 0 1px 3px rgba(27, 37, 89, 0.07);
+  --radius: 12px;
+  --radius-sm: 9px;
+  --ring: 0 0 0 3px rgba(0, 41, 134, 0.16);
+  --ring-bad: 0 0 0 3px rgba(220, 38, 38, 0.14);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --shadow: 0 1px 2px rgba(0, 41, 134, 0.05), 0 1px 3px rgba(0, 41, 134, 0.07);
+  --shadow-md: 0 6px 18px rgba(0, 41, 134, 0.10);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light;
 }
@@ -75,38 +80,43 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  padding: 8px 15px;
+  min-height: 36px;
   font: inherit;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   text-decoration: none !important;
-  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  white-space: nowrap;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease),
+    box-shadow 140ms var(--ease), transform 90ms var(--ease), opacity 140ms ease;
 }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn:not(:disabled):active { transform: translateY(1px); }
 
-.btn-primary { background: var(--navy); color: #fff; }
-.btn-primary:not(:disabled):hover { background: var(--navy-2); }
+.btn-primary { background: var(--navy); color: #fff; box-shadow: 0 1px 2px rgba(0, 41, 134, 0.24); }
+.btn-primary:not(:disabled):hover { background: var(--navy-2); box-shadow: 0 3px 10px rgba(0, 41, 134, 0.28); }
 
 .btn-secondary { background: var(--lav-soft); color: var(--navy); border-color: transparent; }
-.btn-secondary:not(:disabled):hover { background: #e3e6fb; }
+.btn-secondary:not(:disabled):hover { background: #e2e6fb; }
 
 .btn-ghost { background: transparent; color: var(--navy); }
 .btn-ghost:not(:disabled):hover { background: var(--lav-soft); }
 
 .btn-danger { background: var(--bad); color: #fff; }
-.btn-danger:not(:disabled):hover { filter: brightness(1.05); }
+.btn-danger:not(:disabled):hover { background: #b91c1c; }
 
 .btn-outline { background: #fff; color: var(--navy); border-color: var(--border); }
-.btn-outline:not(:disabled):hover { background: var(--lav-soft); }
-
-.btn-danger { background: var(--bad); color: #fff; }
-.btn-danger:not(:disabled):hover { filter: brightness(1.05); }
+.btn-outline:not(:disabled):hover { background: var(--lav-soft); border-color: #c9cee8; }
 
 .btn-block { width: 100%; }
-.btn-xs { padding: 3px 8px; font-size: 12px; border-radius: 6px; }
+.btn-lg { padding: 11px 20px; min-height: 42px; font-size: 15px; border-radius: 11px; }
+.btn-sm { padding: 5px 11px; min-height: 30px; font-size: 12.5px; border-radius: 8px; }
+.btn-xs { padding: 3px 9px; min-height: 24px; font-size: 12px; border-radius: 7px; gap: 5px; }
+.btn .nav-ic, .btn svg { flex: none; }
 
 /* ---------------------------------------------------------------------------
    Cards, layout primitives
@@ -165,7 +175,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   background: #fff;
   color: var(--text);
 }
-.input:focus { outline: 2px solid var(--brand); outline-offset: -1px; border-color: transparent; }
+.input:focus { outline: none; border-color: var(--navy); box-shadow: var(--ring); }
 
 .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
@@ -2160,3 +2170,138 @@ button.tpl-card:hover, .tpl-card-click:hover { transform: translateY(-2px); box-
 .media-add { padding: 16px 18px; margin-bottom: 16px; }
 .media-add-preview { display: flex; align-items: center; gap: 12px; margin: 4px 0 12px; }
 .media-add-preview img { width: 64px; height: 64px; object-fit: contain; border: 1px solid var(--border); border-radius: 10px; padding: 4px; background: #fff; }
+
+/* ===========================================================================
+   Design system v2 — one language for inputs, nav, chips and focus states.
+   (Appended layer; same-specificity rules here win by cascade order.)
+   =========================================================================== */
+
+/* ---- Inputs: unified hover/focus across both field systems ------------------ */
+.f-input, .f-select, .f-area, .input {
+  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease), background 140ms ease;
+}
+.f-input:hover:not(:disabled):not(:focus),
+.f-select:hover:not(:disabled):not(:focus),
+.f-area:hover:not(:disabled):not(:focus),
+.input:hover:not(:disabled):not(:focus) { border-color: #c9cee8; }
+.f-input:focus, .f-select:focus, .f-area:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: var(--ring);
+}
+.f-input:focus-visible, .f-select:focus-visible, .f-area:focus-visible { outline: none; }
+
+/* ---- Focus rings: keyboard users get the same ring everywhere ---------------- */
+.btn:focus-visible,
+.nav-link:focus-visible,
+.ctx-trigger:focus-visible,
+.chip-btn:focus-visible,
+.tpl-cat-pill:focus-visible,
+.rail-toggle:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-sm);
+}
+.nav-link:focus-visible { border-radius: 10px; }
+.tpl-cat-pill:focus-visible { border-radius: 999px; }
+
+/* ---- Sidebar nav: active accent bar, aligned icons, rail dot ---------------- */
+.nav-ic { width: 20px; justify-content: center; }
+.nav-link { position: relative; transition: background 140ms var(--ease), color 140ms var(--ease); }
+.nav-link.active { background: var(--lav-soft); }
+.nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: 0 3px 3px 0;
+  background: var(--navy);
+}
+.sidebar-nav { position: relative; }
+.sidebar.rail .nav-link.active::before { display: none; }
+.sidebar.rail .nav-link.active { background: var(--lav-soft); }
+.sidebar.rail .nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--navy);
+}
+.sidebar-brand { gap: 9px; padding: 14px 16px 10px; }
+.sidebar-brand .nav-label { font-weight: 700; font-size: 14.5px; color: var(--navy); letter-spacing: -0.01em; }
+
+/* ---- Cards + chips ----------------------------------------------------------- */
+.card { border-radius: var(--radius); }
+.card-hover { transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), border-color 160ms ease; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: #d8dcf0; }
+.chip { border-radius: 999px; font-weight: 600; }
+
+/* ---- Login: split brand + form layout ---------------------------------------- */
+.auth-page { align-items: center; }
+.auth-shell {
+  display: grid;
+  grid-template-columns: 400px minmax(360px, 420px);
+  gap: 0;
+  width: 100%;
+  max-width: 880px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 18px 50px rgba(0, 41, 134, 0.14);
+  border: 1px solid rgba(0, 41, 134, 0.08);
+}
+.auth-side {
+  position: relative;
+  background:
+    radial-gradient(420px 300px at -10% -20%, rgba(94, 122, 255, 0.35), transparent 60%),
+    radial-gradient(380px 320px at 120% 120%, rgba(14, 165, 160, 0.18), transparent 55%),
+    var(--navy);
+  color: #fff;
+  padding: 34px 30px;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+.auth-side-brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -0.01em; }
+.auth-side-line {
+  color: #fff;
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  margin: auto 0 14px;
+}
+.auth-side-points { list-style: none; margin: 0 0 22px; padding: 0; display: flex; flex-direction: column; gap: 9px; font-size: 13.5px; color: rgba(255, 255, 255, 0.82); }
+.auth-side-points li { display: flex; align-items: center; gap: 9px; }
+.auth-side-points li::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 999px; flex: none;
+  background: #6ee7ff; box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.18);
+}
+.auth-side-foot { margin-top: auto; font-size: 11.5px; color: rgba(255, 255, 255, 0.55); letter-spacing: 0.04em; }
+.auth-shell .auth-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  max-width: none;
+  padding: 30px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* Wide screens: the side panel carries the brand, the card doesn't repeat it. */
+@media (min-width: 880px) {
+  .auth-shell .auth-brand { display: none; }
+  .auth-card h1 { margin-top: 0; }
+}
+@media (max-width: 879px) {
+  .auth-shell { grid-template-columns: 1fr; max-width: 430px; }
+  .auth-side { display: none; }
+}
