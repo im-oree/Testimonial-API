@@ -4,6 +4,15 @@
 export type ThemeRadiusId = 'sm' | 'md' | 'lg';
 export type ThemeFontId = 'system' | 'serif' | 'mono';
 
+export type DesignSort = 'newest' | 'highest' | 'oldest';
+
+/** No-code content options saved with a product's widget design (versioned). */
+export interface DesignOptions {
+  ratingMin?: number | null;
+  maxReviews?: number | null;
+  sort?: DesignSort | null;
+}
+
 export interface ResolvedTheme {
   presetId: string;
   primary: string;
@@ -215,6 +224,8 @@ export interface AppSummary {
   accentColor: string | null;
   themeOverride?: { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null } | null;
   widgetDesign?: string | null;
+  designVersion?: number;
+  designOptions?: DesignOptions | null;
   status: 'active' | 'paused';
   createdAt: string;
   totalTestimonials: number;
@@ -284,6 +295,8 @@ export interface PublicWall {
   logoUrl: string | null;
   theme?: ResolvedTheme | null;
   design?: string | null;
+  designOptions?: DesignOptions | null;
+  designVersion?: number;
   app: { id: string; name: string; slug: string; websiteUrl: string | null };
   form: { slug: string; name: string } | null;
   testimonials: WallTestimonial[];

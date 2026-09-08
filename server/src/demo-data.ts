@@ -56,6 +56,15 @@ export type WidgetDesignId = (typeof WIDGET_DESIGN_IDS)[number];
  * their own; the platform console can create companies, see metrics and
  * impersonate (super-company access).
  */
+export type DesignSort = 'newest' | 'highest' | 'oldest';
+
+/** No-code content options that ride along with a product's widget design. */
+export interface DesignOptions {
+  ratingMin?: number | null;
+  maxReviews?: number | null;
+  sort?: DesignSort | null;
+}
+
 export interface DemoApp {
   id: string;
   tenantId: string;
@@ -71,6 +80,12 @@ export interface DemoApp {
   themeFont?: string | null;
   /** Per-product widget design from the plug-and-play library. */
   widgetDesign?: string | null;
+  /** Content + layout options saved with the design (each save = new version). */
+  designOptions?: DesignOptions | null;
+  designVersion?: number;
+  designUpdatedAt?: string | null;
+  /** Last few design snapshots (version history). */
+  designHistory?: Array<{ version: number; designId: string | null; options: DesignOptions | null; savedAt: string }>;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -636,10 +651,24 @@ export const DEMO = {
       themeRadius?: string | null;
       themeFont?: string | null;
       widgetDesign?: string | null;
+      designOptions?: DesignOptions | null;
     },
   ): DemoApp | undefined {
     const app = APPS.find((a) => a.id === appId);
     if (!app) return undefined;
+    if (patch.widgetDesign !== undefined || patch.designOptions !== undefined) {
+      // Versioned design save: snapshot the previous state, bump the version.
+      app.designHistory = app.designHistory ?? [];
+      app.designHistory.unshift({
+        version: app.designVersion ?? 0,
+        designId: app.widgetDesign ?? null,
+        options: app.designOptions ?? null,
+        savedAt: new Date().toISOString(),
+      });
+      app.designHistory = app.designHistory.slice(0, 8);
+      app.designVersion = (app.designVersion ?? 0) + 1;
+      app.designUpdatedAt = new Date().toISOString();
+    }
     if (patch.name?.trim()) app.name = patch.name.trim();
     if (patch.websiteUrl !== undefined) app.websiteUrl = patch.websiteUrl?.trim() || null;
     if (patch.status) app.status = patch.status;
@@ -648,6 +677,7 @@ export const DEMO = {
     if (patch.themeRadius !== undefined) app.themeRadius = patch.themeRadius;
     if (patch.themeFont !== undefined) app.themeFont = patch.themeFont;
     if (patch.widgetDesign !== undefined) app.widgetDesign = patch.widgetDesign?.trim() || null;
+    if (patch.designOptions !== undefined) app.designOptions = patch.designOptions;
     return { ...app };
   },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
@@ -673,6 +703,8 @@ export const DEMO = {
         font: app.themeFont ?? null,
       },
       widgetDesign: app.widgetDesign ?? null,
+      designVersion: app.designVersion ?? 0,
+      designOptions: app.designOptions ?? null,
       status: app.status,
       createdAt: app.createdAt,
       totalTestimonials: rows.length,

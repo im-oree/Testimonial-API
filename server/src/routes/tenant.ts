@@ -6,7 +6,7 @@
  * All routes require a company session (`Authorization: Bearer <token>`).
  */
 import { Router, type Request } from 'express';
-import { DEMO, WIDGET_DESIGN_IDS, type DemoRole } from '../demo-data';
+import { DEMO, WIDGET_DESIGN_IDS, type DemoRole, type DesignOptions, type DesignSort } from '../demo-data';
 import {
   appOfSession,
   badRequest,
@@ -101,6 +101,7 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     themeRadius?: string | null;
     themeFont?: string | null;
     widgetDesign?: string | null;
+    designOptions?: DesignOptions | null;
   } = {};
   if (typeof req.body?.name === 'string') patch.name = req.body.name.trim().slice(0, 80);
   if (typeof req.body?.websiteUrl === 'string') patch.websiteUrl = req.body.websiteUrl.trim().slice(0, 300) || null;
@@ -129,9 +130,42 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     else if ((WIDGET_DESIGN_IDS as readonly string[]).includes(id)) patch.widgetDesign = id;
     else throw badRequest('Unknown widget design id.');
   }
+  if (req.body?.designOptions !== undefined) {
+    const raw = req.body.designOptions;
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) patch.designOptions = null;
+    else {
+      const o = raw as Record<string, unknown>;
+      const out: DesignOptions = {};
+      if (o.ratingMin === null || o.ratingMin === '') out.ratingMin = null;
+      else if (typeof o.ratingMin === 'number' && Number.isFinite(o.ratingMin) && o.ratingMin >= 1 && o.ratingMin <= 5) out.ratingMin = Math.round(o.ratingMin);
+      if (o.maxReviews === null || o.maxReviews === '') out.maxReviews = null;
+      else if (typeof o.maxReviews === 'number' && Number.isFinite(o.maxReviews) && o.maxReviews >= 1 && o.maxReviews <= 50) out.maxReviews = Math.round(o.maxReviews);
+      if (o.sort === null || o.sort === '') out.sort = null;
+      else if (o.sort === 'newest' || o.sort === 'highest' || o.sort === 'oldest') out.sort = o.sort as DesignSort;
+      patch.designOptions = out;
+    }
+  }
   const updated = DEMO.updateApp(req.params.appId, patch);
   if (!updated) throw notFound('App not found.');
   res.json({ app: DEMO.appSummary(updated) });
+});
+
+// GET /v1/dashboard/apps/:appId/design — current versioned design + history.
+tenantRouter.get('/dashboard/apps/:appId/design', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  res.json({
+    design: {
+      designId: app.widgetDesign ?? 'classic',
+      options: app.designOptions ?? null,
+      version: app.designVersion ?? 0,
+      updatedAt: app.designUpdatedAt ?? null,
+    },
+    history: app.designHistory ?? [],
+  });
 });
 
 // ---------------------------------------------------------------------------

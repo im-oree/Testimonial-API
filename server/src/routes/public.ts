@@ -33,6 +33,8 @@ function themeForApp(appSlug: string) {
     tenantName: tenant.name,
     logoUrl: tenant.logoUrl ?? null,
     design: app.widgetDesign ?? 'classic',
+    designOptions: app.designOptions ?? null,
+    designVersion: app.designVersion ?? 0,
     theme: { ...base, primary, soft: hexSoft(primary), accent, radius, radiusPx: RADIUS_PX[radius], font },
   };
 }
@@ -78,9 +80,14 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
   const app = DEMO.appBySlug(req.params.appSlug);
   const tenant = app ? DEMO.tenantOfApp(app.id) : undefined;
   if (!app || !tenant) throw notFound('Wall not found.');
-  const approved = DEMO.testimonialsOfApp(app.id)
-    .filter((t) => t.status === 'approved')
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  let approved = DEMO.testimonialsOfApp(app.id).filter((t) => t.status === 'approved');
+  // Content options saved with the design version (no-code builder).
+  const o = app.designOptions ?? {};
+  if (o.sort === 'highest') approved = approved.sort((a, b) => ((b.rating ?? 0) - (a.rating ?? 0)) || (a.createdAt < b.createdAt ? 1 : -1));
+  else if (o.sort === 'oldest') approved = approved.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+  else approved = approved.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  if (typeof o.ratingMin === 'number') approved = approved.filter((t) => (t.rating ?? 0) >= (o.ratingMin as number));
+  if (typeof o.maxReviews === 'number') approved = approved.slice(0, o.maxReviews as number);
   const publishedForm = DEMO.formsOfApp(app.id).find((f) => f.published) ?? null;
   const themed = themeForApp(app.slug);
   res.json({
@@ -90,6 +97,8 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
     logoUrl: tenant.logoUrl ?? null,
     theme: themed?.theme ?? null,
     design: app.widgetDesign ?? 'classic',
+    designOptions: app.designOptions ?? null,
+    designVersion: app.designVersion ?? 0,
     app: { id: app.id, name: app.name, slug: app.slug, websiteUrl: app.websiteUrl },
     form: publishedForm ? { slug: publishedForm.slug, name: publishedForm.name } : null,
     testimonials: approved.map((t) => ({

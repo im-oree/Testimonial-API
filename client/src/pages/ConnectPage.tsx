@@ -9,7 +9,7 @@ import { IconCheck, IconChevronDown, IconExternal } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { AppSummary, FormRow, PublicWall, ThemeFontId, ThemeRadiusId } from '../lib/types';
+import type { AppSummary, DesignOptions, FormRow, PublicWall, ThemeFontId, ThemeRadiusId } from '../lib/types';
 import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader, Select } from '../components/ui';
 import { SkeletonCards } from '../components/Skeleton';
 import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, SAMPLE_ITEMS, WIDGET_DESIGNS, type WidgetItem, type WidgetTokens } from '../widgets';
@@ -39,6 +39,7 @@ export default function ConnectPage() {
   const [wall, setWall] = useState<PublicWall | null>(null);
   const [company, setCompany] = useState<CompanyTheme | null>(null);
   const [ov, setOv] = useState<Override>(NONE);
+  const [opts, setOpts] = useState<DesignOptions | null>(null);
   const [designSel, setDesignSel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export default function ConnectPage() {
         setForm(formsData.rows.find((f) => f.published) ?? formsData.rows[0] ?? null);
         const o = appRow.themeOverride;
         setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
+        setOpts(appRow.designOptions ?? null);
         setDesignSel(appRow.widgetDesign ?? null);
         if (themeRes?.theme) {
           setCompany({
@@ -91,6 +93,9 @@ export default function ConnectPage() {
 
   async function saveDesign(): Promise<void> {
     if (!app) return;
+    const norm = (o: DesignOptions | null | undefined) =>
+      JSON.stringify({ ratingMin: o?.ratingMin ?? null, maxReviews: o?.maxReviews ?? null, sort: o?.sort ?? null });
+    const optionsChanged = norm(opts) !== norm(app.designOptions);
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -102,11 +107,20 @@ export default function ConnectPage() {
         themeFont: ov.font,
       };
       if ((designSel ?? null) !== (app.widgetDesign ?? null)) patch.widgetDesign = designSel ?? null;
+      if (optionsChanged)
+        patch.designOptions = { ratingMin: opts?.ratingMin ?? null, maxReviews: opts?.maxReviews ?? null, sort: opts?.sort ?? null };
       const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, patch);
       setApp(res.app);
+      setOpts(res.app.designOptions ?? null);
+      if (optionsChanged) {
+        api
+          .get<PublicWall>(`/v1/public/walls/${res.app.slug}`)
+          .then((w) => setWall(w))
+          .catch(() => undefined);
+      }
       const o = res.app.themeOverride;
       setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
-      setNotice(`Saved — design "${getWidgetDesign(res.app.widgetDesign ?? null).meta.name}" and this product's look are live on its wall and every embed.`);
+      setNotice(`Saved — design "${getWidgetDesign(res.app.widgetDesign ?? null).meta.name}" is live (version v${res.app.designVersion ?? 0}). The wall and every embed pick it up on next load.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the design.');
     } finally {
@@ -148,7 +162,9 @@ export default function ConnectPage() {
     ov.accent !== (app!.themeOverride?.accent ?? null) ||
     ov.radius !== (app!.themeOverride?.radius ?? null) ||
     ov.font !== (app!.themeOverride?.font ?? null) ||
-    (designSel ?? null) !== (app!.widgetDesign ?? null);
+    (designSel ?? null) !== (app!.widgetDesign ?? null) ||
+    JSON.stringify({ ratingMin: opts?.ratingMin ?? null, maxReviews: opts?.maxReviews ?? null, sort: opts?.sort ?? null }) !==
+      JSON.stringify({ ratingMin: app!.designOptions?.ratingMin ?? null, maxReviews: app!.designOptions?.maxReviews ?? null, sort: app!.designOptions?.sort ?? null });
 
   const origin = window.location.origin;
   const formSlug = form?.slug ?? `${app!.slug}-review`;
@@ -322,6 +338,42 @@ const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r
                     <option value="mono">Mono</option>
                   </Select>
                 </div>
+              </div>
+
+              <div className="divider" style={{ margin: '12px 0' }} />
+              <div className="section-sub">
+                <div className="strong">Which reviews to show</div>
+                <div className="muted small">Saved with the design version — the wall and every embed apply it automatically.</div>
+              </div>
+              <div className="mini-grid">
+                <div>
+                  <Label>Minimum rating</Label>
+                  <Select value={String(opts?.ratingMin ?? '')} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), ratingMin: e.target.value === '' ? null : Number(e.target.value) }))}>
+                    <option value="">Any rating</option>
+                    <option value="4">4 and up</option>
+                    <option value="5">5 only</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Reviews to show</Label>
+                  <Select value={String(opts?.maxReviews ?? '')} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), maxReviews: e.target.value === '' ? null : Number(e.target.value) }))}>
+                    <option value="">No limit</option>
+                    <option value="3">3</option>
+                    <option value="6">6</option>
+                    <option value="12">12</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Order</Label>
+                  <Select value={opts?.sort ?? ''} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), sort: (e.target.value || null) as DesignOptions['sort'] }))}>
+                    <option value="">Newest first</option>
+                    <option value="highest">Highest rated first</option>
+                    <option value="oldest">Oldest first</option>
+                  </Select>
+                </div>
+              </div>
+              <div className="muted small" style={{ marginTop: 8 }}>
+                Design version <span className="chip chip-approved">v{app!.designVersion ?? 0}</span> — every save bumps it, and walls/embeds pick it up on the next load.
               </div>
 
               <div className="modal-actions" style={{ marginTop: 10 }}>

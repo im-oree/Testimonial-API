@@ -212,3 +212,33 @@ Modal support: the Connect & design page has a **Review modal** snippet
 opens the public form (`?embed=1`, chrome-free) in a floating dialog; after
 submit the dialog shows a short "submitted" state and closes — the visitor
 stays on your site. ESC, overlay click and the close button all dismiss it.
+
+## 8 · Design round trip (versioned, per product)
+
+Every save on Connect & design is a **design version**: the server snapshots
+the previous state (history capped at 8), bumps `designVersion`, and public
+surfaces pick the new version up on their next load.
+
+Test the round trip:
+
+1. Connect & design -> pick a design, choose content options (minimum rating,
+   max reviews, order) and hit **Save product design**. The card shows
+   `Design version v1` (then v2, v3...) after each save.
+2. Inspect the stored record:
+   ```bash
+   curl http://localhost:3000/v1/dashboard/apps/app-acme-1/design \
+        -H "authorization: Bearer $TOKEN"   # current version + history
+   ```
+   Every save appends the previous design to `history`.
+3. Public payloads now carry the whole decision:
+   ```bash
+   curl http://localhost:3000/v1/public/walls/acme-marketing-site | grep designOptions
+   curl http://localhost:3000/v1/public/theme/acme-marketing-site  | grep designVersion
+   ```
+4. Content options are applied server-side: rating-min filters, max reviews
+   truncates, order sorts — verified: `{ratingMin:5, maxReviews:6,
+   sort:highest}` returned exactly 6 five-star reviews, then reset to the full
+   12 when cleared.
+5. Render follows: the wall (and `?embed=1`, and the external demo page) draw
+   the design id returned by the payload — version changes never need a
+   redeploy on the embedding site.
