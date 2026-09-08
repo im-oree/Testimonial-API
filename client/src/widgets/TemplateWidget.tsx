@@ -331,11 +331,18 @@ function CoverflowWidget({
   function slideTransform(offset: number): string {
     const abs = Math.abs(offset);
     const sign = offset < 0 ? -1 : 1;
+    const angle = Math.min(maxAngle, 16 + abs * 14);
+    const scale = Math.max(0.62, 1 - abs * 0.14);
+    // A side card's near edge sits at z = -z + (w/2)·scale·sin(angle); if that
+    // crosses 0 the card slices through the active one. Push each card deep
+    // enough that its near edge stays strictly behind the active card's plane.
+    const need = (w / 2) * scale * Math.sin((angle * Math.PI) / 180);
+    const z = Math.max(depth, need + 14);
     return [
       `translateX(${offset * gap}px)`,
-      `translateZ(${-abs * depth}px)`,
-      `rotateY(${sign * Math.min(maxAngle, 16 + abs * 14)}deg)`,
-      `scale(${Math.max(0.62, 1 - abs * 0.14)})`,
+      `translateZ(${-z}px)`,
+      `rotateY(${sign * angle}deg)`,
+      `scale(${scale})`,
     ].join(' ');
   }
 
@@ -514,8 +521,13 @@ function WheelWidget({
   const stageRef = useRef<HTMLDivElement | null>(null);
   const n = slides.length;
   const step = 360 / n;
-  // Radius so neighbouring cards just touch: (w/2) / tan(π/n).
-  const radius = Math.round(w / 2 / Math.tan(Math.PI / n));
+  // Cards are a share of the canvas (same aspect) so the ring has room, and
+  // the radius carries 20% headroom: at the tangent radius neighbouring
+  // cards' edges land exactly ON the front card's plane and slice through
+  // it — headroom keeps every neighbour strictly behind that plane.
+  const cw = Math.round(w * 0.6);
+  const ch = Math.round(h * 0.6);
+  const radius = n >= 3 ? Math.round(((cw / 2) / Math.tan(Math.PI / n)) * 1.2) : 0;
 
   const rotY = useMotionValue(0);
   const rotRef = useRef(0);
@@ -588,12 +600,23 @@ function WheelWidget({
             <div
               key={i}
               className={`tpl-wheel-card ${i === index ? 'is-active' : ''}`}
-              style={{ width: w, height: h, transform: `rotateY(${i * step}deg) translateZ(${radius}px)`, backfaceVisibility: 'hidden' }}
+              style={{
+                width: cw,
+                height: ch,
+                left: '50%',
+                top: '50%',
+                marginLeft: -cw / 2,
+                marginTop: -ch / 2,
+                transform: `rotateY(${i * step}deg) translateZ(${radius}px)`,
+                backfaceVisibility: 'hidden',
+              }}
               onClick={() => {
-                if (Math.abs(dragRef.current?.x ?? 0) >= 0 && i !== index && !dragRef.current) onIndex(i);
+                if (i !== index && !dragRef.current) onIndex(i);
               }}
             >
-              <SchemaSurface schema={schema} record={r} animate ctaHref={i === index ? ctaHref : null} />
+              <div style={{ width: w, height: h, transform: `scale(${cw / w})`, transformOrigin: '0 0' }}>
+                <SchemaSurface schema={schema} record={r} animate ctaHref={i === index ? ctaHref : null} />
+              </div>
             </div>
           ))}
         </motion.div>
