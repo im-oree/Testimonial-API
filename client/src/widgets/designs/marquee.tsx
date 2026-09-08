@@ -1,6 +1,6 @@
 /** Marquee — two endless scrolling strips; pauses when you hover them. */
 import type { WidgetDesignProps } from '../types';
-import { Avatar, StarsInline, WidgetEmpty } from '../primitives';
+import { Avatar, StarsInline, WidgetEmpty, fontStack } from '../primitives';
 
 function strip(items: WidgetDesignProps['items'], tokens: WidgetDesignProps['tokens'], reverse = false) {
   return (
@@ -39,7 +39,7 @@ export default function MarqueeWidget(props: WidgetDesignProps) {
   const top = items.slice(0, half);
   const bottom = items.slice(half);
   return (
-    <div style={{ fontFamily: 'inherit' }}>
+    <div style={{ fontFamily: fontStack(tokens.font) }}>
       <div className="wdg-marquee wdg-marquee-top">{strip(top, tokens, false)}</div>
       {bottom.length > 0 && <div className="wdg-marquee">{strip(bottom, tokens, true)}</div>}
       {cta && (

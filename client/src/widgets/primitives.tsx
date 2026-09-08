@@ -6,7 +6,19 @@
  */
 import { RatingStars } from '../components/ui';
 import { IconStar } from '../components/icons';
+import type { ThemeFontId } from '../lib/types';
 import type { WidgetCta, WidgetItem, WidgetTokens } from './types';
+
+export function fontStack(font: ThemeFontId | undefined): string {
+  switch (font) {
+    case 'serif':
+      return "Georgia, 'Times New Roman', serif";
+    case 'mono':
+      return "'SFMono-Regular', Menlo, Consolas, monospace";
+    default:
+      return "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  }
+}
 
 export function timeLabel(iso: string): string {
   const d = new Date(iso);

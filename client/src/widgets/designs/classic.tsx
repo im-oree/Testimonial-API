@@ -1,6 +1,6 @@
 /** Classic — clean card grid: avatar, stars, message, name/date. */
 import type { WidgetDesignProps } from '../types';
-import { Avatar, CtaRow, StarsInline, timeLabel, WidgetEmpty } from '../primitives';
+import { Avatar, CtaRow, StarsInline, timeLabel, WidgetEmpty, fontStack } from '../primitives';
 
 export default function ClassicWidget({ items, tokens, cta }: WidgetDesignProps) {
   if (items.length === 0) return <WidgetEmpty tokens={tokens} cta={cta} />;
@@ -11,7 +11,7 @@ export default function ClassicWidget({ items, tokens, cta }: WidgetDesignProps)
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
           gap: 14,
-          fontFamily: 'inherit',
+          fontFamily: fontStack(tokens.font),
         }}
       >
         {items.map((it) => (

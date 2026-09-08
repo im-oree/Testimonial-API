@@ -1,7 +1,7 @@
 /** Carousel — one review at a time, auto-rotates, pauses on hover, dot nav. */
 import { useEffect, useState } from 'react';
 import type { WidgetDesignProps } from '../types';
-import { Avatar, StarsInline, timeLabel, WidgetEmpty } from '../primitives';
+import { Avatar, StarsInline, timeLabel, WidgetEmpty, fontStack } from '../primitives';
 
 const INTERVAL_MS = 4800;
 
@@ -20,7 +20,7 @@ export default function CarouselWidget({ items, tokens, cta }: WidgetDesignProps
 
   return (
     <div
-      style={{ fontFamily: 'inherit', maxWidth: 680, margin: '0 auto' }}
+      style={{ fontFamily: fontStack(tokens.font), maxWidth: 680, margin: '0 auto' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >

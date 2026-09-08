@@ -1,0 +1,58 @@
+/* Widget design library styles — shared motions & layout tricks used by the
+   plug-and-play designs in ./designs. Everything else is inline per design. */
+
+/* Generic card lift used by grid-ish designs */
+.wdg-hover:hover {
+  box-shadow: 0 12px 24px -10px rgba(22, 26, 46, 0.16);
+  transform: translateY(-3px);
+}
+
+/* Wall of love masonry */
+.wdg-masonry {
+  columns: 3 210px;
+  column-gap: 12px;
+}
+.wdg-masonry-item {
+  margin: 0 0 12px;
+  width: 100%;
+}
+@media (max-width: 560px) {
+  .wdg-masonry { columns: 2 150px; }
+}
+@media (max-width: 380px) {
+  .wdg-masonry { columns: 1 130px; }
+}
+
+/* Marquee strips */
+.wdg-marquee {
+  overflow: hidden;
+  padding: 6px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.wdg-marquee-top { margin-bottom: 10px; }
+.wdg-marquee-track {
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: wdg-marquee-scroll 36s linear infinite;
+}
+.wdg-marquee-rev { animation-direction: reverse; animation-duration: 30s; }
+.wdg-marquee:hover .wdg-marquee-track { animation-play-state: paused; }
+.wdg-marquee-item { flex: 0 0 auto; width: 268px; padding: 12px; }
+@keyframes wdg-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Orbit centre card entrance */
+.wdg-orbit-card {
+  animation: wdg-fade-up 0.35s ease;
+  box-shadow: 0 14px 30px -16px rgba(22, 26, 46, 0.22);
+}
+.wdg-orbit-avatar { z-index: 1; }
+.wdg-orbit-avatar:focus-visible { outline: 2px solid var(--accent, #7c6fe0); }
+@keyframes wdg-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

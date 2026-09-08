@@ -3,18 +3,18 @@
  * the rest fall into a calm grid below it.
  */
 import { useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import type { WidgetDesignProps } from '../types';
-import { Avatar, StarsInline, timeLabel, WidgetEmpty } from '../primitives';
+import { Avatar, StarsInline, timeLabel, WidgetEmpty, fontStack } from '../primitives';
 
-export default function FeaturedWidget({ items, tokens, cta }: WidgetDesignProps) {
+export default function SpotlightWidget({ items, tokens, cta }: WidgetDesignProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState<CSSProperties>({});
 
   if (items.length === 0) return <WidgetEmpty tokens={tokens} cta={cta} />;
   const [first, ...rest] = items;
 
-  function move(e: React.MouseEvent): void {
+  function move(e: MouseEvent<HTMLDivElement>): void {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -27,7 +27,7 @@ export default function FeaturedWidget({ items, tokens, cta }: WidgetDesignProps
   }
 
   return (
-    <div style={{ fontFamily: 'inherit' }}>
+    <div style={{ fontFamily: fontStack(tokens.font) }}>
       <div
         ref={ref}
         onMouseMove={move}
