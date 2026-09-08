@@ -190,3 +190,25 @@ auto-rotation, orbit) but never drop a required field.
 | Design persistence | `PATCH /v1/apps/:appId` -> `widgetDesign` (server whitelist) |
 | Public design id | `/v1/public/theme/:slug` and `/v1/public/walls/:slug` -> `design` |
 | Auto-height embed | `/wall/:slug?embed=1` + `client/public/widget/embed.js` |
+
+## 7 · Submitting a review: is it actually reflected?
+
+The demo store is shared, so a submission really does flow through the whole
+pipeline — test it end to end:
+
+1. Open the public form (`/forms/website-review`) or, better, the Acme
+   external demo page and click **Leave a review** — it opens as a **modal**
+   now, so you never leave the site.
+2. Submit with a rating + text + name. The confirmation shows a snapshot of
+   exactly what you wrote plus the status path: pending -> approved -> wall.
+3. In Acme's workspace, Moderation shows the submission as **pending**
+   (reflects immediately). `GET /v1/public/walls/acme-marketing-site` count
+   does not change yet.
+4. Approve it -> the wall count increments and your review appears on the
+   external demo page after reload. Reject it and it never appears.
+
+Modal support: the Connect & design page has a **Review modal** snippet
+(`/widget/modal.js`). Any element with `data-zr-open` + `data-zr-form`
+opens the public form (`?embed=1`, chrome-free) in a floating dialog; after
+submit the dialog shows a short "submitted" state and closes — the visitor
+stays on your site. ESC, overlay click and the close button all dismiss it.
