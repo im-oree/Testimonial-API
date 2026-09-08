@@ -155,6 +155,43 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
   res.json({ app: DEMO.appSummary(updated) });
 });
 
+// GET /v1/dashboard/apps/:appId/design/schema — the product's visual-editor
+// schema draft (DOC 7B). Null until the studio saves one for this product.
+tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  res.json({
+    schema: app.studioSchema ?? null,
+    studioVersion: app.studioVersion ?? 0,
+    updatedAt: app.studioUpdatedAt ?? null,
+    designVersion: app.designVersion ?? 0,
+  });
+});
+
+// PATCH /v1/dashboard/apps/:appId/design/schema — persist a studio save. The
+// schema is validated structurally (object or null) and capped in size; the
+// server never interprets element payloads.
+tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const schema = (req.body as Record<string, unknown> | undefined)?.schema ?? null;
+  if (schema !== null && (typeof schema !== 'object' || Array.isArray(schema))) throw badRequest('Schema must be a design JSON object or null.');
+  const serialized = JSON.stringify(schema ?? {});
+  if (serialized.length > 400_000) throw badRequest('Schema is too large (max 400 KB).');
+  const updated = DEMO.updateStudioSchema(req.params.appId, schema);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    schema: updated.studioSchema ?? null,
+    studioVersion: updated.studioVersion ?? 0,
+    updatedAt: updated.studioUpdatedAt ?? null,
+    designVersion: updated.designVersion ?? 0,
+  });
+});
+
 // GET /v1/dashboard/apps/:appId/design — current versioned design + history.
 tenantRouter.get('/dashboard/apps/:appId/design', (req, res) => {
   const tenant = tenantOfSession(req);

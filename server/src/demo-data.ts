@@ -91,6 +91,10 @@ export interface DemoApp {
   designUpdatedAt?: string | null;
   /** Last few design snapshots (version history). */
   designHistory?: Array<{ version: number; designId: string | null; options: DesignOptions | null; savedAt: string }>;
+  /** Visual editor (DOC 7B) custom schema draft — opaque JSON owned by the editor. */
+  studioSchema?: unknown | null;
+  studioVersion?: number;
+  studioUpdatedAt?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -715,6 +719,18 @@ export const DEMO = {
     if (patch.widgetDesign !== undefined) app.widgetDesign = patch.widgetDesign?.trim() || null;
     if (patch.designOptions !== undefined) app.designOptions = patch.designOptions;
     if (patch.designTemplateId !== undefined) app.designTemplateId = patch.designTemplateId?.trim() || null;
+    return { ...app };
+  },
+  /** Studio schema record (DOC 7B): store the schema JSON and bump the design
+   * version so public caches/embeds invalidate exactly like other design saves. */
+  updateStudioSchema(appId: string, schema: unknown): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.studioSchema = schema;
+    app.studioVersion = (app.studioVersion ?? 0) + 1;
+    app.studioUpdatedAt = new Date().toISOString();
+    app.designVersion = (app.designVersion ?? 0) + 1;
+    app.designUpdatedAt = new Date().toISOString();
     return { ...app };
   },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
