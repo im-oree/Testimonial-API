@@ -502,6 +502,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: PENDING_TEXT[p % PENDING_TEXT.length],
         rating: 5,
         status: 'pending',
+        visible: true,
         tags: ['new'],
         day: 2 + ((n + p) % 7),
       });
@@ -513,6 +514,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: 'Buy cheap followers now!!!',
         rating: 1,
         status: 'rejected',
+        visible: true,
         tags: [],
         day: 2,
       });
