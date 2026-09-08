@@ -119,6 +119,8 @@ export interface PublicForm {
   logoUrl: string | null;
   brandColor: string;
   theme?: ResolvedTheme | null;
+  appName?: string;
+  websiteUrl?: string | null;
   questions: FormQuestion[];
 }
 

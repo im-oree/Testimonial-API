@@ -1070,3 +1070,19 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .collapse-toggle svg { flex: none; transition: transform .18s ease; }
 .collapse-toggle svg.flip { transform: rotate(180deg); }
 .collapse-body { border: 1px solid #e6e9fb; background: #fdfdff; border-radius: 10px; margin-top: 6px; padding: 12px; }
+
+/* ---- Public form: embed/modal mode, submission snapshot, back actions ---- */
+.public-page.form-embed { min-height: 0; padding: 0; background: transparent; display: block; }
+.form-embed .public-card {
+  width: 100%; max-width: none; border: 0; border-radius: 0;
+  box-shadow: none; padding: 18px 20px 20px;
+}
+.review-snapshot {
+  width: 100%; max-width: 430px; text-align: left;
+  background: #fbfbfe; border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.review-snapshot .wall-quote { color: var(--navy); font-size: 14px; margin: 0; }
+.public-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.public-actions .btn + .btn { margin-left: 0; }

@@ -65,6 +65,8 @@ publicRouter.get('/public/forms/:slug', (req, res) => {
     logoUrl: tenant.logoUrl ?? null,
     brandColor: app?.accentColor ?? tenant.brandColor ?? '#0ea5a0',
     theme: themed?.theme ?? null,
+    appName: app?.name ?? tenant.name,
+    websiteUrl: app?.websiteUrl ?? null,
     questions: form.questions,
   });
 });
