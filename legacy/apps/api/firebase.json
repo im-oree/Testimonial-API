@@ -1,0 +1,15 @@
+{
+  "firestore": {
+    "rules": "../../infra/firestore/firestore.rules",
+    "indexes": "../../infra/firestore/firestore.indexes.json"
+  },
+  "emulators": {
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    }
+  }
+}

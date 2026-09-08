@@ -1,0 +1,579 @@
+/**
+ * Tenant (company) dashboard routes — everything a signed-in company user
+ * sees: overview stats, testimonials + moderation, imports, forms, widgets,
+ * api keys, webhooks, team, audit logs and billing.
+ *
+ * All routes require a company session (`Authorization: Bearer <token>`).
+ */
+import { Router, type Request } from 'express';
+import { DEMO, type DemoRole } from '../demo-data';
+import {
+  appOfSession,
+  badRequest,
+  formOr404,
+  MODERATION_ACTIONS,
+  normalizeQuestions,
+  notFound,
+  paginate,
+  queryString,
+  createSessionToken,
+  requireCompany,
+  requirePermission,
+  requireTenantOfApp,
+  rowsForApp,
+  rowOr404,
+  sessionOf,
+  slugify,
+  tenantOfSession,
+  type Paging,
+  type RawQuestion,
+} from '../lib';
+import { parseThemePatch, presetSummary, THEME_PRESETS } from '../theme';
+
+export const tenantRouter = Router();
+
+// ---------------------------------------------------------------------------
+// Apps — the company workspace home. A tenant creates one app per website and
+// manages testimonials/forms inside each app. These routes are tenant-scoped:
+// companies only ever see apps their own tenant owns.
+// ---------------------------------------------------------------------------
+
+// GET /v1/apps  (all apps of the signed-in company, with stats + paging)
+tenantRouter.get('/apps', (req, res) => {
+  const tenant = tenantOfSession(req);
+  const q = queryString(req, 'q')?.trim().toLowerCase();
+  const status = queryString(req, 'status');
+  let rows = DEMO.appsOfTenant(tenant.id).map((a) => DEMO.appSummary(a));
+  if (status && status !== 'all') rows = rows.filter((r) => r.status === status);
+  if (q) rows = rows.filter((r) => `${r.name} ${r.slug} ${r.websiteUrl ?? ''}`.toLowerCase().includes(q));
+  const sorted = [...rows].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const perPage = Math.min(Math.max(Number(queryString(req, 'perPage') ?? 50) || 50, 1), 200);
+  const page = Math.max(Number(queryString(req, 'page') ?? 1) || 1, 1);
+  const totals = rows.reduce(
+    (s, a) => ({
+      totalTestimonials: s.totalTestimonials + a.totalTestimonials,
+      pending: s.pending + a.pending,
+      approved: s.approved + a.approved,
+      rejected: s.rejected + a.rejected,
+      forms: s.forms + a.forms,
+      submissions: s.submissions + a.submissions,
+    }),
+    { totalTestimonials: 0, pending: 0, approved: 0, rejected: 0, forms: 0, submissions: 0 },
+  );
+  res.json({ rows: sorted.slice((page - 1) * perPage, page * perPage), total: sorted.length, totals });
+});
+
+// POST /v1/apps  (create an app for a website)
+tenantRouter.post('/apps', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  const name = String(req.body?.name ?? '').trim();
+  if (!name) throw badRequest('App name is required.');
+  const accentColor =
+    typeof req.body?.accentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body.accentColor.trim()) ? req.body.accentColor.trim() : null;
+  const app = DEMO.createApp(tenant.id, { name, websiteUrl: req.body?.websiteUrl, accentColor });
+  // Every new app comes with a ready-to-use public review form so the owner
+  // can start collecting testimonials on that website immediately.
+  const formSlug = DEMO.uniqueFormSlug(`${app.slug}-review`);
+  DEMO.saveForm(app.id, {
+    name: `${app.name} review`,
+    slug: formSlug,
+    published: true,
+    questions: [
+      { id: 'q1', type: 'rating', label: 'How likely are you to recommend us?', required: true },
+      { id: 'q2', type: 'text', label: 'What did we do well?', required: false },
+    ],
+  });
+  res.status(201).json({ app: DEMO.appSummary(app), formSlug });
+});
+
+// PATCH /v1/apps/:appId  (rename / set website / pause)
+tenantRouter.patch('/apps/:appId', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const patch: { name?: string; websiteUrl?: string | null; status?: 'active' | 'paused'; accentColor?: string | null } = {};
+  if (typeof req.body?.name === 'string') patch.name = req.body.name.trim().slice(0, 80);
+  if (typeof req.body?.websiteUrl === 'string') patch.websiteUrl = req.body.websiteUrl.trim().slice(0, 300) || null;
+  else if (req.body?.websiteUrl === null) patch.websiteUrl = null;
+  if (req.body?.status === 'active' || req.body?.status === 'paused') patch.status = req.body.status;
+  if (typeof req.body?.accentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body.accentColor.trim())) patch.accentColor = req.body.accentColor.trim();
+  else if (req.body?.accentColor === null || req.body?.accentColor === '') patch.accentColor = null;
+  const updated = DEMO.updateApp(req.params.appId, patch);
+  if (!updated) throw notFound('App not found.');
+  res.json({ app: DEMO.appSummary(updated) });
+});
+
+// ---------------------------------------------------------------------------
+// Dashboard overview (per app)
+// ---------------------------------------------------------------------------
+
+// GET /v1/dashboard/overview?appId=...
+tenantRouter.get('/dashboard/overview', (req, res) => {
+  const appId = queryString(req, 'appId') ?? appOfSession(req);
+  const rows = rowsForApp(req, appId);
+  res.json({
+    totalPending: rows.filter((r) => r.status === 'pending').length,
+    totalApproved: rows.filter((r) => r.status === 'approved').length,
+    totalRejected: rows.filter((r) => r.status === 'rejected').length,
+    totalTestimonials: rows.length,
+    conversionRate: rows.length ? 42 : undefined,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Testimonials
+// ---------------------------------------------------------------------------
+
+// GET /v1/apps/:appId/testimonials/tags
+tenantRouter.get('/apps/:appId/testimonials/tags', (req, res) => {
+  const rows = rowsForApp(req, req.params.appId);
+  res.json({ tags: [...new Set(rows.flatMap((r) => r.tags))].sort() });
+});
+
+// GET /v1/apps/:appId/testimonials/export
+tenantRouter.get('/apps/:appId/testimonials/export', (req, res) => {
+  const rows = rowsForApp(req, req.params.appId);
+  const csv = ['id,author,rating,status,content']
+    .concat(rows.map((r) => [r.id, r.authorName ?? 'Anonymous', r.rating ?? '', r.status, `"${r.content.replace(/"/g, '""')}"`].join(',')))
+    .join('\n');
+  res.json({ downloadUrl: `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}` });
+});
+
+// GET /v1/apps/:appId/testimonials
+tenantRouter.get('/apps/:appId/testimonials', (req, res) => {
+  const scoped = rowsForApp(req, req.params.appId);
+  const status = queryString(req, 'status');
+  const q = queryString(req, 'q')?.trim().toLowerCase();
+  let out = scoped;
+  if (status && status !== 'all') out = out.filter((r) => r.status === status);
+  if (q) out = out.filter((r) => `${r.authorName ?? ''} ${r.content} ${r.tags.join(' ')}`.toLowerCase().includes(q));
+  const sorted = [...out].sort((a, b) =>
+    a.createdAt === b.createdAt ? (a.id < b.id ? 1 : -1) : a.createdAt < b.createdAt ? 1 : -1,
+  );
+  const perPage = Math.min(Math.max(Number(queryString(req, 'perPage') ?? 50) || 50, 1), 200);
+  const page = Math.max(Number(queryString(req, 'page') ?? 1) || 1, 1);
+  res.json({ rows: sorted.slice((page - 1) * perPage, page * perPage), total: sorted.length });
+});
+
+// POST /v1/apps/:appId/testimonials/bulk/moderation
+tenantRouter.post('/apps/:appId/testimonials/bulk/moderation', (req, res) => {
+  requirePermission(req, 'testimonials.moderate');
+  const rows = rowsForApp(req, req.params.appId);
+  const status = MODERATION_ACTIONS[String(req.body?.action ?? '')];
+  if (!status) throw badRequest('Invalid moderation action.');
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).slice(0, 100); // DOC 6 §2.9 — bulk caps
+  for (const row of rows) {
+    if (ids.includes(row.id) && row.status === 'pending') {
+      DEMO.updateTestimonial(row.id, { status });
+    }
+  }
+  res.json({ ok: true });
+});
+
+// PATCH /v1/apps/:appId/testimonials/:id/moderation
+tenantRouter.patch('/apps/:appId/testimonials/:id/moderation', (req, res) => {
+  requirePermission(req, 'testimonials.moderate');
+  const row = rowOr404(req, req.params.appId, req.params.id);
+  const action = String(req.body?.action ?? '');
+  const status = MODERATION_ACTIONS[action];
+  if (!status) throw badRequest('Invalid moderation action.');
+  if (action === 'reject' && !String(req.body?.reason ?? '').trim().slice(0, 500)) throw badRequest('Rejection reason is required.');
+  const tags = action === 'reject' ? [...row.tags, 'rejected'] : row.tags;
+  DEMO.updateTestimonial(row.id, { status, tags });
+  res.json({ ok: true });
+});
+
+// DELETE /v1/apps/:appId/testimonials/:id
+tenantRouter.delete('/apps/:appId/testimonials/:id', (req, res) => {
+  requirePermission(req, 'testimonials.moderate');
+  rowOr404(req, req.params.appId, req.params.id); // scope check
+  DEMO.deleteTestimonial(req.params.id);
+  res.json({ ok: true });
+});
+
+// PATCH /v1/apps/:appId/testimonials/:id  (update tags)
+tenantRouter.patch('/apps/:appId/testimonials/:id', (req, res) => {
+  requirePermission(req, 'testimonials.write');
+  const row = rowOr404(req, req.params.appId, req.params.id);
+  if (!Array.isArray(req.body?.tags)) throw badRequest('tags must be an array.');
+  const tags = req.body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30);
+  DEMO.updateTestimonial(row.id, { tags });
+  res.json({ ok: true });
+});
+
+// GET /v1/apps/:appId/testimonials/:id
+tenantRouter.get('/apps/:appId/testimonials/:id', (req, res) => {
+  res.json(rowOr404(req, req.params.appId, req.params.id));
+});
+
+// ---------------------------------------------------------------------------
+// Imports
+// ---------------------------------------------------------------------------
+
+// GET /v1/apps/:appId/imports
+tenantRouter.get('/apps/:appId/imports', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  res.json({ rows: DEMO.importsOfApp(req.params.appId) });
+});
+
+// POST /v1/apps/:appId/imports
+tenantRouter.post('/apps/:appId/imports', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'testimonials.write');
+  res.status(201).json(DEMO.enqueueImport(req.params.appId, 'upload.csv'));
+});
+
+// ---------------------------------------------------------------------------
+// Forms
+// ---------------------------------------------------------------------------
+
+interface FormSaveBody {
+  name?: string;
+  slug?: string;
+  published?: boolean;
+  questions?: RawQuestion[];
+}
+
+// GET /v1/apps/:appId/forms
+tenantRouter.get('/apps/:appId/forms', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  const rows = DEMO.formsOfApp(req.params.appId).map((f) => ({
+    id: f.id,
+    appId: f.appId,
+    name: f.name,
+    slug: f.slug,
+    published: f.published,
+    submissionCount: f.submissionCount,
+    createdAt: f.createdAt,
+  }));
+  res.json({ rows });
+});
+
+// POST /v1/apps/:appId/forms  (create)
+tenantRouter.post('/apps/:appId/forms', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'forms.manage');
+  const body = req.body as FormSaveBody;
+  const name = (body?.name?.trim() || 'Untitled form').slice(0, 80);
+  const slug = (body?.slug?.trim() || slugify(name)).slice(0, 60);
+  res.status(201).json(
+    DEMO.saveForm(req.params.appId, {
+      name,
+      slug,
+      published: body?.published ?? false,
+      questions: normalizeQuestions(body?.questions),
+    }),
+  );
+});
+
+// GET /v1/apps/:appId/forms/:formId/stats
+tenantRouter.get('/apps/:appId/forms/:formId/stats', (req, res) => {
+  const form = formOr404(req, req.params.appId, req.params.formId);
+  res.json({ submissions: form.submissionCount, completionRate: 68, avgRating: 4.6 });
+});
+
+// GET /v1/apps/:appId/forms/:formId
+tenantRouter.get('/apps/:appId/forms/:formId', (req, res) => {
+  res.json(formOr404(req, req.params.appId, req.params.formId));
+});
+
+// POST /v1/apps/:appId/forms/:formId  (full update)
+tenantRouter.post('/apps/:appId/forms/:formId', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'forms.manage');
+  const body = req.body as FormSaveBody;
+  const existing = formOr404(req, req.params.appId, req.params.formId);
+  const name = (body?.name?.trim() || existing.name).slice(0, 80);
+  res.status(200).json(
+    DEMO.saveForm(req.params.appId, {
+      id: req.params.formId,
+      name,
+      slug: (body?.slug?.trim() || existing.slug).slice(0, 60),
+      published: body?.published ?? existing.published,
+      questions: normalizeQuestions(body?.questions ?? existing.questions),
+    }),
+  );
+});
+
+// PATCH /v1/apps/:appId/forms/:formId  (publish/unpublish)
+tenantRouter.patch('/apps/:appId/forms/:formId', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'forms.manage');
+  const form = DEMO.setFormPublished(req.params.formId, Boolean(req.body?.published));
+  if (!form) throw notFound('Form not found.');
+  res.json(form);
+});
+
+// ---------------------------------------------------------------------------
+// Widgets
+// ---------------------------------------------------------------------------
+
+interface WidgetSaveBody {
+  id?: string;
+  formId?: string | null;
+  name?: string;
+  enabled?: boolean;
+  theme?: 'light' | 'dark';
+  accentColor?: string;
+  embedType?: 'script' | 'iframe' | 'react';
+}
+
+// GET /v1/apps/:appId/widgets
+tenantRouter.get('/apps/:appId/widgets', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  res.json({ rows: DEMO.widgetsOfApp(req.params.appId) });
+});
+
+// GET /v1/apps/:appId/widgets/:widgetId
+tenantRouter.get('/apps/:appId/widgets/:widgetId', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  const w = DEMO.findWidget(req.params.appId, req.params.widgetId);
+  if (!w) throw notFound('Widget not found.');
+  res.json(w);
+});
+
+// POST /v1/apps/:appId/widgets  (create)
+tenantRouter.post('/apps/:appId/widgets', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'widgets.manage');
+  const body = req.body as WidgetSaveBody;
+  const name = body?.name?.trim() || 'Untitled widget';
+  res.status(201).json(
+    DEMO.saveWidget(req.params.appId, {
+      name,
+      formId: body?.formId ?? null,
+      enabled: body?.enabled ?? false,
+      theme: body?.theme ?? 'light',
+      accentColor: body?.accentColor ?? '#6366F1',
+      embedType: body?.embedType ?? 'script',
+    }),
+  );
+});
+
+// POST /v1/apps/:appId/widgets/:widgetId  (full update)
+tenantRouter.post('/apps/:appId/widgets/:widgetId', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'widgets.manage');
+  const body = req.body as WidgetSaveBody;
+  const existing = DEMO.findWidget(req.params.appId, req.params.widgetId);
+  if (!existing) throw notFound('Widget not found.');
+  res.json(
+    DEMO.saveWidget(req.params.appId, {
+      id: req.params.widgetId,
+      name: body?.name?.trim() || existing.name,
+      formId: body?.formId ?? existing.formId,
+      enabled: body?.enabled ?? existing.enabled,
+      theme: body?.theme ?? existing.theme,
+      accentColor: body?.accentColor ?? existing.accentColor,
+      embedType: body?.embedType ?? existing.embedType,
+    }),
+  );
+});
+
+// PATCH /v1/apps/:appId/widgets/:widgetId  (enable/disable)
+tenantRouter.patch('/apps/:appId/widgets/:widgetId', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  requirePermission(req, 'widgets.manage');
+  const w = DEMO.setWidgetEnabled(req.params.widgetId, Boolean(req.body?.enabled));
+  if (!w) throw notFound('Widget not found.');
+  res.json(w);
+});
+
+// ---------------------------------------------------------------------------
+// API keys
+// ---------------------------------------------------------------------------
+
+// GET /v1/apps/:appId/api-keys
+tenantRouter.get('/apps/:appId/api-keys', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  res.json({ rows: DEMO.apiKeysOfApp(req.params.appId) });
+});
+
+// POST /v1/apps/:appId/api-keys
+tenantRouter.post('/apps/:appId/api-keys', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  if (!req.body?.name) throw badRequest('Key name is required.');
+  const scopes: string[] = Array.isArray(req.body?.scopes) ? req.body.scopes : ['testimonials.read'];
+  res.status(201).json(DEMO.createApiKey(req.params.appId, req.body.name, scopes));
+});
+
+// POST /v1/apps/:appId/api-keys/:keyId/rotate
+tenantRouter.post('/apps/:appId/api-keys/:keyId/rotate', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  const k = DEMO.rotateApiKey(req.params.keyId);
+  if (!k) throw notFound('API key not found.');
+  res.json(k);
+});
+
+// ---------------------------------------------------------------------------
+// Webhooks (tenant)
+// ---------------------------------------------------------------------------
+
+// GET /v1/apps/:appId/webhooks
+tenantRouter.get('/apps/:appId/webhooks', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  res.json({ rows: DEMO.webhooksOfApp(req.params.appId) });
+});
+
+// GET /v1/apps/:appId/webhooks/:webhookId/deliveries
+tenantRouter.get('/apps/:appId/webhooks/:webhookId/deliveries', (req, res) => {
+  requireTenantOfApp(req, req.params.appId);
+  const wh = DEMO.webhooksOfApp(req.params.appId).find((w) => w.id === req.params.webhookId);
+  if (!wh) throw notFound('Webhook not found.');
+  res.json({ rows: DEMO.deliveriesForWebhook(req.params.webhookId) });
+});
+
+// ---------------------------------------------------------------------------
+// Team
+// ---------------------------------------------------------------------------
+
+// GET /v1/account — the signed-in tenant user's own profile.
+tenantRouter.get('/account', (req, res) => {
+  requireCompany(req);
+  const session = sessionOf(req);
+  const user = DEMO.companyUsers().find((u) => u.email === session?.email);
+  if (!user) throw notFound('Account not found.');
+  const tenant = tenantOfSession(req);
+  res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, tenantName: tenant.name });
+});
+
+// PATCH /v1/account — update own name/email and change password. When the
+// email changes the session token is re-issued (tokens embed the email).
+tenantRouter.patch('/account', (req, res) => {
+  requireCompany(req);
+  const session = sessionOf(req);
+  const user = DEMO.companyUsers().find((u) => u.email === session?.email);
+  if (!user) throw notFound('Account not found.');
+  const body = req.body ?? {};
+  let newToken: string | undefined;
+
+  if (typeof body.name === 'string') user.name = (body.name.trim().slice(0, 80) || user.name).trim();
+
+  if (typeof body.email === 'string') {
+    const email = body.email.toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw badRequest('A valid email is required.');
+    if (email !== user.email) {
+      const taken = DEMO.companyUsers().some((u) => u.email === email) || DEMO.platformUsers().some((u) => u.email === email);
+      if (taken) throw badRequest('That email is already in use.');
+      const tenant = tenantOfSession(req);
+      const member = DEMO.teamOfTenant(tenant.id).find((m) => m.email === user.email);
+      if (member) member.email = email;
+      if (tenant.ownerEmail === user.email) tenant.ownerEmail = email;
+      user.email = email;
+      newToken = createSessionToken('company', email);
+    }
+  }
+
+  if (body.currentPassword !== undefined || body.newPassword !== undefined) {
+    if (
+      typeof body.currentPassword !== 'string' ||
+      typeof body.newPassword !== 'string' ||
+      body.newPassword.length < 6 ||
+      body.newPassword.length > 100
+    ) {
+      throw badRequest('Current password and a new password of at least 6 characters are required.');
+    }
+    if (user.password !== body.currentPassword) throw badRequest('Current password is incorrect.');
+    user.password = body.newPassword;
+  }
+
+  res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, token: newToken });
+});
+
+// GET /v1/team
+tenantRouter.get('/team', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({ rows: DEMO.teamOfTenant(tenant.id) });
+});
+
+// POST /v1/team/invites
+const INVITE_ROLES = new Set(['owner', 'admin', 'editor', 'viewer']);
+
+tenantRouter.post('/team/invites', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'team.manage');
+  if (!req.body?.email) throw badRequest('Email is required.');
+  const role: DemoRole = INVITE_ROLES.has(String(req.body.role ?? '')) ? (req.body.role as DemoRole) : 'viewer';
+  res.status(201).json({ member: DEMO.inviteTeamMember(tenant.id, String(req.body.email).toLowerCase().slice(0, 120), role) });
+});
+
+// PATCH /v1/team/:memberId
+tenantRouter.patch('/team/:memberId', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'team.manage');
+  const member = DEMO.teamOfTenant(tenant.id).find((m) => m.id === req.params.memberId);
+  if (!member) throw notFound('Member not found.');
+  const patch: { role?: DemoRole; status?: 'active' | 'suspended' | 'invited' } = {};
+  if (req.body.role) patch.role = req.body.role as DemoRole;
+  if (req.body.status) patch.status = req.body.status as 'active' | 'suspended' | 'invited';
+  const updated = DEMO.patchTeamMember(req.params.memberId, patch);
+  res.json(updated);
+});
+
+// ---------------------------------------------------------------------------
+// Audit + billing (tenant)
+// ---------------------------------------------------------------------------
+
+// GET /v1/settings/theme — the tenant's DOC-7 theme (presets + resolved tokens).
+tenantRouter.get('/settings/theme', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({
+    theme: DEMO.themeOfTenant(tenant),
+    presets: THEME_PRESETS.map((p) => presetSummary(p)),
+    logoUrl: tenant.logoUrl ?? null,
+    brandColor: tenant.brandColor,
+  });
+});
+
+// PATCH /v1/settings/theme — tenant self-service theme editor. Saves presets /
+// tokens + logo, bumps the version so public surfaces and embeds reflect
+// immediately on next read (single pre-resolved payload server-side).
+tenantRouter.patch('/settings/theme', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'settings.manage');
+  const parsed = parseThemePatch(req.body ?? {});
+  if (!parsed.ok) throw badRequest(parsed.error);
+  const withLogo = DEMO.updateTenantIdentity(tenant.id, { logoUrl: req.body?.logoUrl });
+  const updated = withLogo ? DEMO.updateTenantTheme(withLogo.id, parsed.patch) : undefined;
+  if (!updated) throw notFound('Tenant not found.');
+  res.json({
+    theme: DEMO.themeOfTenant(updated),
+    presets: THEME_PRESETS.map((p) => presetSummary(p)),
+    logoUrl: updated.logoUrl ?? null,
+    brandColor: updated.brandColor,
+  });
+});
+
+// PATCH /v1/settings/identity — the tenant updates its own logo/brand colour;
+// shown in its workspace chrome and on its public form + walls.
+tenantRouter.patch('/settings/identity', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'settings.manage');
+  const brandColor = req.body?.brandColor;
+  if (brandColor !== undefined && (typeof brandColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(brandColor.trim()))) {
+    throw badRequest('Brand colour must be a hex value like #1B2559.');
+  }
+  const updated = DEMO.updateTenantIdentity(tenant.id, {
+    brandColor: brandColor === undefined ? undefined : (brandColor as string),
+    logoUrl: req.body?.logoUrl,
+  });
+  res.json({
+    tenant: { id: updated?.id, name: updated?.name, slug: updated?.slug, brandColor: updated?.brandColor ?? null, logoUrl: updated?.logoUrl ?? null },
+  });
+});
+
+// GET /v1/audit-logs
+tenantRouter.get('/audit-logs', (req, res) => {
+  requireCompany(req);
+  const sorted = DEMO.tenantAuditEntries().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const query: Paging = req.query as Paging;
+  const rows = paginate(sorted, query);
+  res.json({ rows, total: sorted.length });
+});
+
+// GET /v1/billing
+tenantRouter.get('/billing', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json(DEMO.billingForTenant(tenant));
+});
