@@ -1,4 +1,5 @@
 /** One app — form list with publish/unpublish ("form approval"). */
+import { IconExternal } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -98,7 +99,7 @@ export default function FormsPage() {
                   <td>
                     <div className="row-actions">
                       <a className="btn btn-ghost btn-xs" href={`/forms/${f.slug}`} target="_blank" rel="noreferrer">
-                        Open ↗
+                        Open <IconExternal size={13} />
                       </a>
                       <Button variant="ghost" className="btn-xs" onClick={() => void copyPublicLink(f)}>
                         {copied === f.id ? 'Copied!' : 'Copy link'}

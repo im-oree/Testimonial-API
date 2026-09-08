@@ -1,4 +1,5 @@
 /** Company workspace — Account settings: profile (name/email) + password. */
+import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { api, storeSessionToken } from '../lib/api';
 import { useAuth } from '../auth';
@@ -86,7 +87,7 @@ export default function AccountPage() {
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
       {!info && !error && <SkeletonCards count={2} height={250} wrap="two-col" />}
 
       {info && (

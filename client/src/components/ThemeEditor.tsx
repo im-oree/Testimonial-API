@@ -6,6 +6,7 @@
  * form/wall/widgets read the pre-resolved theme, so edits reflect immediately
  * on the next page load with zero extra request churn.
  */
+import { IconCheck, IconPlus } from './icons';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { fetchThemePresets, matchingPreset, softOf, textOn, RADIUS_OPTIONS, FONT_OPTIONS } from '../lib/theme';
@@ -174,7 +175,7 @@ export default function ThemeEditor({ endpoint, initial, initialLogo = null, onS
                 value={draft.primary}
                 onChange={(e) => setDraft((d) => ({ ...d, primary: e.target.value }))}
               />
-              +
+              <IconPlus size={12} />
             </label>
             <span className="swatch-hex">{draft.primary.toUpperCase()}</span>
           </div>
@@ -195,7 +196,7 @@ export default function ThemeEditor({ endpoint, initial, initialLogo = null, onS
             ))}
             <label className="swatch swatch-custom" title="Custom accent colour">
               <input type="color" value={draft.accent} onChange={(e) => setDraft((d) => ({ ...d, accent: e.target.value }))} />
-              +
+              <IconPlus size={12} />
             </label>
             <span className="swatch-hex">{draft.accent.toUpperCase()}</span>
           </div>
@@ -258,7 +259,7 @@ export default function ThemeEditor({ endpoint, initial, initialLogo = null, onS
 
         <div className="theme-actions">
           {error && <span className="muted small" style={{ color: 'var(--bad)' }}>{error}</span>}
-          {savedAt && !error && <span className="muted small" style={{ color: 'var(--good)' }}>✓ Saved — public pages &amp; embeds use it now.</span>}
+          {savedAt && !error && <span className="muted small" style={{ color: 'var(--good)' }}><IconCheck size={12} /> Saved — public pages &amp; embeds use it now.</span>}
           <Button onClick={() => void save()} disabled={busy}>
             {busy ? 'Saving…' : 'Save theme'}
           </Button>

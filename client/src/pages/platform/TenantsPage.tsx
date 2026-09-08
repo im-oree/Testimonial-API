@@ -1,4 +1,5 @@
 /** Platform console — tenants directory + create tenant wizard (modal). */
+import { IconPlus } from '../../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
@@ -62,7 +63,7 @@ export default function TenantsPage() {
       <PageHeader
         title="Tenants"
         subtitle={`${total} tenant${total === 1 ? '' : 's'} on the platform. Creating one provisions its ID, plan and admin account end-to-end.`}
-        actions={<Button onClick={() => setCreating(true)}>＋ New tenant</Button>}
+        actions={<Button onClick={() => setCreating(true)}><IconPlus size={14} /> New tenant</Button>}
       />
 
       {error && <ErrorBanner message={error} onRetry={() => load(filter, q, page)} />}

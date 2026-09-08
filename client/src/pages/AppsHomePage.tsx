@@ -4,6 +4,7 @@
  * totals across all products, filters/search, and a "New product" setup
  * wizard in a modal.
  */
+import { IconPlus } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -80,7 +81,7 @@ export default function AppsHomePage() {
       <PageHeader
         title="Products"
         subtitle="One product per website or customer-facing surface. Each product collects its own testimonials through a public form and wall, and is fully isolated from your other products."
-        actions={<Button onClick={() => setCreating(true)}>＋ New product</Button>}
+        actions={<Button onClick={() => setCreating(true)}><IconPlus size={14} /> New product</Button>}
       />
 
       {error && <ErrorBanner message={error} />}

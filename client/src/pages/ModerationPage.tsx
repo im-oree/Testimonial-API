@@ -1,4 +1,5 @@
 /** One app — moderation queue (pending testimonials → approve/reject). */
+import { IconCheck } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -84,7 +85,7 @@ export default function ModerationPage() {
 
       {loading && <SkeletonCards count={3} height={130} wrap="stack" />}
       {!loading && items.length === 0 && (
-        <EmptyState title="All caught up 🎉" hint="New form submissions for this product land here as pending testimonials." />
+        <EmptyState title="All caught up" hint="New form submissions for this product land here as pending testimonials." />
       )}
 
       {!loading &&
@@ -129,7 +130,7 @@ export default function ModerationPage() {
                   Reject
                 </Button>
                 <Button disabled={item.busy} onClick={() => void decide(item, 'approve')}>
-                  {item.busy ? '…' : 'Approve ✓'}
+                  {item.busy ? '…' : (<><IconCheck size={13} /> Approve</>)}
                 </Button>
               </div>
             )}

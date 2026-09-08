@@ -3,6 +3,7 @@
  * every tenant's Appearance page; tenants adopt one and fine-tune it. This
  * page is where the "owners" create/view/edit the catalogue.
  */
+import { IconCheck, IconPlus } from '../../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { ThemeFontId, ThemePresetSummary, ThemeRadiusId } from '../../lib/types';
@@ -73,12 +74,12 @@ export default function TemplatesPage() {
         title="Theme Templates"
         subtitle="Zojatech-owned template library. Tenants adopt these on their Appearance page and can fine-tune any value."
         actions={
-          <Button onClick={() => { setDraft({ ...EMPTY }); setError(null); setNotice(null); }}>＋ New template</Button>
+          <Button onClick={() => { setDraft({ ...EMPTY }); setError(null); setNotice(null); }}><IconPlus size={14} /> New template</Button>
         }
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       {draft && (
         <div className="card stack" style={{ marginBottom: 14, border: '1px dashed var(--lav)', background: '#fdfdff' }}>

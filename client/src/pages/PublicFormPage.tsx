@@ -3,6 +3,7 @@
  * POSTs submissions, which arrive in the tenant's moderation queue as
  * pending testimonials.
  */
+import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
@@ -95,7 +96,7 @@ export default function PublicFormPage() {
 
         {!error && form && done && (
           <div className="public-state">
-            <div className="big-check">✓</div>
+            <div className="big-check"><IconCheck size={34} /></div>
             <h1>Thank you!</h1>
             <p className="muted">
               Your feedback for <strong>{form.tenantName}</strong> was submitted successfully.

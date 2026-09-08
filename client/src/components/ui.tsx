@@ -1,4 +1,5 @@
 /** Small shared UI pieces — plain CSS classes, no component library. */
+import { IconStar } from './icons';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 import { Link } from 'react-router-dom';
 import type { TestimonialStatus } from '../lib/types';
@@ -50,7 +51,7 @@ export function RatingStars({ value, onChange, size = 'md' }: { value?: number; 
           role={interactive ? 'radio' : undefined}
           className={n <= (value ?? 0) ? 'star on' : 'star'}
         >
-          ★
+          <IconStar />
         </button>
       ))}
     </span>

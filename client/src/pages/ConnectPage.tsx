@@ -3,6 +3,7 @@
  * work: product/testimonial IDs, the collect link for the website, the
  * display wall/embed snippet, and the design (accent colour) with live preview.
  */
+import { IconCheck, IconExternal, IconRefresh, IconStar } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -156,13 +157,13 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
         subtitle={`Wire "${app.name}" to a website and show its testimonials — three short steps, everything has an ID.`}
         actions={
           <Link className="btn btn-secondary" to={`/wall/${app.slug}`} target="_blank" rel="noreferrer">
-            Preview wall ↗
+            Preview wall <IconExternal size={13} />
           </Link>
         }
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <div className="stack connect-steps">
         {/* Step 1 — IDs */}
@@ -218,7 +219,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
             <div className="link-copy">
               <code>{`/forms/${formSlug}`}</code>
               <Button variant="outline" className="btn-xs" onClick={() => void copy(formUrl, 'form')}>
-                {copied === 'form' ? 'Copied ✓' : 'Copy'}
+                {copied === 'form' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
               </Button>
             </div>
           </div>
@@ -228,7 +229,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
               <div className="muted small">Paste anywhere in your site HTML — styled to your brand.</div>
             </div>
             <Button variant="outline" className="btn-xs" onClick={() => void copy(buttonSnippet, 'btn')}>
-              {copied === 'btn' ? 'Copied ✓' : 'Copy'}
+              {copied === 'btn' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
             </Button>
           </div>
           {!form?.published && <p className="muted small">Tip: publish a form on the Forms page to accept submissions first.</p>}
@@ -253,7 +254,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
                 <code>{iframeSnippet}</code>
               </pre>
               <Button variant="secondary" className="btn-xs" onClick={() => void copy(iframeSnippet, 'embed')}>
-                {copied === 'embed' ? 'Copied ✓' : 'Copy embed snippet'}
+                {copied === 'embed' ? (<><IconCheck size={12} /> Copied</>) : 'Copy embed snippet'}
               </Button>
             </div>
             <div className="stack" style={{ minWidth: 0 }}>
@@ -355,7 +356,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
                 <div className="stars">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <span key={n} className="star on">
-                      ★
+                      <IconStar />
                     </span>
                   ))}
                 </div>
@@ -389,7 +390,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
                   <code>{widgetSnippet}</code>
                 </pre>
                 <Button variant="secondary" className="btn-xs" onClick={() => void copy(widgetSnippet, 'widget')}>
-                  {copied === 'widget' ? 'Copied ✓' : 'Copy widget snippet'}
+                  {copied === 'widget' ? (<><IconCheck size={12} /> Copied</>) : 'Copy widget snippet'}
                 </Button>
               </div>
               <div>
@@ -397,10 +398,10 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
                 <div id="connect-widget-demo" className="widget-demo" />
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
                   <Button variant="ghost" className="btn-xs" onClick={() => setDemoKey((k) => k + 1)}>
-                    ↻ Re-mount demo
+                    <IconRefresh size={12} /> Re-mount demo
                   </Button>
                   <a className="btn btn-secondary btn-xs" href={`${origin}/external/acme.html?app=${app.slug}&form=${formSlug}`} target="_blank" rel="noreferrer">
-                    Open example external site ↗
+                    Open example external site <IconExternal size={13} />
                   </a>
                 </div>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>

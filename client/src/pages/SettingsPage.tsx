@@ -2,11 +2,12 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import type { MeTenant } from '../lib/types';
+import { IconClipboard, IconLayers, IconLock, IconPalette, IconUsers } from '../components/icons';
 import { Breadcrumbs, PageHeader } from '../components/ui';
 
 interface Cat {
   key: string;
-  icon: string;
+  icon: 'palette' | 'lock' | 'users' | 'clipboard' | 'layers';
   title: string;
   desc: string;
   to: string;
@@ -28,11 +29,11 @@ export default function SettingsPage() {
   const { tenant } = useAuth();
 
   const cats: Cat[] = [
-    { key: 'theme', icon: '🎨', title: 'Appearance & theme', desc: 'Template + colours, corners, font and logo for your public surfaces.', to: '/app/settings/theme' },
-    { key: 'account', icon: '🔐', title: 'Account & security', desc: 'Your name, sign-in email and password.', to: '/app/settings/account' },
-    { key: 'team', icon: '👥', title: 'Users & roles', desc: 'Members, invites, role permissions.', to: '/app/team' },
-    { key: 'audit', icon: '🧾', title: 'Audit & activity', desc: 'Who did what across the workspace.', to: '/app/audit' },
-    { key: 'products', icon: '🧩', title: 'Products & embedding', desc: 'Create products, collect reviews, connect walls to your sites.', to: '/app/products' },
+    { key: 'theme', icon: 'palette', title: 'Appearance & theme', desc: 'Template + colours, corners, font and logo for your public surfaces.', to: '/app/settings/theme' },
+    { key: 'account', icon: 'lock', title: 'Account & security', desc: 'Your name, sign-in email and password.', to: '/app/settings/account' },
+    { key: 'team', icon: 'users', title: 'Users & roles', desc: 'Members, invites, role permissions.', to: '/app/team' },
+    { key: 'audit', icon: 'clipboard', title: 'Audit & activity', desc: 'Who did what across the workspace.', to: '/app/audit' },
+    { key: 'products', icon: 'layers', title: 'Products & embedding', desc: 'Create products, collect reviews, connect walls to your sites.', to: '/app/products' },
   ];
 
   return (
@@ -44,7 +45,13 @@ export default function SettingsPage() {
         {cats.map((c) => (
           <Link key={c.key} to={c.to} className="card cat-card">
             <div className="cat-card-head">
-              <span className="cat-icon">{c.icon}</span>
+              <span className="cat-icon">
+              {c.icon === 'palette' && <IconPalette />}
+              {c.icon === 'lock' && <IconLock />}
+              {c.icon === 'users' && <IconUsers />}
+              {c.icon === 'clipboard' && <IconClipboard />}
+              {c.icon === 'layers' && <IconLayers />}
+            </span>
               {c.key === 'theme' && tenant && <SwatchDots t={tenant} />}
             </div>
             <div className="strong">{c.title}</div>

@@ -90,7 +90,7 @@ export default function OverviewPage() {
             <section className="card">
               <h2>Waiting for moderation</h2>
               {recent.length === 0 ? (
-                <p className="muted">Nothing to review — all caught up. 🎉</p>
+                <p className="muted">Nothing to review — all caught up.</p>
               ) : (
                 <ul className="plain-list">
                   {recent.map((t) => (

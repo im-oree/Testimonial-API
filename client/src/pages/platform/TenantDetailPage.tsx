@@ -1,4 +1,5 @@
 /** Platform console — tenant detail: metrics + trend chart + products + identity + team + impersonate. */
+import { IconCheck } from '../../components/icons';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, storeSessionToken } from '../../lib/api';
@@ -132,7 +133,7 @@ export default function TenantDetailPage() {
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <div className="stat-grid">
         <StatCard label="Monthly MRR" value={`$${tenant.monthlyCostUsd}`} />

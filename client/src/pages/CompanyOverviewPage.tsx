@@ -1,4 +1,5 @@
 /** Company (tenant) workspace — Overview: totals, Recharts analytics + quick product cards. */
+import { IconPlus } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -65,7 +66,7 @@ export default function CompanyOverviewPage() {
       <PageHeader
         title="Overview"
         subtitle="Everything happening across your products — pick one to go deeper, or jump into moderation."
-        actions={<Button onClick={() => navigate('/app/products')}>＋ New product</Button>}
+        actions={<Button onClick={() => navigate('/app/products')}><IconPlus size={14} /> New product</Button>}
       />
 
       {error && <ErrorBanner message={error} />}

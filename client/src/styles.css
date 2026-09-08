@@ -972,3 +972,8 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .override-row .link-copy { justify-content: flex-start; }
 .override-row input[type='color'] { width: 42px; height: 28px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff; cursor: pointer; }
 .override-row .chip { font-size: 11px; }
+
+/* Icon library sizing/inheritance */
+.stars .star, .step-dot, .success-check, .big-check, .perm-check, .wall-empty-icon { display: inline-flex; align-items: center; justify-content: center; }
+.stars .star svg, .step-dot svg, .success-check svg, .big-check svg, .perm-check svg, .wall-empty-icon svg { display: block; }
+.stars .star { vertical-align: -2px; }

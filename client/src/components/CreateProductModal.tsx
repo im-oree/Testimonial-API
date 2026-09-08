@@ -6,6 +6,7 @@
  * The product is created server-side the moment the user leaves step 2; the
  * API provisions its public review form so links work immediately.
  */
+import { IconCheck, IconStar, IconX } from './icons';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -129,7 +130,7 @@ export default function CreateProductModal({
       {created ? (
         <motion.div className="stack" key="done" {...fadeUp}>
           <div className="success-row">
-            <span className="success-check">✓</span>
+            <span className="success-check"><IconCheck size={26} /></span>
             <div>
               <h2 style={{ margin: 0 }}>{created.app.name} is live</h2>
               <p className="muted small" style={{ marginTop: 4, marginBottom: 0 }}>
@@ -157,7 +158,7 @@ export default function CreateProductModal({
               <div className="link-copy">
                 <code>{`/forms/${created.formSlug}`}</code>
                 <Button variant="outline" className="btn-xs" onClick={() => void copy(formUrl, 'form')}>
-                  {copied === 'form' ? 'Copied ✓' : 'Copy'}
+                  {copied === 'form' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
                 </Button>
               </div>
             </div>
@@ -169,7 +170,7 @@ export default function CreateProductModal({
               <div className="link-copy">
                 <code>{`/wall/${created.app.slug}`}</code>
                 <Button variant="outline" className="btn-xs" onClick={() => void copy(wallUrl, 'wall')}>
-                  {copied === 'wall' ? 'Copied ✓' : 'Copy'}
+                  {copied === 'wall' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
                 </Button>
               </div>
             </div>
@@ -202,14 +203,14 @@ export default function CreateProductModal({
               </p>
             </div>
             <Button variant="ghost" onClick={onClose}>
-              ✕ Close
+              <IconX size={13} /> Close
             </Button>
           </div>
 
           <div className="steps">
             {STEPS.map((s) => (
               <div key={s.n} className={`step ${step === s.n ? 'active' : step > s.n ? 'done' : ''}`}>
-                <span className="step-dot">{step > s.n ? '✓' : s.n}</span>
+                <span className="step-dot">{step > s.n ? <IconCheck size={11} /> : s.n}</span>
                 <span className="step-label">{s.label}</span>
               </div>
             ))}
@@ -294,7 +295,7 @@ export default function CreateProductModal({
                     <div className="stars">
                       {[1, 2, 3, 4, 5].map((n) => (
                         <span key={n} className="star on">
-                          ★
+                          <IconStar />
                         </span>
                       ))}
                     </div>

@@ -1,4 +1,5 @@
 /** Company workspace — Users & Roles: members + invite modal + read-only role-permissions modal. */
+import { IconCheck, IconPlus, IconX } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
@@ -116,14 +117,14 @@ export default function TeamPage() {
         actions={
           canManage ? (
             <Button onClick={() => setInviting(true)} disabled={inviting}>
-              ＋ Invite member
+              <IconPlus size={13} /> Invite member
             </Button>
           ) : undefined
         }
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <h2>Reference roles</h2>
       <p className="muted small" style={{ marginTop: -6 }}>
@@ -203,14 +204,14 @@ export default function TeamPage() {
                 </p>
               </div>
               <Button variant="ghost" onClick={() => setOpenRole(null)}>
-                ✕ Close
+                <IconX size={13} /> Close
               </Button>
             </div>
             <p className="small">{openRole.description}</p>
             <ul className="perm-list">
               {openRole.permissions.map((p) => (
                 <li key={p.scope}>
-                  <span className="perm-check">✓</span>
+                  <span className="perm-check"><IconCheck size={11} /></span>
                   <div>
                     <div className="small strong">{p.label}</div>
                     <code className="perm-code">{p.scope}</code>
@@ -236,7 +237,7 @@ export default function TeamPage() {
               </p>
             </div>
             <Button variant="ghost" onClick={() => setInviting(false)}>
-              ✕ Close
+              <IconX size={13} /> Close
             </Button>
           </div>
           <form className="stack" onSubmit={(e) => void invite(e)}>

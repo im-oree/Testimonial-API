@@ -3,6 +3,7 @@
  * reviews with an empty state and a teal "Add a Review +" CTA that opens the
  * product's public form. Mirrors the embeddable widget surface in a browser.
  */
+import { IconStar } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -78,7 +79,7 @@ export default function WallPage() {
 
         {count === 0 ? (
           <div className="wall-empty">
-            <div className="wall-empty-icon">★</div>
+            <div className="wall-empty-icon"><IconStar size={30} /></div>
             <h2>No reviews yet</h2>
             <p className="muted">Be the first to share your experience with {wall.app.name}. It takes less than a minute.</p>
             {wall.form && (

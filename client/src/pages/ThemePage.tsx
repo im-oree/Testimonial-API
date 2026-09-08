@@ -1,4 +1,5 @@
 /** Company workspace — Appearance & theme (own page under Settings). */
+import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -46,7 +47,7 @@ export default function ThemePage() {
       <PageHeader title="Appearance & theme" subtitle="One look for your company — applied to every form, wall and widget embed." />
 
       {error && <ErrorBanner message={error} onRetry={() => setTick((t) => t + 1)} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
+      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <Card className="stack">
         <div className="brand-id">
