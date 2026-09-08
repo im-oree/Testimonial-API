@@ -2,6 +2,7 @@
 import { IconCheck } from '../../components/icons';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../../auth';
 import { api, storeSessionToken } from '../../lib/api';
 import { formatDate } from '../../lib/format';
 import type { Paged, TeamMember, TenantDetail, ThemeSaveResponse } from '../../lib/types';
@@ -16,6 +17,9 @@ import ThemeEditor from '../../components/ThemeEditor';
 export default function TenantDetailPage() {
   const { tenantId = '' } = useParams();
   const navigate = useNavigate();
+  const { permissions } = useAuth();
+  const canWrite = permissions.includes('tenants.write');
+  const canImpersonate = permissions.includes('impersonate');
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [staff, setStaff] = useState<TeamMember[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -126,9 +130,11 @@ export default function TenantDetailPage() {
         title={tenant.name}
         subtitle={`Tenant · ID ${tenant.id} · /${tenant.slug} · created ${formatDate(tenant.createdAt)}`}
         actions={
-          <Button disabled={impersonating} onClick={() => void impersonate()}>
-            {impersonating ? 'Opening…' : 'Open as company'}
-          </Button>
+          canImpersonate ? (
+            <Button disabled={impersonating} onClick={() => void impersonate()}>
+              {impersonating ? 'Opening…' : 'Open as company'}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -146,60 +152,140 @@ export default function TenantDetailPage() {
         <StatCard label="Seats" value={`${tenant.seatsUsed} / ${tenant.seatsLimit}`} />
       </div>
 
+      <div className="card" style={{ marginBottom: 14, padding: "16px 18px" }}>
+        <div className="chart-head">
+          <div>
+            <h2 style={{ margin: 0 }}>7-day activity trend</h2>
+            <p className="muted small" style={{ margin: '2px 0 0' }}>
+              Submissions vs approved across every product.
+            </p>
+          </div>
+        </div>
+        <div style={{ height: 240, width: '100%' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={trendData} margin={{ top: 24, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f2f4" />
+              <XAxis dataKey="day" tickLine={false} axisLine={{ stroke: '#e5e7eb' }} tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} />
+              <Tooltip cursor={{ fill: '#f7f8fe' }} contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 12, color: '#6b7280' }} />
+              <Bar dataKey="submitted" name="Submissions" fill="#0ea5a0" radius={[4, 4, 0, 0]} maxBarSize={16} />
+              <Bar dataKey="approved" name="Approved" fill="#1b2559" radius={[4, 4, 0, 0]} maxBarSize={16} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Theme & branding — full-width settings surface. A half-width column
+          squeezes the presets/token/preview grid, so it owns the whole row and
+          its internal grid adapts instead. */}
+      <div className="card settings-surface" style={{ marginBottom: 14 }}>
+        <div className="brand-id" style={{ marginBottom: 4 }}>
+          {tenant.logoUrl ? (
+            <img src={tenant.logoUrl} alt={`${tenant.name} logo`} className="brand-logo" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
+          ) : (
+            <span className="brand-avatar" style={{ background: tenant.theme?.primary ?? tenant.brandColor ?? 'var(--navy)' }}>
+              {(tenant.name[0] ?? '?').toUpperCase()}
+            </span>
+          )}
+          <div>
+            <h2 style={{ margin: 0 }}>Theme &amp; branding</h2>
+            <p className="muted small" style={{ margin: '2px 0 0' }}>
+              Presets + fully adjustable tokens, saved server-side. The tenant can restyle it themselves — this is your
+              Zojatech-side control.
+            </p>
+          </div>
+        </div>
+        <div className="theme-surface-body">
+          {!canWrite && (
+            <div className="theme-ro-banner">Read-only view — your role can see tenants but not restyle them.</div>
+          )}
+          <div style={canWrite ? undefined : { pointerEvents: 'none', opacity: 0.85 }} aria-disabled={!canWrite}>
+            <ThemeEditor
+              endpoint={`/v1/platform/tenants/${tenant.id}/theme`}
+              initial={tenant.theme ?? null}
+              initialLogo={tenant.logoUrl}
+              onSaved={(res: ThemeSaveResponse) => {
+                setTenant((prev) => (prev ? { ...prev, theme: res.theme, brandColor: res.brandColor ?? prev.brandColor, logoUrl: res.logoUrl ?? prev.logoUrl } : prev));
+                setNotice('Theme saved — the company’s public form, walls and embeds reflect it on next load.');
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="two-col" style={{ marginBottom: 14 }}>
         <Card>
-          <div className="chart-head">
-            <div>
-              <h2 style={{ margin: 0 }}>7-day activity trend</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Submissions vs approved across every product.
+          <h2>Plan, status & owner</h2>
+          <div className="stack">
+            {!canWrite && (
+              <p className="muted small" style={{ margin: 0 }}>
+                Read-only — your role can view tenants but not change their plan, status or owner.
               </p>
+            )}
+            <div>
+              <Label>Plan</Label>
+              <Select value={tenant.plan} disabled={busy || !canWrite} onChange={(e) => void save({ plan: e.target.value })}>
+                <option value="starter">Starter — $29/mo</option>
+                <option value="growth">Growth — $99/mo</option>
+                <option value="scale">Scale — $299/mo</option>
+              </Select>
             </div>
-          </div>
-          <div style={{ height: 230, width: '100%' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 24, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f2f4" />
-                <XAxis dataKey="day" tickLine={false} axisLine={{ stroke: '#e5e7eb' }} tick={{ fill: '#6b7280', fontSize: 11 }} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontSize: 10 }} />
-                <Tooltip cursor={{ fill: '#f7f8fe' }} contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12, color: '#6b7280' }} />
-                <Bar dataKey="submitted" name="Submissions" fill="#0ea5a0" radius={[4, 4, 0, 0]} maxBarSize={16} />
-                <Bar dataKey="approved" name="Approved" fill="#1b2559" radius={[4, 4, 0, 0]} maxBarSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div>
+              <Label>Status</Label>
+              <Select value={tenant.status} disabled={busy || !canWrite} onChange={(e) => void save({ status: e.target.value })}>
+                <option value="active">Active</option>
+                <option value="trialing">Trialing</option>
+                <option value="suspended">Suspended</option>
+              </Select>
+            </div>
+            <div className="card" style={{ padding: 12, background: 'var(--lav-soft)', borderStyle: 'dashed' }}>
+              <Label>Admin account (this email signs in with the demo password)</Label>
+              <div className="stack" style={{ gap: 8 }}>
+                <TextInput
+                  type="email"
+                  aria-label="Admin email"
+                  value={ownerEmail}
+                  disabled={busy || !canWrite}
+                  onChange={(e) => setOwnerEmail(e.target.value)}
+                  placeholder="owner@company.test"
+                />
+                <TextInput aria-label="Admin name" value={ownerName} disabled={busy || !canWrite} onChange={(e) => setOwnerName(e.target.value)} />
+                {canWrite && (
+                  <div>
+                    <Button variant="outline" className="btn-xs" disabled={busy || ownerEmail === tenant.ownerEmail} onClick={() => void saveOwner()}>
+                      {busy ? 'Saving…' : 'Update admin account'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
 
-        <Card className="stack">
-          <div className="brand-id">
-            {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={`${tenant.name} logo`} className="brand-logo" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
-            ) : (
-              <span className="brand-avatar" style={{ background: tenant.theme?.primary ?? tenant.brandColor ?? 'var(--navy)' }}>
-                {(tenant.name[0] ?? '?').toUpperCase()}
-              </span>
-            )}
-            <div>
-              <h2 style={{ margin: 0 }}>Theme &amp; branding</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Presets + fully adjustable tokens, saved server-side. The tenant can restyle it themselves — this is your Zojatech-side control.
-              </p>
-            </div>
-          </div>
-          <ThemeEditor
-            endpoint={`/v1/platform/tenants/${tenant.id}/theme`}
-            initial={tenant.theme ?? null}
-            initialLogo={tenant.logoUrl}
-            onSaved={(res: ThemeSaveResponse) => {
-              setTenant((prev) => (prev ? { ...prev, theme: res.theme, brandColor: res.brandColor ?? prev.brandColor, logoUrl: res.logoUrl ?? prev.logoUrl } : prev));
-              setNotice('Theme saved — the company’s public form, walls and embeds reflect it on next load.');
-            }}
-          />
+        <Card>
+          <h2>Team</h2>
+          {staff.length === 0 ? (
+            <p className="muted">No staff members yet.</p>
+          ) : (
+            <ul className="plain-list">
+              {staff.map((m) => (
+                <li key={m.id} className="list-row">
+                  <div>
+                    <span className="strong">{m.name}</span>
+                    <span className="muted"> · {m.email}</span>
+                  </div>
+                  <span className={`chip chip-${m.status}`}>
+                    {m.role} · {m.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
 
-      <div className="card stack" style={{ marginBottom: 14 }}>
+      <div className="card stack">
         <h2 style={{ margin: 0 }}>Products</h2>
         <p className="muted small" style={{ marginTop: -6 }}>
           Each product collects its own testimonials. Use <strong>Open as company</strong> to manage one exactly like its owner does.
@@ -249,70 +335,6 @@ export default function TenantDetailPage() {
             </table>
           </div>
         )}
-      </div>
-
-      <div className="two-col">
-        <Card>
-          <h2>Plan, status & owner</h2>
-          <div className="stack">
-            <div>
-              <Label>Plan</Label>
-              <Select value={tenant.plan} disabled={busy} onChange={(e) => void save({ plan: e.target.value })}>
-                <option value="starter">Starter — $29/mo</option>
-                <option value="growth">Growth — $99/mo</option>
-                <option value="scale">Scale — $299/mo</option>
-              </Select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={tenant.status} disabled={busy} onChange={(e) => void save({ status: e.target.value })}>
-                <option value="active">Active</option>
-                <option value="trialing">Trialing</option>
-                <option value="suspended">Suspended</option>
-              </Select>
-            </div>
-            <div className="card" style={{ padding: 12, background: 'var(--lav-soft)', borderStyle: 'dashed' }}>
-              <Label>Admin account (this email signs in with the demo password)</Label>
-              <div className="stack" style={{ gap: 8 }}>
-                <TextInput
-                  type="email"
-                  aria-label="Admin email"
-                  value={ownerEmail}
-                  disabled={busy}
-                  onChange={(e) => setOwnerEmail(e.target.value)}
-                  placeholder="owner@company.test"
-                />
-                <TextInput aria-label="Admin name" value={ownerName} disabled={busy} onChange={(e) => setOwnerName(e.target.value)} />
-                <div>
-                  <Button variant="outline" className="btn-xs" disabled={busy || ownerEmail === tenant.ownerEmail} onClick={() => void saveOwner()}>
-                    {busy ? 'Saving…' : 'Update admin account'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <h2>Team</h2>
-          {staff.length === 0 ? (
-            <p className="muted">No staff members yet.</p>
-          ) : (
-            <ul className="plain-list">
-              {staff.map((m) => (
-                <li key={m.id} className="list-row">
-                  <div>
-                    <span className="strong">{m.name}</span>
-                    <span className="muted"> · {m.email}</span>
-                  </div>
-                  <span className={`chip chip-${m.status}`}>
-                    {m.role} · {m.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
       </div>
     </div>
   );
