@@ -652,3 +652,73 @@ describe('DOC 6 — widget templates: catalogue, apply & the widget contract', (
     );
   });
 });
+
+describe('DOC 6 — design drafts: preview, customise and publish without applying', () => {
+  it('draft endpoints require a company session with apps.manage and are app-scoped', async () => {
+    assert.equal((await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft')).status, 401);
+    assert.equal((await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: platformToken })).status, 401);
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: viewerToken })).status, 401);
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: lumen })).status, 404);
+    assert.equal((await req('PATCH', '/v1/dashboard/apps/app-lumen-1/design/draft', { token: ownerToken, body: { schema: {} } })).status, 404);
+  });
+
+  it('a draft never touches the live embed until it is published', async () => {
+    // The live widget before any draft work (set by the earlier tests).
+    const before = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const beforeWidget = (before.json as { widget: { templateId: string | null; width: number } }).widget;
+
+    // 1. Start a draft from the coverflow template.
+    const started = await req('POST', '/v1/apps/app-acme-1/widget-template/coverflow-deck/draft', { token: ownerToken });
+    assert.equal(started.status, 200);
+    assert.equal((started.json as { app: { designDraft: { templateId: string } | null } }).app.designDraft?.templateId, 'coverflow-deck');
+
+    // 2. The studio loads the draft; the embed still serves the live design.
+    const draft = await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal(draft.status, 200);
+    const draftSchema = (draft.json as { schema: { name: string } | null; templateId: string | null }).schema;
+    assert.ok(draftSchema, 'draft schema should be present');
+    assert.equal((draft.json as { templateId: string | null }).templateId, 'coverflow-deck');
+    const mid = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((mid.json as { widget: { width: number } }).widget.width, beforeWidget.width, 'draft must not change the live embed');
+
+    // 3. Saving the draft keeps the embed untouched.
+    const saved = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/draft', {
+      token: ownerToken,
+      body: { schema: { ...draftSchema, name: 'Tuned coverflow' } },
+    });
+    assert.equal(saved.status, 200);
+    const still = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((still.json as { widget: { width: number } }).widget.width, beforeWidget.width, 'saving a draft must not publish it');
+
+    // 4. Draft saves enforce the widget contract too.
+    const broken = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/draft', {
+      token: ownerToken,
+      body: { schema: { name: 'Broken', canvas: { width: 300, height: 200, background: '#fff' }, version: 1, elements: [] } },
+    });
+    assert.equal(broken.status, 400);
+
+    // 5. Publish: the only path that changes the embed.
+    const published = await req('POST', '/v1/dashboard/apps/app-acme-1/design/draft/publish', { token: ownerToken });
+    assert.equal(published.status, 200);
+    assert.ok((published.json as { studioVersion: number }).studioVersion >= 1);
+    const after = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const afterWidget = (after.json as { widget: { templateId: string | null; width: number; schema: { name: string } } }).widget;
+    assert.equal(afterWidget.templateId, 'coverflow-deck');
+    assert.equal(afterWidget.width, 960);
+    assert.equal(afterWidget.schema.name, 'Tuned coverflow');
+
+    // 6. Publishing consumed the draft.
+    const empty = await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal((empty.json as { schema: unknown }).schema, null);
+    assert.equal((await req('POST', '/v1/dashboard/apps/app-acme-1/design/draft/publish', { token: ownerToken })).status, 404);
+
+    // 7. A discard keeps the live design.
+    const again = await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: ownerToken });
+    assert.equal(again.status, 200);
+    const discarded = await req('DELETE', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal(discarded.status, 200);
+    const final = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((final.json as { widget: { templateId: string | null } }).widget.templateId, 'coverflow-deck', 'discard keeps the live design');
+  });
+});

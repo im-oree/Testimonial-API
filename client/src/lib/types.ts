@@ -282,6 +282,8 @@ export interface AppSummary {
   /** >0 once a widget design (applied template or studio save) exists. */
   studioVersion?: number;
   designOptions?: DesignOptions | null;
+  /** Unpublished studio draft (preview/customise/save without applying). */
+  designDraft?: { templateId: string | null; updatedAt: string | null } | null;
   status: 'active' | 'paused';
   createdAt: string;
   totalTestimonials: number;

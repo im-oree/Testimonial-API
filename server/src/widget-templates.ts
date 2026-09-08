@@ -18,7 +18,7 @@
  * editing and on empty walls; a live record overwrites it at render time.
  */
 
-export type TemplateElementType = 'heading' | 'text' | 'image' | 'rating-stars' | 'button' | 'container' | 'spacer';
+export type TemplateElementType = 'heading' | 'text' | 'image' | 'rating-stars' | 'button' | 'container' | 'spacer' | 'shader';
 
 export interface TemplateElement {
   id: string;
@@ -32,6 +32,8 @@ export interface TemplateElement {
   imageUrl: string | null;
   binding: { bindingKey: 'review_text' | 'reviewer_name' | 'review_rating'; property: string } | null;
   animation: { type: string; durationMs: number; delayMs: number } | null;
+  /** GLSL backdrop config (shader elements only). */
+  shader: { preset: 'aurora' | 'plasma' | 'mesh' | 'stars'; speed: number } | null;
 }
 
 export interface TemplateSchema {
@@ -49,7 +51,7 @@ export interface TemplateSchema {
  * carousel, or stream a marquee.
  */
 export interface TemplateBehavior {
-  mode: 'cycle' | 'carousel' | 'marquee';
+  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt';
   autoPlay: boolean;
   intervalSec: number;
   pauseOnHover: boolean;
@@ -90,6 +92,7 @@ function el(p: Partial<TemplateElement> & Pick<TemplateElement, 'id' | 'type' | 
     imageUrl: null,
     binding: null,
     animation: null,
+    shader: null,
     ...p,
   } as TemplateElement;
 }
@@ -439,6 +442,160 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           id: 'tpl_sd_cta', type: 'button', name: 'CTA', text: 'Add a review',
           layout: { x: 240, y: 410, width: 160, height: 42, z: 10 },
           style: { background: '#4f46e5', radius: 21, opacity: 1 },
+          typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
+        }),
+      ],
+    },
+  },
+  {
+    id: 'coverflow-deck',
+    name: 'Coverflow Deck',
+    description: 'A 3D depth carousel — reviews fan out in perspective, the scene leans with your cursor, drag or click a side card to pull it forward.',
+    category: 'Carousel',
+    width: 960,
+    height: 540,
+    features: ['3D perspective', 'Mouse-reactive scene', 'Drag + click-to-focus'],
+    schema: {
+      name: 'Coverflow deck',
+      canvas: { width: 960, height: 540, background: '#0b1020' },
+      version: 1,
+      behavior: { mode: 'coverflow', autoPlay: true, intervalSec: 5, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 8 },
+      elements: [
+        el({
+          id: 'tpl_cf_card', type: 'container', name: 'Glass card', layout: { x: 220, y: 70, width: 520, height: 360, z: 1 },
+          style: { background: '#151d38', radius: 26, opacity: 0.92 },
+        }),
+        el({
+          id: 'tpl_cf_eyebrow', type: 'text', name: 'Eyebrow', text: 'WHAT CUSTOMERS SAY',
+          layout: { x: 220, y: 108, width: 520, height: 20, z: 10 },
+          typography: { fontSize: 11, fontWeight: 700, color: '#7dd3fc', align: 'center' },
+        }),
+        el({
+          id: 'tpl_cf_stars', type: 'rating-stars', name: 'Rating', layout: { x: 420, y: 146, width: 120, height: 28, z: 10 },
+          binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 500, delayMs: 0 },
+        }),
+        el({
+          id: 'tpl_cf_quote', type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+          layout: { x: 270, y: 192, width: 420, height: 140, z: 10 },
+          typography: { fontSize: 19, fontWeight: 400, color: '#e2e8f0', align: 'center' },
+          binding: { bindingKey: 'review_text', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+        }),
+        el({
+          id: 'tpl_cf_author', type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+          layout: { x: 270, y: 344, width: 420, height: 26, z: 10 },
+          typography: { fontSize: 15, fontWeight: 700, color: '#f8fafc', align: 'center' },
+          binding: { bindingKey: 'reviewer_name', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 500, delayMs: 140 },
+        }),
+        el({
+          id: 'tpl_cf_hint', type: 'text', name: 'Hint', text: 'Drag the deck — or click a card to bring it forward',
+          layout: { x: 230, y: 462, width: 500, height: 20, z: 10 },
+          typography: { fontSize: 12, fontWeight: 400, color: '#64748b', align: 'center' },
+        }),
+      ],
+    },
+  },
+  {
+    id: 'tilt-card',
+    name: 'Tilt Card',
+    description: 'A card with presence — it leans toward the visitor’s cursor, catches a moving glare and springs back. One review at a time.',
+    category: 'Spotlight',
+    width: 560,
+    height: 460,
+    features: ['Mouse-reactive 3D tilt', 'Cursor glare', 'Spring physics'],
+    schema: {
+      name: 'Tilt card',
+      canvas: { width: 560, height: 460, background: '#f4f4fb' },
+      version: 1,
+      behavior: { mode: 'tilt', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
+      elements: [
+        el({
+          id: 'tpl_tc_card', type: 'container', name: 'Card', layout: { x: 50, y: 46, width: 460, height: 330, z: 1 },
+          style: { background: '#ffffff', radius: 24, opacity: 1 },
+        }),
+        el({
+          id: 'tpl_tc_stars', type: 'rating-stars', name: 'Rating', layout: { x: 220, y: 88, width: 120, height: 30, z: 10 },
+          binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+        }),
+        el({
+          id: 'tpl_tc_quote', type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+          layout: { x: 100, y: 134, width: 360, height: 150, z: 10 },
+          typography: { fontSize: 18, fontWeight: 400, color: '#334155', align: 'center' },
+          binding: { bindingKey: 'review_text', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 500, delayMs: 60 },
+        }),
+        el({
+          id: 'tpl_tc_author', type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+          layout: { x: 100, y: 296, width: 360, height: 24, z: 10 },
+          typography: { fontSize: 15, fontWeight: 700, color: '#1b2559', align: 'center' },
+          binding: { bindingKey: 'reviewer_name', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 450, delayMs: 120 },
+        }),
+        el({
+          id: 'tpl_tc_sub', type: 'text', name: 'Verified line', text: 'Move your cursor over the card',
+          layout: { x: 100, y: 326, width: 360, height: 18, z: 10 },
+          typography: { fontSize: 11, fontWeight: 400, color: '#94a3b8', align: 'center' },
+        }),
+        el({
+          id: 'tpl_tc_cta', type: 'button', name: 'CTA', text: 'Add a review',
+          layout: { x: 195, y: 402, width: 170, height: 42, z: 10 },
+          style: { background: '#0ea5a0', radius: 21, opacity: 1 },
+          typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
+        }),
+      ],
+    },
+  },
+  {
+    id: 'aurora-glass',
+    name: 'Aurora Glass',
+    description: 'A glassmorphic review card floating over a live GLSL aurora — a real fragment shader animating behind your reviews.',
+    category: 'Spotlight',
+    width: 720,
+    height: 560,
+    features: ['GLSL shader backdrop', 'Glass card', 'Cross-fade cycle'],
+    schema: {
+      name: 'Aurora glass',
+      canvas: { width: 720, height: 560, background: '#060b1b' },
+      version: 1,
+      behavior: { mode: 'cycle', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
+      elements: [
+        el({
+          id: 'tpl_ag_shader', type: 'shader', name: 'Aurora backdrop', layout: { x: 0, y: 0, width: 720, height: 560, z: 0 },
+          style: { background: null, radius: 0, opacity: 1 },
+          shader: { preset: 'aurora', speed: 0.8 },
+        }),
+        el({
+          id: 'tpl_ag_card', type: 'container', name: 'Glass card', layout: { x: 90, y: 90, width: 540, height: 380, z: 5 },
+          style: { background: '#ffffff', radius: 24, opacity: 0.1 },
+        }),
+        el({
+          id: 'tpl_ag_eyebrow', type: 'text', name: 'Eyebrow', text: 'LOVED BY CUSTOMERS',
+          layout: { x: 150, y: 128, width: 420, height: 18, z: 10 },
+          typography: { fontSize: 11, fontWeight: 700, color: '#a5f3fc', align: 'center' },
+        }),
+        el({
+          id: 'tpl_ag_stars', type: 'rating-stars', name: 'Rating', layout: { x: 300, y: 158, width: 120, height: 30, z: 10 },
+          binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+        }),
+        el({
+          id: 'tpl_ag_quote', type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+          layout: { x: 150, y: 202, width: 420, height: 160, z: 10 },
+          typography: { fontSize: 19, fontWeight: 400, color: '#f1f5f9', align: 'center' },
+          binding: { bindingKey: 'review_text', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+        }),
+        el({
+          id: 'tpl_ag_author', type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+          layout: { x: 150, y: 380, width: 420, height: 26, z: 10 },
+          typography: { fontSize: 15, fontWeight: 700, color: '#ffffff', align: 'center' },
+          binding: { bindingKey: 'reviewer_name', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 500, delayMs: 150 },
+        }),
+        el({
+          id: 'tpl_ag_cta', type: 'button', name: 'CTA', text: 'Add a review',
+          layout: { x: 270, y: 500, width: 180, height: 42, z: 10 },
+          style: { background: '#0ea5a0', radius: 21, opacity: 1 },
           typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
         }),
       ],

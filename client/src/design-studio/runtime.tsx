@@ -11,6 +11,7 @@ import { IconStar } from '../components/icons';
 import { elementToCSS, radiusOf } from './css';
 import { displayRating, displayText, resolveFor } from './data-binder';
 import { animationCssFor } from './animation-presets';
+import { ShaderCanvas } from './ShaderCanvas';
 import type { StudioElement, StudioRecord, StudioSchema } from './types';
 
 interface Props {
@@ -78,11 +79,16 @@ function ElementView({ el, record, animate, ctaHref }: { el: StudioElement; reco
     case 'spacer':
       inner = null;
       break;
+    case 'shader':
+      inner = <ShaderCanvas preset={el.shader?.preset ?? 'aurora'} speed={el.shader?.speed ?? 1} />;
+      break;
   }
+
+  const wrapperCss = el.type === 'shader' ? { ...css, overflow: 'hidden' as const } : css;
 
   return (
     <div
-      style={css}
+      style={wrapperCss}
       className={`studio-el ${el.type === 'button' ? 'studio-el-button' : ''}`}
       data-element-id={el.id}
       {...(isCta

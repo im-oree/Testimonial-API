@@ -55,22 +55,28 @@ The point of the app: **templated, editable widgets** you embed on any website.
 - **Templates** (`GET /v1/widget-templates`) — a catalogue of fixed-dimension
   designs (Quote Card 720×560, Spotlight Hero 1200×420, Slim Strip 1200×200,
   Rating Badge 360×320, Story Card 540×760, Bold Statement 800×600, Swipe Deck
-  640×480). Every template carries the **required rating components** —
-  `review_text`, `reviewer_name`, `review_rating` — plus decorative extras.
-- **Pick one** on the product's **Widget** page (`POST /v1/apps/:appId/widget-template/:id/apply`);
-  a fresh copy becomes the product's design. **Customise** it in the **design studio**
-  (colours, typography, positions, extra elements — required components are
-  protected client-side and enforced server-side on every save).
+  640×480, Coverflow Deck 960×540, Tilt Card 560×460, Aurora Glass 720×560).
+  Every template carries the **required rating components** — `review_text`,
+  `reviewer_name`, `review_rating` — plus decorative extras (Aurora Glass
+  includes a live **GLSL shader** backdrop).
+- **Pick one** on the product's **Widget** page — *Apply now* switches the
+  embed immediately, or *Preview & customize* starts an **unpublished draft**
+  (`POST /v1/apps/:appId/widget-template/:id/draft`) and opens the studio.
+  In the studio, **Save writes the draft and Publish is the only step that
+  changes the live embed** — preview, customise and save without applying.
 - **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
   to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
   an immersive full-bleed stage (app sidebar collapses to the icon rail, the
   topbar hides), a layers-first left panel with element adding behind a ＋
-  popover, per-corner **or** linked corner radius, and entrance animations with
-  duration/delay.
+  popover, per-corner **or** linked corner radius, GLSL **shader elements**
+  (aurora / plasma / mesh / starfield presets with adjustable speed), and
+  entrance animations with duration/delay.
 - **Widget behavior** — the answer to "what happens when more reviews come in?"
   Each design carries a `behavior` edited in the studio's properties panel and
   executed by the live widget: **cycle** (cross-fade, one review at a time),
   **carousel** (swipeable/draggable slides with touch inertia, dots + arrows),
+  **coverflow** (a 3D depth carousel that leans toward the cursor — drag it or
+  click a side card), **tilt** (a mouse-reactive 3D card with cursor glare),
   or **marquee** (a continuous stream — direction left/right and speed
   adjustable, pauses on hover). Auto-advance interval and a max-records cap
   keep heavy review counts light.
@@ -124,9 +130,12 @@ Everything is under `/v1` (public docs live in the code — see `server/src/rout
 
 - `POST /v1/auth/login`, `POST /v1/platform/auth/login`, `GET /v1/auth/me`
 - `GET|POST /v1/apps`, `PATCH /v1/apps/:appId` (company's apps — one per website)
-- `GET /v1/widget-templates`, `POST /v1/apps/:appId/widget-template/:templateId/apply`
-  (widget template catalogue + apply; `PATCH /v1/dashboard/apps/:appId/design/schema`
-  enforces the required components — review text, reviewer name, rating)
+- `GET /v1/widget-templates`, `POST /v1/apps/:appId/widget-template/:templateId/apply`,
+  `POST /v1/apps/:appId/widget-template/:templateId/draft`,
+  `GET|PATCH /v1/dashboard/apps/:appId/design/draft`, `POST .../design/draft/publish`,
+  `DELETE .../design/draft` (catalogue + apply; draft/customise/publish flow —
+  `PATCH .../design/schema` and draft saves both enforce the required
+  components — review text, reviewer name, rating)
 - `GET|POST|PATCH|DELETE /v1/apps/:appId/testimonials[...]` — list (paged, filtered, searchable),
   manual create, full edit (content/author/rating/tags), live on-wall toggle (`visible`),
   moderation moves, delete, `POST .../bulk` (approve/reject/archive/show/hide/delete)

@@ -9,7 +9,17 @@
  */
 
 /** Element kinds the canvas + preview runtime can render today. */
-export type ElementType = 'heading' | 'text' | 'image' | 'rating-stars' | 'button' | 'container' | 'spacer';
+export type ElementType = 'heading' | 'text' | 'image' | 'rating-stars' | 'button' | 'container' | 'spacer' | 'shader';
+
+/** Built-in GLSL shader presets for `shader` elements (see ShaderElement). */
+export type ShaderPreset = 'aurora' | 'plasma' | 'mesh' | 'stars';
+
+export const SHADER_PRESETS: Array<{ id: ShaderPreset; label: string; hint: string }> = [
+  { id: 'aurora', label: 'Aurora', hint: 'Soft flowing northern-lights waves' },
+  { id: 'plasma', label: 'Plasma', hint: 'Liquid colour blobs blending' },
+  { id: 'mesh', label: 'Mesh', hint: 'Slow gradient-mesh drift' },
+  { id: 'stars', label: 'Starfield', hint: 'Drifting star specks' },
+];
 
 export type TextAlign = 'left' | 'center' | 'right';
 
@@ -75,6 +85,8 @@ export interface StudioElement {
   binding: DataBinding | null;
   /** Optional entrance animation; keyframes come from the preset engine. */
   animation: { type: string; durationMs: number; delayMs: number } | null;
+  /** GLSL backdrop config (shader elements only). */
+  shader: { preset: ShaderPreset; speed: number } | null;
 }
 
 export interface StudioCanvas {
@@ -89,8 +101,12 @@ export interface StudioCanvas {
  * is the answer to "what happens when more reviews come in".
  */
 export interface WidgetBehavior {
-  /** cycle = one at a time cross-fade · carousel = swipeable slides · marquee = continuous stream. */
-  mode: 'cycle' | 'carousel' | 'marquee';
+  /**
+   * cycle = one at a time cross-fade · carousel = swipeable slides ·
+   * marquee = continuous stream · coverflow = 3D depth carousel with
+   * mouse-parallax · tilt = single mouse-reactive 3D card.
+   */
+  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt';
   /** Auto-advance (cycle/carousel). */
   autoPlay: boolean;
   /** Seconds each review stays on screen. */

@@ -1066,8 +1066,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: block;
 }
 .wall-embed .widgets-root, .wall-embed > div { max-width: none; }
-.wall-design { margin-top: 2px; }
-.wall-design .wdg-hover, .wall-embed .wdg-hover { transition: box-shadow .18s ease, transform .18s ease; }
+.wall-embed .wdg-hover { transition: box-shadow .18s ease, transform .18s ease; }
 
 /* Accessible visually-hidden text */
 .sr-only {
@@ -1133,7 +1132,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .public-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .public-actions .btn + .btn { margin-left: 0; }
 
-/* ---- Appearance & theme page: organised three-zone editor ---------------- */
+/* ---- Appearance & theme page: sticky save bar + two-zone editor ---------- */
 .theme-status-strip {
   display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center;
   background: #fff; border: 1px solid var(--border); border-radius: 14px;
@@ -1143,8 +1142,15 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .theme-status-item .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
 .theme-status-item .color-dots { margin-top: 3px; }
 
-.theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
-@media (max-width: 1060px) { .theme-layout { grid-template-columns: 1fr; } }
+/* Save is always visible: a sticky bar pinned to the top of the editor. */
+.theme-savebar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 10px 14px; margin-bottom: 14px;
+  box-shadow: 0 4px 18px rgba(27, 37, 89, 0.05);
+}
+.theme-savebar-status { flex: 1 1 220px; min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
 
 .theme-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .te-section {
@@ -1158,17 +1164,12 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   font-size: 10.5px; text-transform: capitalize;
 }
 .theme-field-wide { grid-column: 1 / -1; }
-
-.theme-side {
-  position: sticky; top: 10px;
-  background: #fff; border: 1px solid var(--border); border-radius: 14px;
-  padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+.theme-logo-row { display: flex; gap: 8px; align-items: center; }
+.theme-logo-row .f-input-wrap, .theme-logo-row input { flex: 1; min-width: 0; }
+.theme-logo-thumb {
+  width: 38px; height: 38px; object-fit: contain; border-radius: 9px;
+  border: 1px solid var(--border); background: #fff; padding: 3px; flex: none;
 }
-@media (max-width: 1060px) { .theme-side { position: static; } }
-.theme-side-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
-.theme-side-actions .btn { justify-content: center; }
-.theme-pv-body { min-height: 210px; display: flex; flex-direction: column; justify-content: center; }
-.theme-pv-designs { display: inline-flex; }
 
 /* ---- Design template marketplace (company Appearance area) ------------- */
 .market-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
@@ -1906,3 +1907,48 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 @media (max-width: 640px) {
   .studio-ov { width: min(72vw, 210px); }
 }
+
+/* ---- GLSL shader element -------------------------------------------------- */
+.studio-shader-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---- Coverflow: 3D depth carousel ----------------------------------------- */
+.tpl-coverflow { cursor: grab; touch-action: pan-y; }
+.tpl-coverflow:active { cursor: grabbing; }
+.tpl-coverflow-scene {
+  position: absolute; inset: 0;
+  perspective: 1300px; transform-style: preserve-3d;
+}
+.tpl-coverflow-slide {
+  position: absolute; top: 0; left: 0;
+  transition: transform .55s cubic-bezier(.22, .61, .36, 1), opacity .45s ease;
+  will-change: transform; transform-style: preserve-3d;
+}
+.tpl-coverflow-slide.is-active { transition-duration: .5s; }
+
+/* ---- Tilt: mouse-reactive 3D card ----------------------------------------- */
+.tpl-tilt { perspective: 900px; }
+.tpl-tilt-card {
+  position: relative; transform-style: preserve-3d;
+  will-change: transform; border-radius: inherit;
+}
+.tpl-tilt-glare {
+  position: absolute; inset: 0; z-index: 15; pointer-events: none;
+  border-radius: inherit; transition: opacity .3s ease;
+  mix-blend-mode: soft-light;
+}
+
+/* ---- Studio draft note (customise without applying) ----------------------- */
+.studio-draft-note {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center;
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: 7px 12px; margin-bottom: 8px;
+}
+
+/* ---- Widget page: draft banner -------------------------------------------- */
+.draft-banner {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 14px;
+}
+.draft-banner > span:first-child { color: #3730a3; }
+.draft-banner-actions { display: inline-flex; gap: 6px; margin-left: auto; }

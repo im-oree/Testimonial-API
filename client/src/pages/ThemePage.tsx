@@ -1,9 +1,9 @@
 /** Company workspace — Appearance & theme (own page under Settings).
  *
- * Organised as: a status strip up top, then the three-zone ThemeEditor
- * (template catalogue -> fine-tune -> live preview with real widgets), then
+ * Organised as: a status strip up top, then the two-zone ThemeEditor
+ * (template catalogue -> fine-tune tokens, with a sticky save bar), then
  * two short explainer cards. Everything here is company-wide; per-product
- * designs live on each product's Connect & design page.
+ * widget designs live in each product's design studio.
  */
 import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
@@ -122,8 +122,8 @@ export default function ThemePage() {
               <Link to="/app/settings/theme/marketplace">design template marketplace</Link>.
             </li>
             <li>
-              <strong>Per-product design</strong>: each product picks its own widget look (classic grid, wall of love, carousel,
-              spotlight, marquee, orbit) and can override any token on its Connect &amp; design page.
+              <strong>Per-product design</strong>: each product builds its widget from a fixed-dimension template and customises it
+              in the <Link to="/app/products">design studio</Link> — colours, typography, layouts, carousel and marquee behaviors.
             </li>
             <li>
               <strong>Versioning</strong>: every save here (and every product design save) bumps a version that public surfaces pick

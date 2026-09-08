@@ -4,7 +4,7 @@
  * Two modes:
  *   · Full page   — brand header, the product's WIDGET (its template-based,
  *                   studio-edited design cycling live reviews) as the hero,
- *                   then every approved review below in the browse design.
+ *                   plus the review stats and a link to the form.
  *   · ?embed=1    — the widget itself, at its exact fixed dimensions, used
  *                   inside the <iframe> created by /widget/embed.js. No chrome,
  *                   transparent background. The embed is the product's main
@@ -17,7 +17,7 @@ import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import type { PublicWall } from '../lib/types';
 import type { StudioRecord } from '../design-studio/types';
-import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, type WidgetItem, type WidgetTokens } from '../widgets';
+import type { WidgetTokens } from '../widgets';
 import { TemplateWidget } from '../widgets/TemplateWidget';
 import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
@@ -123,8 +123,6 @@ export default function WallPage() {
     '--font-stack': FONT_OPTIONS.find((f) => f.id === th?.font)?.stack ?? 'inherit',
   } as React.CSSProperties;
 
-  const designId = (q.get('design') || wall.design || DEFAULT_WIDGET_DESIGN).trim();
-  const { meta, component: Widget } = getWidgetDesign(designId);
   const tokens: WidgetTokens = {
     primary: th?.primary ?? wall.brandColor,
     soft: th?.soft ?? '#e0f5f4',
@@ -132,13 +130,6 @@ export default function WallPage() {
     radiusPx: th?.radiusPx ?? 14,
     font: th?.font ?? 'system',
   };
-  const items: WidgetItem[] = wall.testimonials.map((t) => ({
-    id: t.id,
-    content: t.content,
-    authorName: t.authorName ?? 'Anonymous visitor',
-    rating: t.rating ?? null,
-    createdAt: t.createdAt,
-  }));
   // Records that fill the product's widget template (same shape the studio
   // preview uses — bound fields resolve from these).
   const widgetRecords: StudioRecord[] = wall.testimonials.map((t) => ({
@@ -152,21 +143,13 @@ export default function WallPage() {
   // Widget mode: the product's template at its exact fixed dimensions —
   // designed to be embedded on external websites.
   if (embed) {
-    if (wall.widget) {
-      return (
-        <div className="wall wall-embed wall-template">
-          <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
-        </div>
-      );
-    }
     return (
-      <div className="wall wall-embed" style={vars}>
-        <div className="sr-only">{meta.name} — {count} review{count === 1 ? '' : 's'}</div>
-        <Widget
-          items={items}
-          tokens={tokens}
-          cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null}
-        />
+      <div className="wall wall-embed wall-template">
+        {wall.widget ? (
+          <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+        ) : (
+          <WidgetEmpty tokens={tokens} cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null} />
+        )}
       </div>
     );
   }
@@ -206,20 +189,14 @@ export default function WallPage() {
                   </>
                 )}
               </span>
-              <span className="muted small chip" title={`Design: ${meta.name}`}>
-                {meta.name}
-              </span>
               {wall.form && (
                 <Link to={`/forms/${wall.form.slug}`} className="btn btn-teal">
                   Add a Review +
                 </Link>
               )}
             </div>
-            <div className="wall-design">
-              <Widget items={items} tokens={tokens} cta={null} />
-            </div>
             <p className="muted small" style={{ textAlign: 'center' }}>
-              Latest review {timeAgo(items[0]?.createdAt ?? '')}
+              Latest review {timeAgo(wall.testimonials[0]?.createdAt ?? '')}
             </p>
           </>
         )}

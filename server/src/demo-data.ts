@@ -95,6 +95,14 @@ export interface DemoApp {
   studioSchema?: unknown | null;
   studioVersion?: number;
   studioUpdatedAt?: string | null;
+  /**
+   * Unpublished design draft (preview/customize/save without applying): a
+   * schema being tuned in the studio before an explicit publish pushes it
+   * into studioSchema (the live embed). Null = no draft.
+   */
+  designDraft?: unknown | null;
+  designDraftTemplateId?: string | null;
+  designDraftUpdatedAt?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -846,6 +854,49 @@ export const DEMO = {
     const saved = DEMO.updateStudioSchema(appId, JSON.parse(JSON.stringify(template.schema)));
     return saved ?? { ...app };
   },
+
+  /** Start an unpublished draft from a template (or the current live design):
+   *  the studio customises it and only an explicit publish touches the embed. */
+  startDesignDraft(appId: string, template: { id: string; schema: unknown } | null): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    const base = template ? JSON.parse(JSON.stringify(template.schema)) : app.studioSchema ?? null;
+    app.designDraft = base;
+    app.designDraftTemplateId = template ? template.id : app.designTemplateId ?? null;
+    app.designDraftUpdatedAt = new Date().toISOString();
+    return { ...app };
+  },
+
+  /** Save the unpublished draft (studio Save button). */
+  updateDesignDraft(appId: string, schema: unknown): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designDraft = schema;
+    app.designDraftUpdatedAt = new Date().toISOString();
+    return { ...app };
+  },
+
+  /** Publish the draft: it becomes the live design the embed serves. */
+  publishDesignDraft(appId: string): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app || app.designDraft == null) return undefined;
+    if (app.designDraftTemplateId) app.designTemplateId = app.designDraftTemplateId;
+    const saved = DEMO.updateStudioSchema(appId, JSON.parse(JSON.stringify(app.designDraft)));
+    app.designDraft = null;
+    app.designDraftTemplateId = null;
+    app.designDraftUpdatedAt = null;
+    return saved ?? { ...app };
+  },
+
+  /** Throw the draft away and keep the live design. */
+  discardDesignDraft(appId: string): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designDraft = null;
+    app.designDraftTemplateId = null;
+    app.designDraftUpdatedAt = null;
+    return { ...app };
+  },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
   appSummary(app: DemoApp) {
     const rows = TESTIMONIALS.filter((r) => r.appId === app.id);
@@ -873,6 +924,9 @@ export const DEMO = {
       designVersion: app.designVersion ?? 0,
       studioVersion: app.studioVersion ?? 0,
       designOptions: app.designOptions ?? null,
+      designDraft: app.designDraft
+        ? { templateId: app.designDraftTemplateId ?? null, updatedAt: app.designDraftUpdatedAt ?? null }
+        : null,
       status: app.status,
       createdAt: app.createdAt,
       totalTestimonials: rows.length,

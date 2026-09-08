@@ -18,6 +18,13 @@ import { cloneSchema, createDefaultElement, starterSchema } from './element-fact
 import type { ElementType, StudioElement, StudioRecord, StudioSaveResponse, StudioSchema, WidgetBehavior } from './types';
 import { DEFAULT_BEHAVIOR } from './types';
 
+/** GET/PATCH /v1/dashboard/apps/:appId/design/draft */
+interface DraftResponse {
+  schema: StudioSchema | null;
+  templateId: string | null;
+  updatedAt: string | null;
+}
+
 interface EditorState {
   // Core
   appId: string | null;
@@ -25,6 +32,13 @@ interface EditorState {
   schema: StudioSchema | null;
   isLoading: boolean;
   loadError: string | null;
+
+  /** True while editing an unpublished draft — saving never publishes. */
+  isDraft: boolean;
+  draftTemplateId: string | null;
+  publishing: boolean;
+  publishError: string | null;
+  publishedAt: number | null;
 
   // Selection / hover
   selectedIds: string[];
@@ -68,13 +82,15 @@ interface EditorState {
 
   updateSchemaName: (name: string) => void;
   updateCanvas: (patch: { width?: number; height?: number; background?: string }) => void;
-  /** Edit the live widget's multi-review behavior (cycle / carousel / marquee). */
+  /** Edit the live widget's multi-review behavior (cycle / carousel / marquee / coverflow / tilt). */
   updateBehavior: (patch: Partial<WidgetBehavior>) => void;
 
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
   save: () => Promise<boolean>;
+  /** Push the saved draft live (the only path that changes the embed). */
+  publish: () => Promise<boolean>;
 }
 
 const HISTORY_CAP = 60;
@@ -90,6 +106,11 @@ export const useEditorStore = create<EditorState>()(
     schema: null,
     isLoading: false,
     loadError: null,
+    isDraft: false,
+    draftTemplateId: null,
+    publishing: false,
+    publishError: null,
+    publishedAt: null,
     selectedIds: [],
     hoveredId: null,
     past: [],
@@ -107,8 +128,25 @@ export const useEditorStore = create<EditorState>()(
     load: async (appId, productName) => {
       const prevApp = get().appId;
       if (prevApp !== appId) set({ schema: null, past: [], future: [], selectedIds: [] });
-      set({ appId, productName, isLoading: true, loadError: null, previewMode: false });
+      set({ appId, productName, isLoading: true, loadError: null, previewMode: false, publishedAt: null });
       try {
+        // Draft-first: an unpublished customisation wins over the live design —
+        // the studio never touches the live embed until you publish.
+        const draft = await api.get<DraftResponse>(`/v1/dashboard/apps/${appId}/design/draft`);
+        const ds = draft.schema;
+        if (ds) {
+          set((s) => {
+            s.schema = cloneSchema(ds);
+            s.schema.behavior = { ...DEFAULT_BEHAVIOR, ...(ds.behavior ?? {}) };
+            s.isDraft = true;
+            s.draftTemplateId = draft.templateId ?? null;
+            s.savedStudioVersion = 0;
+            s.designVersion = 0;
+            s.isLoading = false;
+            s.selectedIds = [];
+          });
+          return;
+        }
         const res = await api.get<StudioSaveResponse>(`/v1/dashboard/apps/${appId}/design/schema`);
         set((s) => {
           if (res.schema) {
@@ -117,11 +155,17 @@ export const useEditorStore = create<EditorState>()(
             // behavior panel always has a complete object to edit.
             s.schema.behavior = { ...DEFAULT_BEHAVIOR, ...(res.schema.behavior ?? {}) };
             s.savedStudioVersion = res.studioVersion;
+            // Live design loaded straight into the editor: the next save turns
+            // it into a draft (never a silent live change).
+            s.isDraft = false;
+            s.draftTemplateId = null;
           } else {
             // No saved schema yet: give the studio the starter draft. It is a
             // brand-new draft — mark dirty so the first Save is obvious.
             s.schema = starterSchema(productName);
             s.savedStudioVersion = 0;
+            s.isDraft = false;
+            s.draftTemplateId = null;
             s.dirty = true;
           }
           s.designVersion = res.designVersion;
@@ -364,19 +408,50 @@ export const useEditorStore = create<EditorState>()(
       if (!schema || !appId) return false;
       set({ saving: true, saveError: null });
       try {
-        const res = await api.patch<StudioSaveResponse>(`/v1/dashboard/apps/${appId}/design/schema`, {
+        // Saving writes the DRAFT — the live embed only changes when you
+        // publish. Editing a live design turns it into a draft on first save.
+        const res = await api.patch<DraftResponse>(`/v1/dashboard/apps/${appId}/design/draft`, {
           schema: { ...cloneSchema(schema), version: schema.version },
         });
         set((s) => {
           s.schema = cloneSchema(res.schema ?? schema);
+          if (s.schema) s.schema.behavior = { ...DEFAULT_BEHAVIOR, ...(s.schema.behavior ?? {}) };
           s.saving = false;
           s.dirty = false;
-          s.savedStudioVersion = res.studioVersion;
-          s.designVersion = res.designVersion;
+          s.isDraft = true;
+          s.draftTemplateId = res.templateId ?? s.draftTemplateId;
         });
         return true;
       } catch (err) {
         set({ saving: false, saveError: err instanceof Error ? err.message : 'Could not save the design.' });
+        return false;
+      }
+    },
+
+    publish: async () => {
+      const { schema, appId, dirty } = get();
+      if (!schema || !appId) return false;
+      set({ publishing: true, publishError: null });
+      try {
+        if (dirty) {
+          const saved = await get().save();
+          if (!saved) {
+            set({ publishing: false });
+            return false;
+          }
+        }
+        const res = await api.post<StudioSaveResponse>(`/v1/dashboard/apps/${appId}/design/draft/publish`);
+        set((s) => {
+          s.publishing = false;
+          s.isDraft = false;
+          s.draftTemplateId = null;
+          s.savedStudioVersion = res.studioVersion;
+          s.designVersion = res.designVersion;
+          s.publishedAt = Date.now();
+        });
+        return true;
+      } catch (err) {
+        set({ publishing: false, publishError: err instanceof Error ? err.message : 'Could not publish the design.' });
         return false;
       }
     },

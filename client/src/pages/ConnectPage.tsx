@@ -17,7 +17,7 @@
  */
 import { IconCheck, IconCopy, IconEdit, IconExternal } from '../components/icons';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAppName } from '../lib/useAppName';
 import type { AppSummary, WidgetTemplateRow } from '../lib/types';
@@ -70,6 +70,7 @@ function TemplatePreview({ schema }: { schema: StudioSchema }) {
 export default function ConnectPage() {
   const { appId = '' } = useParams();
   const appName = useAppName(appId);
+  const navigate = useNavigate();
 
   const [templates, setTemplates] = useState<WidgetTemplateRow[] | null>(null);
   const [app, setApp] = useState<AppSummary | null>(null);
@@ -111,6 +112,35 @@ export default function ConnectPage() {
       flash(`${t.name} applied — your widget now uses it.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply the template.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Preview & customise WITHOUT applying: starts an unpublished draft from
+   *  the template and opens the studio. The live embed is untouched until the
+   *  draft is published from the studio. */
+  async function customizeTemplate(t: WidgetTemplateRow): Promise<void> {
+    setBusyId(t.id);
+    setError(null);
+    try {
+      await api.post(`/v1/apps/${appId}/widget-template/${t.id}/draft`);
+      navigate(`/app/a/${appId}/studio`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start a draft from this template.');
+      setBusyId(null);
+    }
+  }
+
+  async function discardDraft(): Promise<void> {
+    setBusyId('discard');
+    setError(null);
+    try {
+      const res = await api.del<{ app: AppSummary }>(`/v1/dashboard/apps/${appId}/design/draft`);
+      setApp(res.app);
+      flash('Draft discarded — the live design stays as it is.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not discard the draft.');
     } finally {
       setBusyId(null);
     }
@@ -171,6 +201,23 @@ export default function ConnectPage() {
         </div>
       )}
 
+      {app?.designDraft && (
+        <div className="draft-banner" role="status">
+          <span className="strong small">
+            Draft in progress{app.designDraft.templateId ? ` — ${templates?.find((t) => t.id === app.designDraft?.templateId)?.name ?? app.designDraft.templateId}` : ''}
+          </span>
+          <span className="muted small">Customising without applying: the live embed keeps serving your published design until you publish from the studio.</span>
+          <span className="draft-banner-actions">
+            <Link className="btn btn-secondary btn-xs" to={`/app/a/${appId}/studio`}>
+              <IconEdit size={12} /> Open studio
+            </Link>
+            <Button variant="ghost" className="btn-xs" disabled={busyId === 'discard'} onClick={() => void discardDraft()}>
+              Discard draft
+            </Button>
+          </span>
+        </div>
+      )}
+
       {/* ---- 1 · Pick a template ------------------------------------------ */}
       <section className="tpl-section">
         <div className="section-head">
@@ -224,9 +271,14 @@ export default function ConnectPage() {
                           <IconEdit size={13} /> Customize
                         </Link>
                       ) : (
-                        <Button className="btn-sm" disabled={busyId === t.id} onClick={() => requestApply(t)}>
-                          {busyId === t.id ? 'Applying…' : 'Use this template'}
-                        </Button>
+                        <>
+                          <Button className="btn-sm" disabled={busyId === t.id} onClick={() => requestApply(t)} title="Apply now — the embed switches to this template immediately">
+                            {busyId === t.id ? 'Applying…' : 'Apply now'}
+                          </Button>
+                          <Button variant="secondary" className="btn-sm" disabled={busyId === t.id} onClick={() => void customizeTemplate(t)} title="Preview & customise it in the studio first — nothing goes live until you publish">
+                            Preview &amp; customize
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

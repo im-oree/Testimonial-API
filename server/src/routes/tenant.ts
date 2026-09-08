@@ -195,6 +195,23 @@ tenantRouter.post('/apps/:appId/widget-template/:templateId/apply', (req, res) =
   });
 });
 
+// POST /v1/apps/:appId/widget-template/:templateId/draft — start an
+// UNPUBLISHED draft from a template: preview & customise & save it in the
+// studio without touching the live embed until an explicit publish.
+tenantRouter.post('/apps/:appId/widget-template/:templateId/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const template = widgetTemplateById(req.params.templateId);
+  if (!template) throw notFound('Template not found.');
+  const updated = DEMO.startDesignDraft(req.params.appId, template);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    app: DEMO.appSummary(updated),
+    template: { id: template.id, name: template.name, width: template.width, height: template.height },
+  });
+});
+
 // GET /v1/dashboard/apps/:appId/design/schema — the product's visual-editor
 // schema draft (DOC 7B). Null until the studio saves one for this product.
 tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
@@ -238,6 +255,76 @@ tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
     updatedAt: updated.studioUpdatedAt ?? null,
     designVersion: updated.designVersion ?? 0,
   });
+});
+
+// GET /v1/dashboard/apps/:appId/design/draft — the unpublished draft the
+// studio is customising (null when the live design is what you see).
+tenantRouter.get('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  res.json({
+    schema: app.designDraft ?? null,
+    templateId: app.designDraftTemplateId ?? null,
+    updatedAt: app.designDraftUpdatedAt ?? null,
+  });
+});
+
+// PATCH /v1/dashboard/apps/:appId/design/draft — save the studio draft. Same
+// contract as the live schema save (size cap + required components), but it
+// never touches the public embed — publishing is a separate explicit step.
+tenantRouter.patch('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  const schema = (req.body as Record<string, unknown> | undefined)?.schema ?? null;
+  if (schema !== null && (typeof schema !== 'object' || Array.isArray(schema))) throw badRequest('Schema must be a design JSON object or null.');
+  const serialized = JSON.stringify(schema ?? {});
+  if (serialized.length > 400_000) throw badRequest('Schema is too large (max 400 KB).');
+  if (schema !== null) {
+    const missing = missingWidgetFields(schema);
+    if (missing.length > 0) {
+      throw badRequest(`A widget must keep its required components — add back: ${missing.join(', ')}.`);
+    }
+  }
+  const updated = DEMO.updateDesignDraft(req.params.appId, schema);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    schema: updated.designDraft ?? null,
+    templateId: updated.designDraftTemplateId ?? null,
+    updatedAt: updated.designDraftUpdatedAt ?? null,
+  });
+});
+
+// POST /v1/dashboard/apps/:appId/design/draft/publish — push the draft live:
+// this is the ONLY studio path that changes what the embed serves.
+tenantRouter.post('/dashboard/apps/:appId/design/draft/publish', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const updated = DEMO.publishDesignDraft(req.params.appId);
+  if (!updated) throw notFound('No draft to publish — save one first.');
+  res.json({
+    schema: updated.studioSchema ?? null,
+    studioVersion: updated.studioVersion ?? 0,
+    updatedAt: updated.studioUpdatedAt ?? null,
+    designVersion: updated.designVersion ?? 0,
+  });
+});
+
+// DELETE /v1/dashboard/apps/:appId/design/draft — throw the draft away and
+// keep serving the live design.
+tenantRouter.delete('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const updated = DEMO.discardDesignDraft(req.params.appId);
+  if (!updated) throw notFound('App not found.');
+  res.json({ app: DEMO.appSummary(updated) });
 });
 
 // GET /v1/dashboard/apps/:appId/design — current versioned design + history.

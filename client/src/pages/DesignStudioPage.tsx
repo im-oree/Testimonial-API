@@ -9,6 +9,8 @@
  *     screen; panels can be hidden for maximum stage)
  *   · per-element per-corner radius, entrance animations, and the live
  *     widget behavior (cycle / swipe carousel / marquee) edited right here
+ *   · Draft-first: Save writes an unpublished draft; Publish is the only
+ *     action that changes what the live embed serves
  *   · Preview renders the REAL TemplateWidget — the exact component the
  *     embed iframe runs — so previews and live output can never drift
  *   · Zustand + Immer store with undo/redo, snap engine, data bindings,
@@ -22,7 +24,7 @@ import { useEditorStore } from '../design-studio/editor-store';
 import { SchemaSurface } from '../design-studio/runtime';
 import { TemplateWidget } from '../widgets/TemplateWidget';
 import { snapBox, type SnapGuide } from '../design-studio/snap-engine';
-import { MIN_SIZE, type WidgetBehavior } from '../design-studio/types';
+import { MIN_SIZE, SHADER_PRESETS, type ShaderPreset, type WidgetBehavior } from '../design-studio/types';
 import { elementToCSS } from '../design-studio/css';
 import { ANIMATION_PRESETS } from '../design-studio/animation-presets';
 import { boundFieldId, boundValue, displayText, FIELD_DEFS, fieldDefOf } from '../design-studio/data-binder';
@@ -40,6 +42,7 @@ const ELEMENTS: Array<{ type: ElementType; label: string; hint: string }> = [
   { type: 'button', label: 'Button', hint: 'CTA block' },
   { type: 'container', label: 'Card', hint: 'Backdrop panel' },
   { type: 'spacer', label: 'Spacer', hint: 'Breathing room' },
+  { type: 'shader', label: 'Shader', hint: 'Animated GLSL backdrop' },
 ];
 
 const PALETTE_SWATCHES = ['#1b2559', '#0ea5a0', '#2563eb', '#7c3aed', '#e11d48', '#f59e0b', '#0f172a', '#ffffff'];
@@ -398,7 +401,15 @@ export default function DesignStudioPage() {
             aria-label="Design name"
             onChange={(e) => store.updateSchemaName(e.target.value)}
           />
-          {store.dirty ? <span className="chip chip-pending">Unsaved</span> : <span className="chip chip-approved"><IconCheck size={11} /> Saved</span>}
+          {store.isDraft ? (
+            <span className="chip chip-pending" title="Your customisation is safe — publish it when you're ready">Draft · not live</span>
+          ) : store.dirty ? (
+            <span className="chip chip-pending">Unsaved</span>
+          ) : store.publishedAt ? (
+            <span className="chip chip-approved"><IconCheck size={11} /> Live</span>
+          ) : (
+            <span className="chip chip-approved"><IconCheck size={11} /> Saved</span>
+          )}
         </div>
         <div className="studio-tb-right">
           <div className="segmented" role="group" aria-label="Editor mode">
@@ -429,14 +440,25 @@ export default function DesignStudioPage() {
           <span className="chip" title="Fixed template dimensions — the embed reserves exactly this space">
             {schema.canvas.width} × {schema.canvas.height}
           </span>
-          <Button className="btn-sm" disabled={store.saving || !store.dirty} onClick={() => void store.save()}>
-            {store.saving ? 'Saving…' : 'Save design'}
+          <Button variant="secondary" className="btn-sm" disabled={store.saving || !store.dirty} onClick={() => void store.save()} title="Saves your customisation without changing the live embed">
+            {store.saving ? 'Saving…' : 'Save draft'}
           </Button>
+          {(store.isDraft || store.dirty) && (
+            <Button className="btn-sm" disabled={store.publishing} onClick={() => void store.publish()} title="Push the saved draft live — this is what the embed will serve">
+              {store.publishing ? 'Publishing…' : 'Publish'}
+            </Button>
+          )}
         </div>
       </div>
-      {(store.saveError || guardError) && (
+      {store.isDraft && !store.previewMode && (
+        <div className="studio-draft-note" role="status">
+          <span className="strong">Customising “{schema.name}” as a draft</span>
+          <span className="muted small"> — the live embed keeps serving your published design until you hit Publish.</span>
+        </div>
+      )}
+      {(store.saveError || store.publishError || guardError) && (
         <div className="banner banner-error" role="alert">
-          <span>{store.saveError ?? guardError}</span>
+          <span>{store.saveError ?? store.publishError ?? guardError}</span>
         </div>
       )}
 
@@ -820,6 +842,8 @@ function PropertiesPanel({ onDeleteSelected }: { onDeleteSelected: () => void })
           <SelectField size="sm" value={b.mode} onChange={(e) => setB({ mode: e.target.value as WidgetBehavior['mode'] })}>
             <option value="cycle">Cycle — one review at a time (cross-fade)</option>
             <option value="carousel">Carousel — swipeable / draggable slides</option>
+            <option value="coverflow">Coverflow — 3D depth carousel, leans with the cursor</option>
+            <option value="tilt">Tilt — mouse-reactive 3D card</option>
             <option value="marquee">Marquee — continuous stream</option>
           </SelectField>
         </Field>
@@ -1042,6 +1066,35 @@ function PropertiesPanel({ onDeleteSelected }: { onDeleteSelected: () => void })
           <div className="studio-panel-label">Image</div>
           <Field label="Image URL">
             <TextInput value={single.imageUrl ?? ''} placeholder="https://example.com/picture.jpg" onChange={(e) => upd(single.id, { imageUrl: e.target.value || null })} />
+          </Field>
+        </>
+      )}
+
+      {single.type === 'shader' && (
+        <>
+          <hr className="divider" style={{ margin: '8px 0' }} />
+          <div className="studio-panel-label">Shader</div>
+          <Field label="Preset" hint="A live GLSL animation on a WebGL canvas — the same one the embed renders.">
+            <SelectField
+              size="sm"
+              value={single.shader?.preset ?? 'aurora'}
+              onChange={(e) => upd(single.id, { shader: { preset: e.target.value as ShaderPreset, speed: single.shader?.speed ?? 1 } })}
+            >
+              {SHADER_PRESETS.map((s) => (
+                <option key={s.id} value={s.id}>{s.label} — {s.hint}</option>
+              ))}
+            </SelectField>
+          </Field>
+          <Field label={`Speed · ${(single.shader?.speed ?? 1).toFixed(2)}×`}>
+            <input
+              className="f-range-slider"
+              type="range"
+              min={0.1}
+              max={3}
+              step={0.05}
+              value={single.shader?.speed ?? 1}
+              onChange={(e) => upd(single.id, { shader: { preset: single.shader?.preset ?? 'aurora', speed: Number(e.target.value) } })}
+            />
           </Field>
         </>
       )}
