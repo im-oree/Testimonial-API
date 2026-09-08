@@ -3,7 +3,8 @@ import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { api, storeSessionToken } from '../lib/api';
 import { useAuth } from '../auth';
-import { Breadcrumbs, Button, Card, ErrorBanner, Label, PageHeader, TextInput } from '../components/ui';
+import { Breadcrumbs, Button, Card, ErrorBanner, PageHeader } from '../components/ui';
+import { Field, PasswordInput, TextInput } from '../components/fields';
 import { SkeletonCards } from '../components/Skeleton';
 
 interface AccountInfo {
@@ -98,14 +99,12 @@ export default function AccountPage() {
               Your name and sign-in email. Changing the email updates it everywhere and keeps you signed in.
             </p>
             <form className="stack" onSubmit={(e) => void saveProfile(e)}>
-              <div>
-                <Label>Full name</Label>
-                <TextInput value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
+              <Field label="Full name" required htmlFor="ac-name">
+                <TextInput id="ac-name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+              </Field>
+              <Field label="Sign-in email" required hint="Changing the email updates it everywhere and keeps you signed in." htmlFor="ac-email">
+                <TextInput id="ac-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+              </Field>
               <div className="modal-actions">
                 <Button type="submit" disabled={busy}>
                   {busy ? 'Saving…' : 'Save profile'}
@@ -120,18 +119,15 @@ export default function AccountPage() {
               {`Demo account — current password is demo1234 for every seeded user.`}
             </p>
             <form className="stack" onSubmit={(e) => void changePassword(e)}>
-              <div>
-                <Label>Current password</Label>
-                <TextInput type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-              </div>
-              <div>
-                <Label>New password (min 6 characters)</Label>
-                <TextInput type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-              </div>
-              <div>
-                <Label>Confirm new password</Label>
-                <TextInput type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-              </div>
+              <Field label="Current password" htmlFor="ac-cur">
+                <PasswordInput id="ac-cur" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+              </Field>
+              <Field label="New password" hint="At least 6 characters." htmlFor="ac-new">
+                <PasswordInput id="ac-new" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+              </Field>
+              <Field label="Confirm new password" error={newPassword !== confirmPassword && confirmPassword !== '' ? 'Passwords do not match.' : null} htmlFor="ac-confirm">
+                <PasswordInput id="ac-confirm" invalid={newPassword !== confirmPassword && confirmPassword !== ''} autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+              </Field>
               <div className="modal-actions">
                 <Button type="submit" disabled={busy}>
                   {busy ? 'Updating…' : 'Change password'}

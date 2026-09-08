@@ -8,7 +8,8 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, FullScreenLoading } from '../auth';
 import { api, ApiError, getAuthDebug, recordAuthDebug, storeSessionToken } from '../lib/api';
-import { Button, ErrorBanner, Label, TextInput } from '../components/ui';
+import { Button, ErrorBanner } from '../components/ui';
+import { Field, PasswordInput, TextInput } from '../components/fields';
 import type { LoginResponse } from '../lib/types';
 
 type Mode = 'company' | 'platform';
@@ -30,9 +31,13 @@ const MODE_META: Record<Mode, { title: string; subtitle: string; endpoint: strin
   },
 };
 
-const DEMO_ACCOUNTS: Array<{ mode: Mode; email: string; password: string }> = [
-  { mode: 'company', email: 'owner@acme.test', password: 'demo1234' },
-  { mode: 'platform', email: 'admin@zojatech.test', password: 'demo1234' },
+const DEMO_ACCOUNTS: Array<{ mode: Mode; label: string; email: string; password: string }> = [
+  { mode: 'company', label: 'Company workspace · owner', email: 'owner@acme.test', password: 'demo1234' },
+  { mode: 'company', label: 'Company workspace · editor', email: 'editor@acme.test', password: 'demo1234' },
+  { mode: 'company', label: 'Company workspace · viewer', email: 'chris@acme.test', password: 'demo1234' },
+  { mode: 'platform', label: 'Platform · super admin', email: 'admin@zojatech.test', password: 'demo1234' },
+  { mode: 'platform', label: 'Platform · admin', email: 'tolu@zojatech.test', password: 'demo1234' },
+  { mode: 'platform', label: 'Platform · editor', email: 'kemi@zojatech.test', password: 'demo1234' },
 ];
 
 const REASON_MESSAGES: Record<string, string> = {
@@ -127,14 +132,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit} className="stack">
-          <div>
-            <Label>Email</Label>
-            <TextInput type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
-          </div>
-          <div>
-            <Label>Password</Label>
-            <TextInput type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-          </div>
+          <Field label="Email" required htmlFor="login-email">
+            <TextInput id="login-email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+          </Field>
+          <Field label="Password" required htmlFor="login-password">
+            <PasswordInput id="login-password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          </Field>
           <Button type="submit" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </Button>
@@ -147,7 +150,7 @@ export default function LoginPage() {
         <div className="demo-list">
           {DEMO_ACCOUNTS.map((account) => (
             <Button key={account.email} variant="secondary" type="button" disabled={busy} onClick={() => demoSignIn(account)}>
-              <span className="demo-btn-main">{MODE_META[account.mode].demoLabel}</span>
+              <span className="demo-btn-main">{account.label}</span>
               <span className="demo-btn-sub">{account.email} · {account.password}</span>
             </Button>
           ))}
