@@ -116,6 +116,13 @@ The point of the app: **templated, editable widgets** you embed on any website.
   template, configure what the widget does with your reviews (mode, timing,
   count cap), tune the look (colours, radius, text size) with a live preview
   of your real reviews at every step, then save as a draft or publish.
+- **AI Studio** (`/app/ai`) — describe the widget you want in plain words
+  ("a dark midnight carousel with gold star ratings"); the generator
+  synthesises a complete design — palette, motion mode, canvas, layout —
+  previews it with your live reviews, and supports regenerate, refine ("make
+  the cards rounder, use violet") and a this-session history. One click
+  takes it to the studio as a draft or straight to the live embed. No
+  external AI service: a deterministic, seeded keyword synthesizer.
 - **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
   to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
   an immersive full-bleed stage (app sidebar collapses to the icon rail, the
