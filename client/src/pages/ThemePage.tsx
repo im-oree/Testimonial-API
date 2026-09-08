@@ -81,7 +81,7 @@ export default function ThemePage() {
         <summary>Where does this theme show up? (and why it updates everywhere)</summary>
         <ul className="plain-list">
           <li>Every product&apos;s <strong>public review form</strong> and <strong>wall</strong> ({' '}
-            <Link to="/app/products">Products</Link> → Connect) render with these tokens.
+            <Link to="/app/products">Products</Link> — set up under Connect &amp; design) render with these tokens.
           </li>
           <li>The <strong>widget script</strong> and <strong>iframe embeds</strong> on your external sites pull the same theme on every load — change it once here and all embeds follow on their next visit. Nothing to redeploy.</li>
           <li>A single product can still <strong>override</strong> specific tokens on its own Connect &amp; design page (e.g. one website with its own accent).</li>

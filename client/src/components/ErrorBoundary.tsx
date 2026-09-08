@@ -38,14 +38,14 @@ export function ErrorScreen({ title = 'Something went wrong', message }: { title
       )}
       <div className="error-actions">
         <Button variant="ghost" onClick={() => navigate(-1)}>
-          ← Go back
+          Go back
         </Button>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Reload page
         </Button>
         {status === 'signedIn' ? (
           <Link className="btn btn-primary" to={home}>
-            Go to my dashboard →
+            Go to my dashboard
           </Link>
         ) : (
           <Link className="btn btn-primary" to="/login">
@@ -71,11 +71,11 @@ export function NotFoundScreen({ title = 'Page not found' }: { title?: string })
       {role && <p className="muted small">{role} We’ve pointed the button below at the right home for you.</p>}
       <div className="error-actions">
         <Button variant="ghost" onClick={() => navigate(-1)}>
-          ← Go back
+          Go back
         </Button>
         {status === 'signedIn' ? (
           <Link className="btn btn-primary" to={home}>
-            Go to my dashboard →
+            Go to my dashboard
           </Link>
         ) : (
           <Link className="btn btn-primary" to="/login">

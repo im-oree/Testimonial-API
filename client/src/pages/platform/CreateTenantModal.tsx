@@ -1,5 +1,5 @@
 /** Platform console — create tenant setup wizard (modal). */
-import { IconCheck, IconX } from '../../components/icons';
+import {IconCheck, IconX, IconChevronLeft } from '../../components/icons';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -155,7 +155,7 @@ export default function CreateTenantModal({
                 navigate(`/platform/tenants/${created.tenant.id}`);
               }}
             >
-              Open tenant →
+              Open tenant
             </Button>
           </div>
         </motion.div>
@@ -208,7 +208,7 @@ export default function CreateTenantModal({
               </div>
               <div className="modal-actions">
                 <Button variant="secondary" disabled={!step1Ok} onClick={() => setStep(2)}>
-                  Continue →
+                  Continue
                 </Button>
               </div>
             </motion.div>
@@ -244,7 +244,7 @@ export default function CreateTenantModal({
               </p>
               <div className="modal-actions">
                 <Button variant="ghost" onClick={() => setStep(1)}>
-                  ‹ Back
+                  <IconChevronLeft size={14} /> Back
                 </Button>
                 <Button disabled={busy || !step2Ok || !ownerName.trim()} onClick={() => void create()}>
                   {busy ? 'Creating…' : 'Create tenant'}

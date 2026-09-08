@@ -56,7 +56,7 @@ export default function SettingsPage() {
             </div>
             <div className="strong">{c.title}</div>
             <div className="muted small">{c.desc}</div>
-            <span className="cat-go">Open →</span>
+            <span className="cat-go">Open</span>
           </Link>
         ))}
       </div>

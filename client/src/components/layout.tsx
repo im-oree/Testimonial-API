@@ -97,7 +97,7 @@ function Sidebar({
               <span className="muted small">{user.role.replace('_', ' ')}</span>
               {!user.role.startsWith('platform') && (
                 <Link to="/app/settings/account" className="sidebar-account-link">
-                  Account settings →
+                  Account settings
                 </Link>
               )}
             </span>
@@ -276,7 +276,7 @@ export function AppLayout() {
 
   const groups: NavGroup[] = appId
     ? [
-        { items: [{ label: '← All products', to: '/app/products' }] },
+        { items: [{ label: 'All products', to: '/app/products' }] },
         {
           label: 'Product pages',
           items: [

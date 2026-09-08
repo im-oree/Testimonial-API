@@ -140,7 +140,7 @@ export default function TeamPage() {
             <p className="muted small">{role.description}</p>
             <p className="small">
               <span className="strong">{byRole(role.role)}</span> member{byRole(role.role) === 1 ? '' : 's'} ·{' '}
-              <span className="linklike">View permissions →</span>
+              <span className="linklike">View permissions</span>
             </p>
           </button>
         ))}

@@ -1,5 +1,5 @@
 /** Small shared UI pieces — plain CSS classes, no component library. */
-import { IconStar } from './icons';
+import { IconChevronLeft, IconChevronRight, IconStar } from './icons';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 import { Link } from 'react-router-dom';
 import type { TestimonialStatus } from '../lib/types';
@@ -166,10 +166,10 @@ export function Pager({ page, pageCount, total, onChange }: { page: number; page
       </span>
       <div className="pager-buttons">
         <Button variant="secondary" className="btn-xs" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          ‹ Prev
+          <IconChevronLeft size={13} /> Prev
         </Button>
         <Button variant="secondary" className="btn-xs" disabled={page >= pages} onClick={() => onChange(page + 1)}>
-          Next ›
+          Next <IconChevronRight size={13} />
         </Button>
       </div>
     </div>

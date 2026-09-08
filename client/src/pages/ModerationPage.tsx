@@ -1,4 +1,4 @@
-/** One app — moderation queue (pending testimonials → approve/reject). */
+/** One app — moderation queue (pending testimonials — approve or reject). */
 import { IconCheck } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';

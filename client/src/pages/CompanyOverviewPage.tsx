@@ -167,7 +167,7 @@ export default function CompanyOverviewPage() {
           <div className="section-row">
             <h2 style={{ margin: 0 }}>Your products</h2>
             <Link className="small linklike" to="/app/products">
-              Manage all products →
+              Manage all products
             </Link>
           </div>
           <div className="product-grid">
@@ -202,7 +202,7 @@ export default function CompanyOverviewPage() {
                 </div>
                 <div className="muted small">
                   Created {formatDate(a.createdAt)}
-                  <span className="product-open">Open product →</span>
+                  <span className="product-open">Open product</span>
                 </div>
               </Link>
             ))}

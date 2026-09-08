@@ -153,7 +153,7 @@ export default function AppsHomePage() {
                             {app.status === 'active' ? 'Pause' : 'Resume'}
                           </Button>
                           <Link className="btn btn-secondary btn-xs" to={`/app/a/${app.id}/overview`}>
-                            Open →
+                            Open
                           </Link>
                         </div>
                       </td>
@@ -179,7 +179,7 @@ export default function AppsHomePage() {
             The wizard gives you the public review link and wall link — put them on that website.
           </li>
           <li>
-            Visitors submit reviews → they land in that product&apos;s <strong>Moderation</strong> queue.
+            Visitors submit reviews, then they land in that product&apos;s <strong>Moderation</strong> queue.
           </li>
           <li>
             Approve the good ones — they appear in the product&apos;s <strong>Testimonials</strong> and on its public Wall.

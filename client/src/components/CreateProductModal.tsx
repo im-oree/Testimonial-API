@@ -6,7 +6,7 @@
  * The product is created server-side the moment the user leaves step 2; the
  * API provisions its public review form so links work immediately.
  */
-import { IconCheck, IconStar, IconX } from './icons';
+import {IconCheck, IconStar, IconX, IconChevronLeft } from './icons';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -189,7 +189,7 @@ export default function CreateProductModal({
                 navigate(`/app/a/${created.app.id}/overview`);
               }}
             >
-              Open product →
+              Open product
             </Button>
           </div>
         </motion.div>
@@ -255,7 +255,7 @@ export default function CreateProductModal({
               )}
               <div className="modal-actions">
                 <Button variant="secondary" disabled={!canContinue} onClick={() => setStep(2)}>
-                  Continue →
+                  Continue
                 </Button>
               </div>
             </motion.div>
@@ -314,7 +314,7 @@ export default function CreateProductModal({
 
               <div className="modal-actions">
                 <Button variant="ghost" onClick={() => setStep(1)}>
-                  ‹ Back
+                  <IconChevronLeft size={14} /> Back
                 </Button>
                 <Button disabled={busy} onClick={() => void create()}>
                   {busy ? 'Creating…' : 'Create product'}
