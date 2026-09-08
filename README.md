@@ -54,18 +54,31 @@ The point of the app: **templated, editable widgets** you embed on any website.
 
 - **Templates** (`GET /v1/widget-templates`) — a catalogue of fixed-dimension
   designs (Quote Card 720×560, Spotlight Hero 1200×420, Slim Strip 1200×200,
-  Rating Badge 360×320, Story Card 540×760, Bold Statement 800×600). Every
-  template carries the **required rating components** — `review_text`,
-  `reviewer_name`, `review_rating` — plus decorative extras.
+  Rating Badge 360×320, Story Card 540×760, Bold Statement 800×600, Swipe Deck
+  640×480). Every template carries the **required rating components** —
+  `review_text`, `reviewer_name`, `review_rating` — plus decorative extras.
 - **Pick one** on the product's **Widget** page (`POST /v1/apps/:appId/widget-template/:id/apply`);
   a fresh copy becomes the product's design. **Customise** it in the **design studio**
   (colours, typography, positions, extra elements — required components are
   protected client-side and enforced server-side on every save).
+- **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
+  to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
+  an immersive full-bleed stage (app sidebar collapses to the icon rail, the
+  topbar hides), a layers-first left panel with element adding behind a ＋
+  popover, per-corner **or** linked corner radius, and entrance animations with
+  duration/delay.
+- **Widget behavior** — the answer to "what happens when more reviews come in?"
+  Each design carries a `behavior` edited in the studio's properties panel and
+  executed by the live widget: **cycle** (cross-fade, one review at a time),
+  **carousel** (swipeable/draggable slides with touch inertia, dots + arrows),
+  or **marquee** (a continuous stream — direction left/right and speed
+  adjustable, pauses on hover). Auto-advance interval and a max-records cap
+  keep heavy review counts light.
 - **Embed it** — the Widget page hands you the drop-in iframe and auto-sizing
   script. The embed (`/widget/embed.js`) sizes itself to the template's exact
-  dimensions, and the wall inside renders the product's saved schema cycling its
-  live approved reviews — the same runtime the studio preview uses, so editing
-  and live output can never drift apart.
+  dimensions, and the wall inside renders the product's saved schema with its
+  behavior over its live approved reviews — the same runtime the studio preview
+  uses, so editing and live output can never drift apart.
 
 ## Try the full loop
 

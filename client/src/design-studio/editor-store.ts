@@ -15,7 +15,8 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { api } from '../lib/api';
 import { cloneSchema, createDefaultElement, starterSchema } from './element-factory';
-import type { ElementType, StudioElement, StudioRecord, StudioSaveResponse, StudioSchema } from './types';
+import type { ElementType, StudioElement, StudioRecord, StudioSaveResponse, StudioSchema, WidgetBehavior } from './types';
+import { DEFAULT_BEHAVIOR } from './types';
 
 interface EditorState {
   // Core
@@ -67,6 +68,8 @@ interface EditorState {
 
   updateSchemaName: (name: string) => void;
   updateCanvas: (patch: { width?: number; height?: number; background?: string }) => void;
+  /** Edit the live widget's multi-review behavior (cycle / carousel / marquee). */
+  updateBehavior: (patch: Partial<WidgetBehavior>) => void;
 
   pushHistory: () => void;
   undo: () => void;
@@ -110,6 +113,9 @@ export const useEditorStore = create<EditorState>()(
         set((s) => {
           if (res.schema) {
             s.schema = cloneSchema(res.schema);
+            // Designs saved before behaviors existed get the defaults, so the
+            // behavior panel always has a complete object to edit.
+            s.schema.behavior = { ...DEFAULT_BEHAVIOR, ...(res.schema.behavior ?? {}) };
             s.savedStudioVersion = res.studioVersion;
           } else {
             // No saved schema yet: give the studio the starter draft. It is a
@@ -293,6 +299,13 @@ export const useEditorStore = create<EditorState>()(
         if (!s.schema) return;
         s.schema.name = name;
         s.dirty = true;
+      }),
+    updateBehavior: (patch) =>
+      set((s) => {
+        if (!s.schema) return;
+        s.schema.behavior = { ...DEFAULT_BEHAVIOR, ...(s.schema.behavior ?? {}), ...patch };
+        s.dirty = true;
+        s.schema.version += 1;
       }),
     updateCanvas: (patch) =>
       set((s) => {

@@ -25,8 +25,17 @@ export interface ElementLayout {
 export interface ElementStyle {
   /** Hex/rgb/gradient string or null for transparent. */
   background: string | null;
-  /** Corner radius in px (all four corners). */
+  /** Corner radius in px — used for all four corners. */
   radius: number;
+  /**
+   * Per-corner radius overrides (top-left, top-right, bottom-right, bottom-left).
+   * When any is set it wins over `radius` for that corner, so a card can be
+   * square on top and fully rounded at the bottom. Undefined = linked.
+   */
+  radiusTL?: number;
+  radiusTR?: number;
+  radiusBR?: number;
+  radiusBL?: number;
   /** 0..1 */
   opacity: number;
 }
@@ -74,12 +83,46 @@ export interface StudioCanvas {
   background: string;
 }
 
+/**
+ * How the live widget presents MANY reviews inside its fixed frame. Set in the
+ * studio (canvas properties) and consumed by the embed's TemplateWidget — this
+ * is the answer to "what happens when more reviews come in".
+ */
+export interface WidgetBehavior {
+  /** cycle = one at a time cross-fade · carousel = swipeable slides · marquee = continuous stream. */
+  mode: 'cycle' | 'carousel' | 'marquee';
+  /** Auto-advance (cycle/carousel). */
+  autoPlay: boolean;
+  /** Seconds each review stays on screen. */
+  intervalSec: number;
+  /** Pause the motion while a visitor hovers. */
+  pauseOnHover: boolean;
+  /** Marquee direction and speed (px per second). */
+  direction: 'left' | 'right';
+  speedPx: number;
+  /** How many reviews the widget includes (0 = all). */
+  maxRecords: number;
+}
+
+/** Sensible defaults for designs saved before behaviors existed. */
+export const DEFAULT_BEHAVIOR: WidgetBehavior = {
+  mode: 'cycle',
+  autoPlay: true,
+  intervalSec: 6,
+  pauseOnHover: true,
+  direction: 'left',
+  speedPx: 60,
+  maxRecords: 0,
+};
+
 /** One versioned, editable design — the root object the store edits. */
 export interface StudioSchema {
   name: string;
   canvas: StudioCanvas;
   version: number;
   elements: StudioElement[];
+  /** Live multi-review behavior of the embedded widget. */
+  behavior?: WidgetBehavior;
 }
 
 /** Review-shaped record the binder and preview resolve against. */

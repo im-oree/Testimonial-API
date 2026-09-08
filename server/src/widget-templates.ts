@@ -39,6 +39,23 @@ export interface TemplateSchema {
   canvas: { width: number; height: number; background: string };
   version: number;
   elements: TemplateElement[];
+  /** Live multi-review behavior of the embedded widget. */
+  behavior?: TemplateBehavior;
+}
+
+/**
+ * How a widget presents many reviews inside its fixed frame — the answer to
+ * "what happens when more reviews come in": cycle one at a time, swipe a
+ * carousel, or stream a marquee.
+ */
+export interface TemplateBehavior {
+  mode: 'cycle' | 'carousel' | 'marquee';
+  autoPlay: boolean;
+  intervalSec: number;
+  pauseOnHover: boolean;
+  direction: 'left' | 'right';
+  speedPx: number;
+  maxRecords: number;
 }
 
 export interface WidgetTemplate {
@@ -128,6 +145,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           typography: { fontSize: 15, fontWeight: 600, color: '#ffffff', align: 'center' },
         }),
       ],
+      behavior: { mode: 'cycle', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
     },
   },
   {
@@ -182,6 +200,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           binding: { bindingKey: 'reviewer_name', property: 'text' },
         }),
       ],
+      behavior: { mode: 'cycle', autoPlay: true, intervalSec: 8, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
     },
   },
   {
@@ -223,6 +242,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           typography: { fontSize: 12, fontWeight: 400, color: '#94a3b8', align: 'left' },
         }),
       ],
+      behavior: { mode: 'marquee', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 70, maxRecords: 12 },
     },
   },
   {
@@ -265,6 +285,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           binding: { bindingKey: 'reviewer_name', property: 'text' },
         }),
       ],
+      behavior: { mode: 'cycle', autoPlay: true, intervalSec: 5, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
     },
   },
   {
@@ -320,6 +341,7 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
         }),
       ],
+      behavior: { mode: 'carousel', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
     },
   },
   {
@@ -370,9 +392,60 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
           typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
         }),
       ],
+      behavior: { mode: 'cycle', autoPlay: true, intervalSec: 7, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
+    },
+  },
+  {
+    id: 'swipe-deck',
+    name: 'Swipe Deck',
+    description: 'Touch-friendly card deck — swipe or drag through reviews, with dots and arrows. Built for interaction.',
+    category: 'Carousel',
+    width: 640,
+    height: 480,
+    features: ['Swipe / drag', 'Dots + arrows', 'Auto-advance'],
+    schema: {
+      name: 'Swipe deck',
+      canvas: { width: 640, height: 480, background: '#eef2ff' },
+      version: 1,
+      behavior: { mode: 'carousel', autoPlay: true, intervalSec: 5, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0 },
+      elements: [
+        el({
+          id: 'tpl_sd_card', type: 'container', name: 'Card', layout: { x: 50, y: 60, width: 540, height: 320, z: 1 },
+          style: { background: '#ffffff', radius: 24, opacity: 1 },
+        }),
+        el({
+          id: 'tpl_sd_stars', type: 'rating-stars', name: 'Rating', layout: { x: 260, y: 104, width: 120, height: 28, z: 10 },
+          binding: { bindingKey: 'review_rating', property: 'rating' },
+        }),
+        el({
+          id: 'tpl_sd_quote', type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+          layout: { x: 100, y: 150, width: 440, height: 150, z: 10 },
+          typography: { fontSize: 18, fontWeight: 400, color: '#334155', align: 'center' },
+          binding: { bindingKey: 'review_text', property: 'text' },
+          animation: { type: 'fade-in-up', durationMs: 500, delayMs: 60 },
+        }),
+        el({
+          id: 'tpl_sd_author', type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+          layout: { x: 100, y: 312, width: 440, height: 26, z: 10 },
+          typography: { fontSize: 15, fontWeight: 700, color: '#1b2559', align: 'center' },
+          binding: { bindingKey: 'reviewer_name', property: 'text' },
+        }),
+        el({
+          id: 'tpl_sd_sub', type: 'text', name: 'Verified line', text: 'Swipe to read more',
+          layout: { x: 100, y: 342, width: 440, height: 20, z: 10 },
+          typography: { fontSize: 12, fontWeight: 400, color: '#6366f1', align: 'center' },
+        }),
+        el({
+          id: 'tpl_sd_cta', type: 'button', name: 'CTA', text: 'Add a review',
+          layout: { x: 240, y: 410, width: 160, height: 42, z: 10 },
+          style: { background: '#4f46e5', radius: 21, opacity: 1 },
+          typography: { fontSize: 14, fontWeight: 600, color: '#ffffff', align: 'center' },
+        }),
+      ],
     },
   },
 ];
+
 
 /** The template a product gets before it picks one itself. */
 export function defaultWidgetTemplate(): WidgetTemplate {

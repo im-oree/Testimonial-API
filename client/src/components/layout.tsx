@@ -17,6 +17,7 @@ import { useAuth } from '../auth';
 import { api } from '../lib/api';
 import { initials } from '../lib/format';
 import type { AppSummary, MeTenant } from '../lib/types';
+import { useEditorStore } from '../design-studio/editor-store';
 import { InlineSpinner } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import {
@@ -198,6 +199,7 @@ function Shell({
   identity,
   sidebarExtra,
   banner,
+  immersive = false,
 }: {
   brand: string;
   groups: NavGroup[];
@@ -205,6 +207,9 @@ function Shell({
   identity?: Pick<MeTenant, 'name' | 'brandColor' | 'logoUrl'> | null;
   sidebarExtra?: ReactNode;
   banner?: ReactNode;
+  /** Full-bleed mode (design studio editor): app sidebar collapses to the
+   *  icon rail and the topbar disappears so the canvas fills the screen. */
+  immersive?: boolean;
 }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
@@ -220,6 +225,20 @@ function Shell({
     return pathname.includes('/studio');
   });
 
+  // Entering the studio editor forces the rail (and leaving restores the
+  // saved preference) — the canvas should fill as much screen as possible.
+  useEffect(() => {
+    if (immersive) setRail(true);
+    else {
+      try {
+        const stored = window.localStorage.getItem(RAIL_KEY);
+        setRail(stored === null ? false : stored === '1');
+      } catch {
+        setRail(false);
+      }
+    }
+  }, [immersive]);
+
   function toggleRail(next: boolean): void {
     setRail(next);
     try {
@@ -232,11 +251,12 @@ function Shell({
   const fullBleed = pathname.includes('/studio');
 
   return (
-    <div className="shell">
+    <div className={`shell ${immersive ? 'shell-immersive' : ''}`}>
       <Sidebar brand={brand} groups={groups} identity={identity} extra={sidebarExtra} rail={rail} onToggleRail={toggleRail} />
       <div className="shell-main">
         {banner}
-        <header className="topbar">
+        {!immersive && (
+          <header className="topbar">
           <div className="topbar-scope">
             {scopeLabel}
             {identity && <span className="topbar-scope-sub"> / Company</span>}
@@ -259,7 +279,8 @@ function Shell({
             <span className="muted small">{user?.email}</span>
           </div>
         </header>
-        <main className={`content ${fullBleed ? 'content-full' : ''}`}>
+        )}
+        <main className={`content ${fullBleed ? 'content-full' : ''} ${immersive ? 'content-immersive' : ''}`}>
           <ErrorBoundary resetKey={pathname}>
             <motion.div
               key={pathname}
@@ -366,8 +387,12 @@ function ImpersonationBar() {
 export function AppLayout() {
   const { tenant } = useAuth();
   const { pathname } = useLocation();
+  const studioPreview = useEditorStore((s) => s.previewMode);
   const match = pathname.match(/^\/app\/a\/([^/]+)/);
   const appId = match?.[1] ?? null;
+  // The studio editor takes the whole screen (rail sidebar, no topbar);
+  // its Preview mode brings the normal chrome back.
+  const immersive = pathname.includes('/studio') && !studioPreview;
 
   const workspaceManage: NavItem[] = [
     { label: 'Settings', to: '/app/settings', end: true, icon: <IconSettings size={16} /> },
@@ -409,6 +434,7 @@ export function AppLayout() {
       identity={tenant}
       sidebarExtra={appId ? <ProductSwitcher activeAppId={appId} /> : null}
       banner={<ImpersonationBar />}
+      immersive={immersive}
     />
   );
 }

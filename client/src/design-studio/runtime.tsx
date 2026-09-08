@@ -8,7 +8,7 @@
  */
 import { type ReactNode } from 'react';
 import { IconStar } from '../components/icons';
-import { elementToCSS } from './css';
+import { elementToCSS, radiusOf } from './css';
 import { displayRating, displayText, resolveFor } from './data-binder';
 import { animationCssFor } from './animation-presets';
 import type { StudioElement, StudioRecord, StudioSchema } from './types';
@@ -51,7 +51,7 @@ function ElementView({ el, record, animate, ctaHref }: { el: StudioElement; reco
         <img
           src={el.imageUrl}
           alt={el.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: el.style.radius || 0 }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: radiusOf(el.style) }}
           onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
         />
       ) : (
