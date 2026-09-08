@@ -6,7 +6,16 @@
  * All routes require a company session (`Authorization: Bearer <token>`).
  */
 import { Router, type Request } from 'express';
-import { COMPANY_ROLE_TEMPLATES, DEMO, WIDGET_DESIGN_IDS, type DemoRole, type DesignOptions, type DesignSort } from '../demo-data';
+import {
+  COMPANY_ROLE_TEMPLATES,
+  DEMO,
+  WIDGET_DESIGN_IDS,
+  type DemoRole,
+  type DemoTestimonial,
+  type DesignOptions,
+  type DesignSort,
+  type TestimonialStatus,
+} from '../demo-data';
 import {
   appOfSession,
   badRequest,
@@ -262,6 +271,54 @@ tenantRouter.get('/apps/:appId/testimonials', (req, res) => {
   res.json({ rows: sorted.slice((page - 1) * perPage, page * perPage), total: sorted.length });
 });
 
+// POST /v1/apps/:appId/testimonials  (manual create — full CRUD support)
+tenantRouter.post('/apps/:appId/testimonials', (req, res) => {
+  requirePermission(req, 'testimonials.write');
+  const content = String(req.body?.content ?? '').trim().slice(0, 2000);
+  if (!content) throw badRequest('Testimonial content is required.');
+  const authorName = req.body?.authorName == null || req.body.authorName === '' ? null : String(req.body.authorName).trim().slice(0, 120);
+  const rating =
+    req.body?.rating == null || req.body?.rating === '' ? undefined : Math.min(5, Math.max(1, Math.round(Number(req.body.rating)) || 1));
+  const status = (['pending', 'approved', 'rejected', 'archived'] as const).includes(req.body?.status)
+    ? (req.body.status as TestimonialStatus)
+    : 'approved'; // manually added reviews are trusted live by default
+  const tags = Array.isArray(req.body?.tags) ? req.body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30) : [];
+  const visible = req.body?.visible === false ? false : true;
+  const created = DEMO.addTestimonial({ appId: req.params.appId, content, authorName, rating, status, visible, tags });
+  res.status(201).json(created);
+});
+
+// POST /v1/apps/:appId/testimonials/bulk  (bulk management: status, live
+// toggle, delete). ids are capped (DOC 6 §2.9) and every id is resolved
+// through the app-scoped rows so a foreign id can never be touched.
+const BULK_ACTIONS = new Set(['approve', 'reject', 'archive', 'show', 'hide', 'delete']);
+tenantRouter.post('/apps/:appId/testimonials/bulk', (req, res) => {
+  const action = String(req.body?.action ?? '');
+  if (!BULK_ACTIONS.has(action)) throw badRequest('Invalid bulk action.');
+  // Status changes and deletes are destructive moderation work; the live
+  // toggle is a content edit.
+  requirePermission(req, action === 'show' || action === 'hide' ? 'testimonials.write' : 'testimonials.moderate');
+  const rows = rowsForApp(req, req.params.appId);
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).slice(0, 100); // DOC 6 §2.9 — bulk caps
+  const scopedIds = new Set(rows.filter((r) => ids.includes(r.id)).map((r) => r.id));
+  let affected = 0;
+  if (action === 'delete') {
+    for (const id of scopedIds) {
+      if (DEMO.deleteTestimonial(id)) affected += 1;
+    }
+  } else if (action === 'show' || action === 'hide') {
+    for (const id of scopedIds) {
+      if (DEMO.updateTestimonial(id, { visible: action === 'show' })) affected += 1;
+    }
+  } else {
+    const status = MODERATION_ACTIONS[action];
+    for (const id of scopedIds) {
+      if (DEMO.updateTestimonial(id, { status })) affected += 1;
+    }
+  }
+  res.json({ ok: true, affected });
+});
+
 // POST /v1/apps/:appId/testimonials/bulk/moderation
 tenantRouter.post('/apps/:appId/testimonials/bulk/moderation', (req, res) => {
   requirePermission(req, 'testimonials.moderate');
@@ -298,14 +355,45 @@ tenantRouter.delete('/apps/:appId/testimonials/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// PATCH /v1/apps/:appId/testimonials/:id  (update tags)
+// PATCH /v1/apps/:appId/testimonials/:id  (full edit: content, author, rating,
+// tags, live toggle — plus status changes for moderators)
 tenantRouter.patch('/apps/:appId/testimonials/:id', (req, res) => {
   requirePermission(req, 'testimonials.write');
   const row = rowOr404(req, req.params.appId, req.params.id);
-  if (!Array.isArray(req.body?.tags)) throw badRequest('tags must be an array.');
-  const tags = req.body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30);
-  DEMO.updateTestimonial(row.id, { tags });
-  res.json({ ok: true });
+  const body = req.body ?? {};
+  const patch: Partial<DemoTestimonial> = {};
+
+  if (body.content !== undefined) {
+    const content = String(body.content ?? '').trim().slice(0, 2000);
+    if (!content) throw badRequest('Testimonial content cannot be empty.');
+    patch.content = content;
+  }
+  if (body.authorName !== undefined) {
+    patch.authorName = body.authorName == null || body.authorName === '' ? null : String(body.authorName).trim().slice(0, 120);
+  }
+  if (body.rating !== undefined) {
+    patch.rating =
+      body.rating == null || body.rating === '' ? undefined : Math.min(5, Math.max(1, Math.round(Number(body.rating)) || 1));
+  }
+  if (body.tags !== undefined) {
+    if (!Array.isArray(body.tags)) throw badRequest('tags must be an array.');
+    patch.tags = body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30);
+  }
+  if (body.visible !== undefined) {
+    if (typeof body.visible !== 'boolean') throw badRequest('visible must be a boolean.');
+    patch.visible = body.visible;
+  }
+  if (body.status !== undefined) {
+    // Moving a review between moderation states is moderator work, separate
+    // from editing its content.
+    requirePermission(req, 'testimonials.moderate');
+    if (!(['pending', 'approved', 'rejected', 'archived'] as const).includes(body.status)) throw badRequest('Unknown status.');
+    patch.status = body.status;
+  }
+
+  const updated = DEMO.updateTestimonial(row.id, patch);
+  if (!updated) throw notFound('Testimonial not found.');
+  res.json(updated);
 });
 
 // GET /v1/apps/:appId/testimonials/:id

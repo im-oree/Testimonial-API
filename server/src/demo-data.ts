@@ -107,6 +107,12 @@ export interface DemoTestimonial {
   authorName?: string | null;
   rating?: number;
   status: TestimonialStatus;
+  /**
+   * Live toggle: approved testimonials with visible !== false render on the
+   * public wall. Hiding one keeps it approved in the dashboard but pulls it
+   * from every public surface until it is switched back on.
+   */
+  visible?: boolean;
   tags: string[];
   createdAt: string;
   updatedAt?: string;
@@ -484,6 +490,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: COMPLIMENTS[(i + n) % COMPLIMENTS.length],
         rating: 4 + ((i + n) % 2), // 4 or 5
         status: 'approved',
+        visible: true,
         tags: (i + n) % 2 === 0 ? ['website', 'product'] : ['video-ready'],
         day: 1 + ((i + n) % 8),
       });
@@ -930,7 +937,7 @@ export const DEMO = {
     return TESTIMONIALS.filter((r) => r.appId === appId);
   },
   addTestimonial(t: Omit<DemoTestimonial, 'id' | 'createdAt'>): DemoTestimonial {
-    const row: DemoTestimonial = { ...t, id: `t-${randomUUID().slice(0, 8)}`, createdAt: new Date().toISOString() };
+    const row: DemoTestimonial = { ...t, visible: t.visible ?? true, id: `t-${randomUUID().slice(0, 8)}`, createdAt: new Date().toISOString() };
     TESTIMONIALS.push(row);
     return row;
   },

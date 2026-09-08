@@ -459,3 +459,111 @@ describe('DOC 6 — company settings surface (workspace profile)', () => {
     assert.equal((await req('PATCH', '/v1/settings/workspace', { token: owner, body: { name: 'Acme Inc' } })).status, 200);
   });
 });
+
+describe('DOC 6 — testimonial CRUD, live toggle & bulk management', () => {
+  it('viewer cannot create/edit/delete testimonials (write permission required)', async () => {
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials', { token: viewerToken, body: { content: 'nope' } })).status,
+      401,
+    );
+    assert.equal(
+      (
+        await req('PATCH', '/v1/apps/app-acme-1/testimonials/t-app-acme-1-a-0', {
+          token: viewerToken,
+          body: { content: 'nope' },
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (await req('DELETE', '/v1/apps/app-acme-1/testimonials/t-app-acme-1-a-0', { token: viewerToken })).status,
+      401,
+    );
+  });
+
+  it('editor can create and edit content but cannot change moderation status', async () => {
+    const created = await req('POST', '/v1/apps/app-acme-1/testimonials', {
+      token: editorToken,
+      body: { content: 'Editor-written review', authorName: 'Editor', rating: 4 },
+    });
+    assert.equal(created.status, 201);
+    const id = (created.json as { id: string }).id;
+    const edited = await req('PATCH', `/v1/apps/app-acme-1/testimonials/${id}`, {
+      token: editorToken,
+      body: { content: 'Editor-written review (edited)' },
+    });
+    assert.equal(edited.status, 200);
+    // status changes need testimonials.moderate
+    assert.equal(
+      (await req('PATCH', `/v1/apps/app-acme-1/testimonials/${id}`, { token: editorToken, body: { status: 'rejected' } })).status,
+      401,
+    );
+    // cleanup
+    assert.equal((await req('DELETE', `/v1/apps/app-acme-1/testimonials/${id}`, { token: ownerToken })).status, 200);
+  });
+
+  it('create clamps ratings and caps content length (write-time hygiene)', async () => {
+    const created = await req('POST', '/v1/apps/app-acme-1/testimonials', {
+      token: ownerToken,
+      body: { content: 'x', authorName: 'Hygiene', rating: 99 },
+    });
+    assert.equal(created.status, 201);
+    const row = created.json as { rating: number };
+    assert.equal(row.rating, 5);
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials', { token: ownerToken, body: { content: '   ' } })).status,
+      400,
+    );
+  });
+
+  it('live toggle pulls a review from the public wall without changing its status', async () => {
+    const list = await req('GET', '/v1/apps/app-acme-1/testimonials?status=approved&perPage=1', { token: ownerToken });
+    const victim = (list.json as { rows: Array<{ id: string }> }).rows[0];
+    const wallBefore = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const beforeIds = (wallBefore.json as { testimonials: Array<{ id: string }> }).testimonials.map((t) => t.id);
+    assert.ok(beforeIds.includes(victim.id), 'seeded approved review should be on the wall');
+
+    const hidden = await req('PATCH', `/v1/apps/app-acme-1/testimonials/${victim.id}`, { token: ownerToken, body: { visible: false } });
+    assert.equal(hidden.status, 200);
+    const wallAfter = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const afterIds = (wallAfter.json as { testimonials: Array<{ id: string }> }).testimonials.map((t) => t.id);
+    assert.ok(!afterIds.includes(victim.id), 'hidden review must not render on the wall');
+    assert.equal((hidden.json as { status: string }).status, 'approved', 'hiding must not change moderation state');
+
+    // restore
+    assert.equal(
+      (await req('PATCH', `/v1/apps/app-acme-1/testimonials/${victim.id}`, { token: ownerToken, body: { visible: true } })).status,
+      200,
+    );
+  });
+
+  it('bulk actions are permission-checked, capped and app-scoped', async () => {
+    // viewer cannot bulk-anything
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: viewerToken, body: { action: 'approve', ids: [] } }))
+        .status,
+      401,
+    );
+    // editor cannot bulk-delete (moderate required) but can toggle visibility
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: editorToken, body: { action: 'delete', ids: [] } })).status,
+      401,
+    );
+    const ids = ['t-app-acme-1-a-1', 't-app-acme-1-a-2'];
+    const bulkHide = await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: ownerToken, body: { action: 'hide', ids } });
+    assert.equal(bulkHide.status, 200);
+    assert.equal((bulkHide.json as { affected: number }).affected, 2);
+    // foreign ids silently resolve to nothing (no IDOR, no error leak)
+    const foreign = await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', {
+      token: ownerToken,
+      body: { action: 'hide', ids: ['t-app-lumen-1-a-0'] },
+    });
+    assert.equal(foreign.status, 200);
+    assert.equal((foreign.json as { affected: number }).affected, 0);
+    // restore
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: ownerToken, body: { action: 'show', ids } })).status,
+      200,
+    );
+  });
+});

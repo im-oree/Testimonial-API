@@ -23,7 +23,7 @@ import type { AppSummary } from '../lib/types';
 import type { ElementType, StudioElement, StudioRecord } from '../design-studio/types';
 import { Button, ErrorBanner } from '../components/ui';
 import { Field, NumberInput, SelectField, TextAreaInput, TextInput } from '../components/fields';
-import { IconCheck, IconLayers, IconPlus, IconRefresh, IconSidebar, IconTrash, IconX } from '../components/icons';
+import { IconCheck, IconLayers, IconPlus, IconRefresh, IconSidebar, IconTrash, IconX, IconZoomMinus, IconZoomPlus } from '../components/icons';
 
 const ELEMENTS: Array<{ type: ElementType; label: string; hint: string }> = [
   { type: 'heading', label: 'Heading', hint: 'Section title' },
@@ -49,6 +49,7 @@ export default function DesignStudioPage() {
   const store = useEditorStore();
   const schema = store.schema;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const [gesture, setGesture] = useState<Gesture>(null);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const [productName, setProductName] = useState('');
@@ -57,6 +58,30 @@ export default function DesignStudioPage() {
   // can claim the whole stage — the preview should never be squeezed.
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
+
+  // ---- Zoom: the canvas scales to fit the stage (the default) so any design
+  // — the starter template included — is always fully visible, never cropped
+  // behind scrollbars. The user can also pin 100% or nudge the zoom manually.
+  const [zoom, setZoom] = useState<'fit' | number>('fit');
+  const [fitScale, setFitScale] = useState(1);
+  const scale = zoom === 'fit' ? fitScale : zoom;
+  const scaleRef = useRef(1);
+  scaleRef.current = scale;
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || !schema) return;
+    const measure = (): void => {
+      // Padding budget: the viewport's own padding + breathing room.
+      const availW = Math.max(120, vp.clientWidth - 64);
+      const availH = Math.max(120, vp.clientHeight - 64);
+      setFitScale(Math.min(1, availW / schema.canvas.width, availH / schema.canvas.height));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [schema?.canvas.width, schema?.canvas.height, showLeft, showRight]);
 
   // Product display name + slug (for the real review records used in preview).
   useEffect(() => {
@@ -103,7 +128,7 @@ export default function DesignStudioPage() {
     if (!gesture) return;
     const onMove = (e: PointerEvent) => {
       e.preventDefault();
-      applyGesture(gesture, e.clientX, e.clientY, surfaceRef, setGuides);
+      applyGesture(gesture, e.clientX, e.clientY, surfaceRef, setGuides, scaleRef.current);
     };
     const onUp = () => {
       setGesture(null);
@@ -164,10 +189,39 @@ export default function DesignStudioPage() {
   }, []);
 
   if (store.isLoading) {
+    // Skeleton mirrors the real studio: toolbar, left palette, canvas, props.
     return (
-      <div className="card">
-        <div className="block-center" style={{ padding: '30px 0' }}>
-          <span className="spinner" aria-hidden />
+      <div className="studio-page" aria-busy="true">
+        <div className="studio-toolbar">
+          <div className="studio-tb-left">
+            <span className="sk" style={{ width: 92, height: 26, borderRadius: 8 }} />
+            <span className="sk" style={{ width: 170, height: 18 }} />
+          </div>
+          <div className="studio-tb-right">
+            <span className="sk" style={{ width: 130, height: 26, borderRadius: 8 }} />
+            <span className="sk" style={{ width: 84, height: 26, borderRadius: 8 }} />
+          </div>
+        </div>
+        <div className="studio-grid" data-left="1" data-right="1">
+          <aside className="studio-panel studio-left">
+            <div className="studio-panel-fixed">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <span key={i} className="sk" style={{ display: 'block', width: '92%', height: 34, borderRadius: 9, marginBottom: 6 }} />
+              ))}
+            </div>
+          </aside>
+          <main className="studio-stage">
+            <div className="studio-viewport" style={{ minHeight: 340 }}>
+              <span className="sk" style={{ width: '72%', height: '76%', borderRadius: 14 }} />
+            </div>
+          </main>
+          <aside className="studio-panel studio-right">
+            <div className="studio-panel-fixed">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <span key={i} className="sk" style={{ display: 'block', width: `${88 - i * 6}%`, height: 30, borderRadius: 9, marginBottom: 8 }} />
+              ))}
+            </div>
+          </aside>
         </div>
       </div>
     );
@@ -203,23 +257,6 @@ export default function DesignStudioPage() {
           )}
         </div>
         <div className="studio-tb-right">
-          <span className="chip" title={`Schema v${store.savedStudioVersion} · design v${store.designVersion}`}>
-            v{store.savedStudioVersion}
-          </span>
-          <div className="segmented studio-panel-toggles" role="group" aria-label="Side panels">
-            <button type="button" className={`segment ${showLeft ? 'active' : ''}`} aria-pressed={showLeft} onClick={() => setShowLeft((v) => !v)}>
-              Elements
-            </button>
-            <button type="button" className={`segment ${showRight ? 'active' : ''}`} aria-pressed={showRight} onClick={() => setShowRight((v) => !v)}>
-              Properties
-            </button>
-          </div>
-          <Button variant="ghost" className="btn-xs" disabled={store.past.length === 0} title="Undo (Ctrl/Cmd+Z)" onClick={() => store.undo()}>
-            <IconRefresh size={12} style={{ transform: 'scaleX(-1)' }} /> Undo
-          </Button>
-          <Button variant="ghost" className="btn-xs" disabled={store.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => store.redo()}>
-            <IconRefresh size={12} /> Redo
-          </Button>
           <div className="segmented" role="group" aria-label="Editor mode">
             <button type="button" className={`segment ${!store.previewMode ? 'active' : ''}`} onClick={() => store.setPreviewMode(false)}>
               Editor
@@ -228,6 +265,26 @@ export default function DesignStudioPage() {
               Preview
             </button>
           </div>
+          <span className="studio-tb-sep" aria-hidden />
+          <div className="segmented studio-panel-toggles" role="group" aria-label="Side panels">
+            <button type="button" className={`segment ${showLeft ? 'active' : ''}`} aria-pressed={showLeft} onClick={() => setShowLeft((v) => !v)}>
+              Elements
+            </button>
+            <button type="button" className={`segment ${showRight ? 'active' : ''}`} aria-pressed={showRight} onClick={() => setShowRight((v) => !v)}>
+              Properties
+            </button>
+          </div>
+          <span className="studio-tb-sep" aria-hidden />
+          <Button variant="ghost" className="btn-xs" disabled={store.past.length === 0} title="Undo (Ctrl/Cmd+Z)" onClick={() => store.undo()}>
+            <IconRefresh size={12} style={{ transform: 'scaleX(-1)' }} /> Undo
+          </Button>
+          <Button variant="ghost" className="btn-xs" disabled={store.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => store.redo()}>
+            <IconRefresh size={12} /> Redo
+          </Button>
+          <span className="studio-tb-sep" aria-hidden />
+          <span className="chip" title={`Schema v${store.savedStudioVersion} · design v${store.designVersion}`}>
+            v{store.savedStudioVersion}
+          </span>
           <Button className="btn-sm" disabled={store.saving || !store.dirty} onClick={() => void store.save()}>
             {store.saving ? 'Saving…' : 'Save design'}
           </Button>
@@ -239,22 +296,9 @@ export default function DesignStudioPage() {
         </div>
       )}
 
-      <div
-        className="studio-grid"
-        style={
-          showLeft && showRight
-            ? undefined
-            : {
-                gridTemplateColumns: showLeft
-                  ? '236px minmax(0, 1fr)'
-                  : showRight
-                    ? 'minmax(0, 1fr) 252px'
-                    : 'minmax(0, 1fr)',
-              }
-        }
-      >
-        {showLeft ? (
-          <aside className="studio-panel">
+      <div className="studio-grid" data-left={showLeft ? '1' : '0'} data-right={showRight ? '1' : '0'}>
+        <aside className={`studio-panel studio-left ${showLeft ? '' : 'is-hidden'}`} aria-hidden={!showLeft}>
+          <div className="studio-panel-fixed">
           <div className="studio-panel-head">
             <div className="studio-panel-title" style={{ margin: 0 }}>Elements</div>
             <button type="button" className="ctx-trigger" title="Hide elements & layers" aria-label="Hide elements and layers" onClick={() => setShowLeft(false)}>
@@ -311,22 +355,38 @@ export default function DesignStudioPage() {
                     </button>
                   </span>
                 </div>
-              );
+              ); 
             })}
           </div>
-          </aside>
-        ) : (
-          <div className="studio-rail-btn" onClick={() => setShowLeft(true)} title="Show elements & layers" role="button" tabIndex={0} onKeyDown={(e)=>{ if(e.key==='Enter') setShowLeft(true); }}>
-            <IconLayers size={16} />
           </div>
-        )}
+        </aside>
 
         <main className="studio-stage">
-          <div className="studio-viewport">
+          {!showLeft && (
+            <button type="button" className="studio-float-btn studio-float-left" title="Show elements & layers" onClick={() => setShowLeft(true)}>
+              <IconLayers size={15} />
+            </button>
+          )}
+          {!showRight && (
+            <button type="button" className="studio-float-btn studio-float-right" title="Show properties" onClick={() => setShowRight(true)}>
+              <IconSidebar size={15} />
+            </button>
+          )}
+          <div className="studio-viewport" ref={viewportRef}>
+            <div
+              className="studio-scale-wrap"
+              style={{ width: schema.canvas.width * scale, height: schema.canvas.height * scale }}
+            >
             <div
               ref={surfaceRef}
               className="studio-surface studio-edit-surface"
-              style={{ width: schema.canvas.width, height: schema.canvas.height, background: schema.canvas.background }}
+              style={{
+                width: schema.canvas.width,
+                height: schema.canvas.height,
+                background: schema.canvas.background,
+                transform: `scale(${scale})`,
+                transformOrigin: '0 0',
+              }}
               data-testid="studio-canvas"
               onPointerDown={(e) => {
                 if (!store.previewMode && e.target === e.currentTarget) store.clearSelection();
@@ -388,11 +448,42 @@ export default function DesignStudioPage() {
                 </>
               )}
             </div>
+            </div>
+            <div className="studio-zoom" role="group" aria-label="Canvas zoom">
+              <button
+                type="button"
+                className="ctx-trigger"
+                title="Zoom out"
+                aria-label="Zoom out"
+                disabled={scale <= 0.2}
+                onClick={() => setZoom(Math.max(0.2, Math.round((scale - 0.1) * 100) / 100))}
+              >
+                <IconZoomMinus size={14} />
+              </button>
+              <button
+                type="button"
+                className={`studio-zoom-value ${zoom === 'fit' ? 'active' : ''}`}
+                title="Zoom to fit"
+                onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')}
+              >
+                {zoom === 'fit' ? `Fit · ${Math.round(fitScale * 100)}%` : `${Math.round(scale * 100)}%`}
+              </button>
+              <button
+                type="button"
+                className="ctx-trigger"
+                title="Zoom in"
+                aria-label="Zoom in"
+                disabled={scale >= 2}
+                onClick={() => setZoom(Math.min(2, Math.round((scale + 0.1) * 100) / 100))}
+              >
+                <IconZoomPlus size={14} />
+              </button>
+            </div>
           </div>
         </main>
 
-        {showRight ? (
-          <aside className="studio-panel">
+        <aside className={`studio-panel studio-right ${showRight ? '' : 'is-hidden'}`} aria-hidden={!showRight}>
+          <div className="studio-panel-fixed">
             <div className="studio-panel-head">
               <div className="studio-panel-title" style={{ margin: 0 }}>Properties</div>
               <button type="button" className="ctx-trigger" title="Hide properties" aria-label="Hide properties" onClick={() => setShowRight(false)}>
@@ -400,12 +491,8 @@ export default function DesignStudioPage() {
               </button>
             </div>
             <PropertiesPanel />
-          </aside>
-        ) : (
-          <div className="studio-rail-btn studio-rail-right" onClick={() => setShowRight(true)} title="Show properties" role="button" tabIndex={0} onKeyDown={(e)=>{ if(e.key==='Enter') setShowRight(true); }}>
-            <IconSidebar size={16} />
           </div>
-        )}
+        </aside>
       </div>
     </div>
   );
@@ -486,13 +573,15 @@ function EditOverlay({ el, onGestureStart }: { el: StudioElement; onGestureStart
   );
 }
 
-/** One move/resize tick for the active gesture. */
+/** One move/resize tick for the active gesture. Pointer deltas are divided
+ * by the current canvas scale so dragging feels 1:1 at any zoom level. */
 function applyGesture(
   gesture: NonNullable<Gesture>,
   clientX: number,
   clientY: number,
   surfaceRef: React.RefObject<HTMLDivElement | null>,
   setGuides: (g: SnapGuide[]) => void,
+  scale = 1,
 ): void {
   const surf = surfaceRef.current;
   if (!surf) return;
@@ -504,8 +593,8 @@ function applyGesture(
   const grid = 8;
 
   if (gesture.kind === 'move') {
-    const rawX = gesture.baseX + (clientX - gesture.startX);
-    const rawY = gesture.baseY + (clientY - gesture.startY);
+    const rawX = gesture.baseX + (clientX - gesture.startX) / scale;
+    const rawY = gesture.baseY + (clientY - gesture.startY) / scale;
     const others = schema.elements
       .filter((e) => e.id !== gesture.id)
       .map((e) => ({ id: e.id, x: e.layout.x, y: e.layout.y, width: e.layout.width, height: e.layout.height }));
@@ -514,8 +603,8 @@ function applyGesture(
     setGuides(res.guides);
   } else {
     const { dir, base } = gesture;
-    const dx = clientX - gesture.startX;
-    const dy = clientY - gesture.startY;
+    const dx = (clientX - gesture.startX) / scale;
+    const dy = (clientY - gesture.startY) / scale;
     let w = base.width;
     let h = base.height;
     if (dir.includes('e')) w = base.width + dx;

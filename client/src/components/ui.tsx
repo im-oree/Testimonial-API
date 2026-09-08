@@ -156,21 +156,95 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
   );
 }
 
-export function Pager({ page, pageCount, total, onChange }: { page: number; pageCount: number; total: number; onChange: (page: number) => void }) {
+export function Pager({
+  page,
+  pageCount,
+  total,
+  perPage,
+  perPageOptions,
+  onChange,
+  onPerPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  /** Rows per page — enables the "Showing X–Y of Z" summary + page-size menu. */
+  perPage?: number;
+  /** Selectable page sizes (e.g. [7, 15, 30]). Requires onPerPageChange. */
+  perPageOptions?: number[];
+  onChange: (page: number) => void;
+  onPerPageChange?: (perPage: number) => void;
+}) {
   if (total === 0) return null;
   const pages = Math.max(1, pageCount);
+
+  // Compact page list with ellipsis: 1 … p-1 p p+1 … last
+  const pageList: Array<number | 'gap'> = [];
+  const window = 1;
+  for (let p = 1; p <= pages; p += 1) {
+    if (p === 1 || p === pages || Math.abs(p - page) <= window) pageList.push(p);
+    else if (pageList[pageList.length - 1] !== 'gap') pageList.push('gap');
+  }
+
+  const shownFrom = perPage ? (page - 1) * perPage + 1 : 0;
+  const shownTo = perPage ? Math.min(page * perPage, total) : 0;
+
   return (
     <div className="pager">
-      <span className="muted small">
-        Page {page} of {pages} · {total} total
+      <span className="muted small pager-summary">
+        {perPage ? (
+          <>
+            Showing <strong>{shownFrom}</strong>–<strong>{shownTo}</strong> of <strong>{total}</strong>
+          </>
+        ) : (
+          <>
+            Page {page} of {pages} · {total} total
+          </>
+        )}
       </span>
-      <div className="pager-buttons">
-        <Button variant="secondary" className="btn-xs" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          <IconChevronLeft size={13} /> Prev
-        </Button>
-        <Button variant="secondary" className="btn-xs" disabled={page >= pages} onClick={() => onChange(page + 1)}>
-          Next <IconChevronRight size={13} />
-        </Button>
+      <div className="pager-controls">
+        {perPageOptions && onPerPageChange && (
+          <label className="pager-size">
+            <span className="muted small">Per page</span>
+            <select
+              className="input"
+              aria-label="Rows per page"
+              value={perPageOptions.includes(perPage ?? 0) ? perPage : perPageOptions[0]}
+              onChange={(e) => onPerPageChange(Number(e.target.value))}
+            >
+              {perPageOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="pager-buttons">
+          <Button variant="secondary" className="btn-xs" disabled={page <= 1} onClick={() => onChange(page - 1)} aria-label="Previous page">
+            <IconChevronLeft size={13} /> Prev
+          </Button>
+          {pageList.map((p, i) =>
+            p === 'gap' ? (
+              <span key={`gap-${i}`} className="pager-gap">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                className={`pager-num ${p === page ? 'active' : ''}`}
+                aria-current={p === page ? 'page' : undefined}
+                onClick={() => onChange(p)}
+              >
+                {p}
+              </button>
+            ),
+          )}
+          <Button variant="secondary" className="btn-xs" disabled={page >= pages} onClick={() => onChange(page + 1)} aria-label="Next page">
+            Next <IconChevronRight size={13} />
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -81,7 +81,10 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
   const app = DEMO.appBySlug(req.params.appSlug);
   const tenant = app ? DEMO.tenantOfApp(app.id) : undefined;
   if (!app || !tenant) throw notFound('Wall not found.');
-  let approved = DEMO.testimonialsOfApp(app.id).filter((t) => t.status === 'approved');
+  // Only approved reviews that are switched live render publicly — the live
+  // toggle on the testimonials page pulls a review from every surface without
+  // touching its moderation state.
+  let approved = DEMO.testimonialsOfApp(app.id).filter((t) => t.status === 'approved' && t.visible !== false);
   // Content options saved with the design version (no-code builder).
   const o = app.designOptions ?? {};
   if (o.sort === 'highest') approved = approved.sort((a, b) => ((b.rating ?? 0) - (a.rating ?? 0)) || (a.createdAt < b.createdAt ? 1 : -1));

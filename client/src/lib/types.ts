@@ -139,6 +139,11 @@ export interface Testimonial {
   authorName?: string | null;
   rating?: number;
   status: TestimonialStatus;
+  /**
+   * Live toggle: when false an approved testimonial is kept in the dashboard
+   * but pulled from every public surface (wall, embeds) until switched back.
+   */
+  visible?: boolean;
   tags: string[];
   createdAt: string;
   updatedAt?: string;

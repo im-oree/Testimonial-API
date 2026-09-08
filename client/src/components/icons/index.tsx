@@ -287,3 +287,21 @@ export function IconLogout(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconZoomMinus(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="6.4" />
+      <path d="M8.2 11h5.6M16 16l4 4" />
+    </Svg>
+  );
+}
+
+export function IconZoomPlus(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="6.4" />
+      <path d="M8.2 11h5.6M11 8.2v5.6M16 16l4 4" />
+    </Svg>
+  );
+}
