@@ -22,6 +22,7 @@ const TYPE_DEFAULTS: Record<
   button: { name: 'Button', text: 'Add a review', w: 220, h: 44, fontSize: 14, fontWeight: 600, color: '#ffffff', bg: '#0ea5a0', radius: 10 },
   container: { name: 'Card', text: null, w: 360, h: 240, fontSize: 12, fontWeight: 400, color: '#0f172a', bg: '#ffffff', radius: 16 },
   spacer: { name: 'Spacer', text: null, w: 600, h: 24, fontSize: 12, fontWeight: 400, color: '#94a3b8', bg: null, radius: 0 },
+  shader: { name: 'Shader', text: null, w: 400, h: 280, fontSize: 12, fontWeight: 400, color: '#94a3b8', bg: null, radius: 14 },
 };
 
 /** New element at a position (snap applied by caller if needed). */
@@ -35,13 +36,16 @@ export function createDefaultElement(type: ElementType, x: number, y: number, z:
     layout: { x, y, width: d.w, height: d.h, z },
     style: { background: d.bg, radius: d.radius, opacity: 1 },
     typography:
-      type === 'image' || type === 'spacer' || type === 'container'
+      type === 'image' || type === 'spacer' || type === 'container' || type === 'shader'
         ? null
         : { fontSize: d.fontSize, fontWeight: d.fontWeight, color: d.color, align: type === 'button' ? 'center' : type === 'heading' ? 'left' : 'left' },
     text: d.text,
     imageUrl: null,
-    binding: null,
+    // Rating stars always render the record's rating — bind them up front so
+    // a freshly added stars block already fills live instead of sitting empty.
+    binding: type === 'rating-stars' ? { bindingKey: 'review_rating', property: 'rating' } : null,
     animation: null,
+    shader: type === 'shader' ? { preset: 'aurora', speed: 1 } : null,
   };
 }
 
@@ -84,7 +88,7 @@ export function starterSchema(productName: string): StudioSchema {
         type: 'heading',
         name: 'Author (bound)',
         text: 'Ada Okafor',
-        binding: { bindingKey: 'authorName', property: 'text' },
+        binding: { bindingKey: 'reviewer_name', property: 'text' },
         layout: { x: 100, y: 176, width: 420, height: 26, z: 10 },
         typography: { fontSize: 18, fontWeight: 700, color: '#1b2559', align: 'left' },
       }),
@@ -92,7 +96,7 @@ export function starterSchema(productName: string): StudioSchema {
         id: 'el_seed_rating',
         type: 'rating-stars',
         name: 'Rating (bound)',
-        binding: { bindingKey: 'rating', property: 'rating' },
+        binding: { bindingKey: 'review_rating', property: 'rating' },
         layout: { x: 100, y: 212, width: 132, height: 26, z: 10 },
       }),
       el({
@@ -100,7 +104,7 @@ export function starterSchema(productName: string): StudioSchema {
         type: 'text',
         name: 'Review (bound)',
         text: 'The embed was live on our site before lunch and reviews started arriving the same day.',
-        binding: { bindingKey: 'content', property: 'text' },
+        binding: { bindingKey: 'review_text', property: 'text' },
         layout: { x: 100, y: 252, width: 520, height: 120, z: 10 },
         typography: { fontSize: 16, fontWeight: 400, color: '#475569', align: 'left' },
       }),

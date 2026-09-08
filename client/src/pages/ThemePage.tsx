@@ -1,9 +1,9 @@
 /** Company workspace — Appearance & theme (own page under Settings).
  *
- * Organised as: a status strip up top, then the three-zone ThemeEditor
- * (template catalogue -> fine-tune -> live preview with real widgets), then
+ * Organised as: a status strip up top, then the two-zone ThemeEditor
+ * (template catalogue -> fine-tune tokens, with a sticky save bar), then
  * two short explainer cards. Everything here is company-wide; per-product
- * designs live on each product's Connect & design page.
+ * widget designs live in each product's design studio.
  */
 import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
@@ -86,7 +86,7 @@ export default function ThemePage() {
       </div>
 
       {theme ? (
-        <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} catalogueHref="/app/settings/theme/marketplace" />
+        <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} catalogueHref="/app/templates" />
       ) : (
         <div className="card" aria-busy="true">
           <div className="block-center" style={{ padding: '26px 0' }}>
@@ -118,12 +118,12 @@ export default function ThemePage() {
           <ul className="plain-list">
             <li>
               <strong>Templates</strong>: the tiles in step 1 come from Zojatech&apos;s live template catalogue — new ones appear
-              here automatically. For templates that also pick the widget <em>design</em>, open the{' '}
-              <Link to="/app/settings/theme/marketplace">design template marketplace</Link>.
+              here automatically. Browse and apply widget designs in the{' '}
+              <Link to="/app/templates">template gallery</Link>.
             </li>
             <li>
-              <strong>Per-product design</strong>: each product picks its own widget look (classic grid, wall of love, carousel,
-              spotlight, marquee, orbit) and can override any token on its Connect &amp; design page.
+              <strong>Per-product design</strong>: each product builds its widget from a fixed-dimension template and customises it
+              in the <Link to="/app/products">design studio</Link> — colours, typography, layouts, carousel and marquee behaviors.
             </li>
             <li>
               <strong>Versioning</strong>: every save here (and every product design save) bumps a version that public surfaces pick

@@ -1,507 +1,292 @@
 /**
- * Product "Connect & design" — pick the widget design, fine-tune this
- * product's look (layered over the company theme), preview with live data and
- * copy the embed code. Noise (IDs, security notes, developer API) is tucked
- * into collapsible sections so the useful part sits on top and the page stays
- * responsive — the preview reflows instead of cropping.
+ * Product "Widget" — pick the template your widget is built from.
+ *
+ * A paginated catalogue of fixed-dimension, pre-designed widget templates
+ * rendered live with sample data (6 per page). Every template already
+ * contains the required rating components (review text, reviewer name,
+ * rating stars) plus its own decorative extras; dimensions are fixed so a
+ * developer knows exactly what space the embed occupies before it loads.
+ *
+ * From here: Apply now switches the live embed immediately, Preview &
+ * customize starts an unpublished draft in the design studio. The embed
+ * snippets and the live preview live on the Connect tab.
  */
-import { IconCheck, IconChevronDown, IconExternal } from '../components/icons';
+import { IconCheck, IconEdit } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { AppSummary, DesignOptions, FormRow, PublicWall, ThemeFontId, ThemeRadiusId } from '../lib/types';
-import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader, Select } from '../components/ui';
-import { SkeletonCards } from '../components/Skeleton';
-import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, SAMPLE_ITEMS, WIDGET_DESIGNS, type WidgetItem, type WidgetTokens } from '../widgets';
-import { RADIUS_OPTIONS, softOf } from '../lib/theme';
-
-interface Override {
-  primary: string | null;
-  accent: string | null;
-  radius: ThemeRadiusId | null;
-  font: ThemeFontId | null;
-}
-const NONE: Override = { primary: null, accent: null, radius: null, font: null };
-
-interface CompanyTheme {
-  primary: string;
-  accent: string;
-  radius: ThemeRadiusId;
-  font: ThemeFontId;
-}
-
-const FALLBACK: CompanyTheme = { primary: '#0ea5a0', accent: '#7c6fe0', radius: 'md', font: 'system' };
+import { useAppName } from '../lib/useAppName';
+import type { AppSummary, WidgetTemplateRow } from '../lib/types';
+import { TemplatePreview } from '../components/TemplatePreview';
+import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
+import { ConfirmDialog } from '../components/menu';
 
 export default function ConnectPage() {
   const { appId = '' } = useParams();
+  const appName = useAppName(appId);
+  const navigate = useNavigate();
+
+  const [templates, setTemplates] = useState<WidgetTemplateRow[] | null>(null);
   const [app, setApp] = useState<AppSummary | null>(null);
-  const [form, setForm] = useState<FormRow | null>(null);
-  const [wall, setWall] = useState<PublicWall | null>(null);
-  const [company, setCompany] = useState<CompanyTheme | null>(null);
-  const [ov, setOv] = useState<Override>(NONE);
-  const [opts, setOpts] = useState<DesignOptions | null>(null);
-  const [designSel, setDesignSel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
-  const [codeTab, setCodeTab] = useState<'widget' | 'modal' | 'iframe' | 'button' | 'api'>('widget');
-  const [open, setOpen] = useState<{ collect: boolean; details: boolean }>({ collect: false, details: false });
+  const [note, setNote] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmApply, setConfirmApply] = useState<WidgetTemplateRow | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(() => {
-    setError(null);
     Promise.all([
+      api.get<{ rows: WidgetTemplateRow[] }>('/v1/widget-templates'),
       api.get<{ rows: AppSummary[] }>('/v1/apps?perPage=200').then((d) => d.rows.find((a) => a.id === appId) ?? null),
-      api.get<{ rows: FormRow[] }>(`/v1/apps/${appId}/forms`),
-      api.get<{ theme: CompanyTheme }>('/v1/settings/theme'),
     ])
-      .then(([appRow, formsData, themeRes]) => {
-        if (!appRow) {
-          setError('This product does not exist or you do not have access to it.');
-          return;
-        }
+      .then(([tpls, appRow]) => {
+        setTemplates(tpls.rows);
         setApp(appRow);
-        setForm(formsData.rows.find((f) => f.published) ?? formsData.rows[0] ?? null);
-        const o = appRow.themeOverride;
-        setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
-        setOpts(appRow.designOptions ?? null);
-        setDesignSel(appRow.widgetDesign ?? null);
-        if (themeRes?.theme) {
-          setCompany({
-            primary: themeRes.theme.primary,
-            accent: themeRes.theme.accent,
-            radius: themeRes.theme.radius,
-            font: themeRes.theme.font,
-          });
-        }
-        return appRow.slug;
+        setError(null);
       })
-      .then((slug) => {
-        if (slug) {
-          api
-            .get<PublicWall>(`/v1/public/walls/${slug}`)
-            .then((w) => setWall(w))
-            .catch(() => undefined);
-        }
-      })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load this product.'));
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load the widget catalogue.'));
   }, [appId]);
 
-    useEffect(() => {
+  useEffect(() => {
     load();
   }, [load]);
 
-  async function saveDesign(): Promise<void> {
-    if (!app) return;
-    const norm = (o: DesignOptions | null | undefined) =>
-      JSON.stringify({ ratingMin: o?.ratingMin ?? null, maxReviews: o?.maxReviews ?? null, sort: o?.sort ?? null });
-    const optionsChanged = norm(opts) !== norm(app.designOptions);
-    setBusy(true);
+  function flash(msg: string): void {
+    setNote(msg);
+    window.setTimeout(() => setNote((cur) => (cur === msg ? null : cur)), 2600);
+  }
+
+  async function applyTemplate(t: WidgetTemplateRow): Promise<void> {
+    setBusyId(t.id);
     setError(null);
-    setNotice(null);
     try {
-      const patch: Record<string, unknown> = {
-        accentColor: ov.primary ?? null,
-        themeAccent: ov.accent,
-        themeRadius: ov.radius,
-        themeFont: ov.font,
-      };
-      if ((designSel ?? null) !== (app.widgetDesign ?? null)) patch.widgetDesign = designSel ?? null;
-      if (optionsChanged)
-        patch.designOptions = { ratingMin: opts?.ratingMin ?? null, maxReviews: opts?.maxReviews ?? null, sort: opts?.sort ?? null };
-      const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, patch);
+      const res = await api.post<{ app: AppSummary }>(`/v1/apps/${appId}/widget-template/${t.id}/apply`);
       setApp(res.app);
-      setOpts(res.app.designOptions ?? null);
-      if (optionsChanged) {
-        api
-          .get<PublicWall>(`/v1/public/walls/${res.app.slug}`)
-          .then((w) => setWall(w))
-          .catch(() => undefined);
-      }
-      const o = res.app.themeOverride;
-      setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
-      setNotice(`Saved — design "${getWidgetDesign(res.app.widgetDesign ?? null).meta.name}" is live (version v${res.app.designVersion ?? 0}). The wall and every embed pick it up on next load.`);
+      setConfirmApply(null);
+      flash(`${t.name} applied — your widget now uses it.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the design.');
+      setError(err instanceof Error ? err.message : 'Could not apply the template.');
     } finally {
-      setBusy(false);
+      setBusyId(null);
     }
   }
 
-  async function copy(text: string, key: string): Promise<void> {
+  /** Preview & customise WITHOUT applying: starts an unpublished draft from
+   *  the template and opens the studio. The live embed is untouched until the
+   *  draft is published from the studio. */
+  async function customizeTemplate(t: WidgetTemplateRow): Promise<void> {
+    setBusyId(t.id);
+    setError(null);
     try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // clipboard unavailable — visual feedback still shows
+      await api.post(`/v1/apps/${appId}/widget-template/${t.id}/draft`);
+      navigate(`/app/a/${appId}/studio`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start a draft from this template.');
+      setBusyId(null);
     }
-    setCopied(key);
-    window.setTimeout(() => setCopied(null), 1800);
   }
 
-  const loadingSkeleton =
-    !app ? (
-      <div>
-        <div className="card" style={{ padding: 18 }}>
-          <span className="sk" style={{ display: 'block', width: '38%', height: 17 }} />
-          <span className="sk" style={{ display: 'block', width: '66%', height: 11, marginTop: 9 }} />
-        </div>
-        <SkeletonCards count={3} height={150} wrap="grid" />
-      </div>
-    ) : null;
+  async function discardDraft(): Promise<void> {
+    setBusyId('discard');
+    setError(null);
+    try {
+      const res = await api.del<{ app: AppSummary }>(`/v1/dashboard/apps/${appId}/design/draft`);
+      setApp(res.app);
+      flash('Draft discarded — the live design stays as it is.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not discard the draft.');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
-  if (error && !app) return <ErrorBanner message={error} onRetry={load} />;
-  if (loadingSkeleton) return loadingSkeleton;
+  function requestApply(t: WidgetTemplateRow): void {
+    // Switching templates replaces the product's current design; confirm when
+    // there is something to lose (an applied template or studio customisation).
+    if ((app?.studioVersion ?? 0) > 0) setConfirmApply(t);
+    else void applyTemplate(t);
+  }
 
-  const comp = company ?? FALLBACK;
-  const primary = ov.primary ?? comp.primary;
-  const accent = ov.accent ?? comp.accent;
-  const radius = ov.radius ?? comp.radius;
-  const font = ov.font ?? comp.font;
-  const dirtyDesign =
-    ov.primary !== (app!.themeOverride?.primary ?? null) ||
-    ov.accent !== (app!.themeOverride?.accent ?? null) ||
-    ov.radius !== (app!.themeOverride?.radius ?? null) ||
-    ov.font !== (app!.themeOverride?.font ?? null) ||
-    (designSel ?? null) !== (app!.widgetDesign ?? null) ||
-    JSON.stringify({ ratingMin: opts?.ratingMin ?? null, maxReviews: opts?.maxReviews ?? null, sort: opts?.sort ?? null }) !==
-      JSON.stringify({ ratingMin: app!.designOptions?.ratingMin ?? null, maxReviews: app!.designOptions?.maxReviews ?? null, sort: app!.designOptions?.sort ?? null });
+  const activeTemplateId = app?.designTemplateId ?? null;
+  const activeTemplate = templates?.find((t) => t.id === activeTemplateId) ?? null;
+  const hasCustomDesign = (app?.studioVersion ?? 0) > 0;
 
-  const origin = window.location.origin;
-  const formSlug = form?.slug ?? `${app!.slug}-review`;
-  const formUrl = `${origin}/forms/${formSlug}`;
-  const wallEmbedUrl = `${origin}/wall/${app!.slug}?embed=1`;
+  // Pagination: 6 templates per page. Land on the page holding the active
+  // template so the current choice is what you see first.
+  const PAGE_SIZE = 6;
+  const pages = Math.max(1, Math.ceil((templates?.length ?? 0) / PAGE_SIZE));
+  const safePage = Math.min(page, pages);
+  const rows = templates?.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) ?? null;
 
-  const widgetSnippet = `<!-- Zojatech widget — ${app!.name}: approved reviews only -->
-<div id="zojatech-wall-${app!.slug}"></div>
-<script src="${origin}/widget/embed.js" data-app="${app!.slug}" async></script>`;
-  const modalSnippet = `<!-- "Leave a review" popup — visitors never leave your site -->
-<button type="button" data-zr-open data-zr-form="${formSlug}"
-        style="display:inline-block;background:${primary};color:#fff;padding:10px 18px;border:0;border-radius:10px;font:inherit;font-weight:600;cursor:pointer">Leave a review</button>
-<script src="${origin}/widget/modal.js" async></script>`;
-  const iframeSnippet = `<!-- Zojatech wall (auto-height embed) — product ${app!.code} -->
-<iframe
-  src="${wallEmbedUrl}"
-  title="Reviews for ${app!.name}"
-  loading="lazy"
-  style="width:100%;max-width:680px;border:0;min-height:300px;background:transparent"
-></iframe>`;
-  const buttonSnippet = `<a href="${formUrl}" style="display:inline-block;background:${primary};color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600">Leave a review</a>`;
-  const apiSnippet = `// Developer path — CORS-open public GETs, no secret needed (approved data only)
-const theme = await fetch("${origin}/v1/public/theme/${app!.slug}").then((r) => r.json());
-const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r.json());
-// wall.design selects the widget design; wall.theme carries the tokens.`;
-
-  const tokens: WidgetTokens = {
-    primary,
-    soft: softOf(primary),
-    accent,
-    radiusPx: RADIUS_OPTIONS.find((r) => r.id === radius)?.px ?? 12,
-    font,
-  };
-
-  const realItems: WidgetItem[] = (wall?.testimonials ?? []).map((t) => ({
-    id: t.id,
-    content: t.content,
-    authorName: t.authorName,
-    rating: t.rating,
-    createdAt: t.createdAt,
-  }));
-  const previewItems = realItems.length > 0 ? realItems : SAMPLE_ITEMS;
-  const usingSample = realItems.length === 0;
-  const designId = designSel ?? app!.widgetDesign ?? DEFAULT_WIDGET_DESIGN;
-  const { meta: designMeta, component: DesignWidget } = getWidgetDesign(designId);
-
-  const codeBlocks: Record<string, { label: string; hint: string; code: string; copyKey: string }> = {
-    widget: { label: 'Widget — one script tag', hint: 'Best for any site: WordPress, Webflow, Shopify, plain HTML. Auto-height, no crop.', code: widgetSnippet, copyKey: 'widget' },
-    modal: { label: 'Review modal', hint: 'Floating popup on your page — visitors submit without leaving. Works with any [data-zr-open] element.', code: modalSnippet, copyKey: 'modal' },
-    iframe: { label: 'Iframe embed', hint: 'Drop-in iframe that resizes to the wall height automatically.', code: iframeSnippet, copyKey: 'embed' },
-    button: { label: 'Review button', hint: 'Point your "Leave a review" button at the public form.', code: buttonSnippet, copyKey: 'btn' },
-    api: { label: 'Developer API', hint: 'Little-code path: fetch approved reviews + resolved theme directly.', code: apiSnippet, copyKey: 'api' },
-  };
+  // First render with templates loaded: open on the active template's page.
+  useEffect(() => {
+    if (!templates || !activeTemplate) return;
+    setPage(Math.floor(templates.indexOf(activeTemplate) / PAGE_SIZE) + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, activeTemplate?.id]);
 
   return (
     <div>
       <Breadcrumbs
         items={[
           { label: 'Products', to: '/app/products' },
-          { label: app!.name, to: `/app/a/${app!.id}/overview` },
-          { label: 'Connect & design' },
+          { label: appName ?? appId, to: `/app/a/${appId}/overview` },
+          { label: 'Widget' },
         ]}
       />
       <PageHeader
-        title="Connect & design"
-        subtitle={`${app!.name} — pick a look from the widget library, fine-tune it for this product, preview with live reviews, then copy the snippet.`}
+        title="Widget"
+        subtitle="Pick the template your widget is built from — customise it in the studio, connect it on the Connect tab."
         actions={
           <>
-            <Link className="btn btn-secondary" to={`/app/a/${app!.id}/studio`}>
-              Design studio
+            <Link className="btn btn-outline" to={`/app/a/${appId}/embed`}>
+              Connect it →
             </Link>
-            <Link className="btn btn-secondary" to={`/wall/${app!.slug}`} target="_blank" rel="noreferrer">
-              Preview wall <IconExternal size={13} />
+            <Link className="btn btn-outline" to={`/app/a/${appId}/studio`}>
+              <IconEdit size={13} /> Customize in studio
             </Link>
           </>
         }
       />
 
-      {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
+      {error && <ErrorBanner message={error} onRetry={load} />}
+      {note && (
+        <div className="banner banner-ok" role="status">
+          <span>
+            <IconCheck size={13} /> {note}
+          </span>
+        </div>
+      )}
 
-      <div className="stack" style={{ gap: 16 }}>
-        {/* ---- Design picker ---- */}
-        <section className="card" style={{ padding: 18 }}>
-          <div className="section-head">
-            <div>
-              <h2 style={{ margin: 0 }}>1 · Pick the look</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Every design shows the same things — reviewer, rating, message, time — in its own layout. One file per design, all plug-and-play.
-              </p>
-            </div>
+      {app?.designDraft && (
+        <div className="draft-banner" role="status">
+          <span className="strong small">
+            Draft in progress{app.designDraft.templateId ? ` — ${templates?.find((t) => t.id === app.designDraft?.templateId)?.name ?? app.designDraft.templateId}` : ''}
+          </span>
+          <span className="muted small">Customising without applying: the live embed keeps serving your published design until you publish from the studio.</span>
+          <span className="draft-banner-actions">
+            <Link className="btn btn-secondary btn-xs" to={`/app/a/${appId}/studio`}>
+              <IconEdit size={12} /> Open studio
+            </Link>
+            <Button variant="ghost" className="btn-xs" disabled={busyId === 'discard'} onClick={() => void discardDraft()}>
+              Discard draft
+            </Button>
+          </span>
+        </div>
+      )}
+
+      {/* ---- 1 · Pick a template ------------------------------------------ */}
+      <section className="tpl-section">
+        <div className="section-head">
+          <div>
+            <h2 style={{ margin: 0 }}>Pick a template</h2>
+            <p className="muted small" style={{ margin: '2px 0 0' }}>
+              Every template ships with the required rating components — review text, reviewer name and stars — plus its
+              own extras. Dimensions are fixed, so you always know where it fits.
+            </p>
           </div>
+        </div>
 
-          <div className="design-layout">
-            <div className="design-tiles">
-              {WIDGET_DESIGNS.map((d) => {
-                const active = d.meta.id === designId;
-                return (
-                  <button
-                    key={d.meta.id}
-                    type="button"
-                    onClick={() => setDesignSel(d.meta.id)}
-                    aria-pressed={active}
-                    className={`design-tile${active ? ' active' : ''}`}
-                    style={active ? { borderColor: primary, boxShadow: `0 0 0 3px ${primary}22` } : undefined}
-                  >
-                    <span className="design-tile-head">
-                      <span className="strong">{d.meta.name}</span>
-                      {active && <IconCheck size={13} />}
-                    </span>
-                    <span className="design-tile-tag muted small">{d.meta.tagline}</span>
-                    <span className="design-tile-feats">
-                      {d.meta.features.slice(0, 2).map((f) => (
-                        <span key={f} className="chip">{f}</span>
-                      ))}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="design-appearance card-soft">
-              <div className="section-sub">
-                <div className="strong">Fine-tune for this product</div>
-                <div className="muted small">Leave a field on “Company” to inherit {app!.name === 'Acme' ? 'the company theme' : 'your company theme'}.</div>
-              </div>
-
-              {company ? (
-                <div className="company-theme-line">
-                  <span className="color-dots">
-                    <i style={{ background: company.primary }} />
-                    <i style={{ background: company.accent }} />
-                  </span>
-                  <span className="muted small">Company theme: {company.primary} · {company.radius} corners · {company.font} font</span>
-                </div>
-              ) : (
-                <div className="muted small">Loading company theme…</div>
-              )}
-
-              <div className="mini-grid">
-                <div>
-                  <Label>Product colour</Label>
-                  <div className="link-copy">
-                    <input type="color" aria-label="Product primary colour" value={primary}
-                      onChange={(e) => setOv((d) => ({ ...d, primary: e.target.value }))} />
-                    {ov.primary ? (
-                      <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, primary: null }))}>Inherit company</Button>
-                    ) : <span className="chip chip-approved">Company</span>}
-                  </div>
-                </div>
-                <div>
-                  <Label>Accent colour</Label>
-                  <div className="link-copy">
-                    <input type="color" aria-label="Product accent colour" value={accent}
-                      onChange={(e) => setOv((d) => ({ ...d, accent: e.target.value }))} />
-                    {ov.accent ? (
-                      <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, accent: null }))}>Inherit company</Button>
-                    ) : <span className="chip chip-approved">Company</span>}
-                  </div>
-                </div>
-                <div>
-                  <Label>Corners</Label>
-                  <Select value={ov.radius ?? ''} onChange={(e) => setOv((d) => ({ ...d, radius: (e.target.value || null) as ThemeRadiusId | null }))}>
-                    <option value="">Company ({company?.radius ?? 'md'})</option>
-                    <option value="sm">Sharp</option>
-                    <option value="md">Soft</option>
-                    <option value="lg">Rounded</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Font</Label>
-                  <Select value={ov.font ?? ''} onChange={(e) => setOv((d) => ({ ...d, font: (e.target.value || null) as ThemeFontId | null }))}>
-                    <option value="">Company ({company?.font ?? 'system'})</option>
-                    <option value="system">System</option>
-                    <option value="serif">Serif</option>
-                    <option value="mono">Mono</option>
-                  </Select>
+        {!templates && (
+          <div className="tpl-grid" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="card tpl-card">
+                <div className="tpl-card-preview"><span className="sk tpl-preview-sk" /></div>
+                <div className="tpl-card-body">
+                  <span className="sk" style={{ display: 'block', width: '55%', height: 15 }} />
+                  <span className="sk" style={{ display: 'block', width: '80%', height: 10 }} />
+                  <span className="sk" style={{ display: 'block', width: '40%', height: 10 }} />
                 </div>
               </div>
-
-              <div className="divider" style={{ margin: '12px 0' }} />
-              <div className="section-sub">
-                <div className="strong">Which reviews to show</div>
-                <div className="muted small">Saved with the design version — the wall and every embed apply it automatically.</div>
-              </div>
-              <div className="mini-grid">
-                <div>
-                  <Label>Minimum rating</Label>
-                  <Select value={String(opts?.ratingMin ?? '')} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), ratingMin: e.target.value === '' ? null : Number(e.target.value) }))}>
-                    <option value="">Any rating</option>
-                    <option value="4">4 and up</option>
-                    <option value="5">5 only</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Reviews to show</Label>
-                  <Select value={String(opts?.maxReviews ?? '')} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), maxReviews: e.target.value === '' ? null : Number(e.target.value) }))}>
-                    <option value="">No limit</option>
-                    <option value="3">3</option>
-                    <option value="6">6</option>
-                    <option value="12">12</option>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Order</Label>
-                  <Select value={opts?.sort ?? ''} onChange={(e) => setOpts((d) => ({ ...(d ?? {}), sort: (e.target.value || null) as DesignOptions['sort'] }))}>
-                    <option value="">Newest first</option>
-                    <option value="highest">Highest rated first</option>
-                    <option value="oldest">Oldest first</option>
-                  </Select>
-                </div>
-              </div>
-              <div className="muted small" style={{ marginTop: 8 }}>
-                Design version <span className="chip chip-approved">v{app!.designVersion ?? 0}</span> — every save bumps it, and walls/embeds pick it up on the next load.
-              </div>
-
-              <div className="modal-actions" style={{ marginTop: 10 }}>
-                <Button variant="secondary" disabled={busy || !dirtyDesign} onClick={() => void saveDesign()}>
-                  {busy ? 'Saving…' : dirtyDesign ? 'Save product design' : 'Saved — up to date'}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* ---- Live preview: real render of the chosen design, never cropped ---- */}
-          <div style={{ marginTop: 18 }}>
-            <div className="section-sub" style={{ marginBottom: 6 }}>
-              <span className="strong">Live preview — {designMeta.name}</span>
-              <span className="muted small" style={{ marginLeft: 8 }}>{designMeta.tagline}</span>
-            </div>
-            {usingSample && (
-              <p className="muted small" style={{ margin: '0 0 8px' }}>
-                No approved reviews yet, so you are seeing sample content. Approve a few in Moderation and this preview switches to real reviews.
-              </p>
-            )}
-            <div className="preview-frame">
-              <div className="preview-frame-bar">
-                <i /><i /><i />
-                <span className="muted small">{wallEmbedUrl}</span>
-              </div>
-              <div className="preview-frame-body">
-                <DesignWidget items={previewItems} tokens={tokens} cta={form ? { href: formUrl, label: 'Add a Review +' } : null} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ---- 2 · Get the code (open) ---- */}
-        <section className="card" style={{ padding: 18 }}>
-          <div className="section-head">
-            <div>
-              <h2 style={{ margin: 0 }}>2 · Get the code</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Paste on the website where {app!.name} reviews should appear. {usingSample ? 'Live approved reviews' : `${realItems.length} approved review${realItems.length === 1 ? '' : 's'} live now`} — nothing to rebuild when new ones are approved.
-              </p>
-            </div>
-          </div>
-
-          <div className="segmented" role="tablist" aria-label="Embed options">
-            {(Object.keys(codeBlocks) as ('widget' | 'modal' | 'iframe' | 'button' | 'api')[]).map((k) => (
-              <button key={k} type="button" role="tab" aria-selected={codeTab === k} className={`segment ${codeTab === k ? 'active' : ''}`} onClick={() => setCodeTab(k)}>
-                {codeBlocks[k].label.split('—')[0].trim()}
-              </button>
             ))}
           </div>
-          <p className="muted small" style={{ marginTop: 6 }}>{codeBlocks[codeTab].hint}</p>
-          <pre className="code-block" style={{ marginTop: 8 }}><code>{codeBlocks[codeTab].code}</code></pre>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-            <Button variant="secondary" className="btn-sm" onClick={() => void copy(codeBlocks[codeTab].code, codeBlocks[codeTab].copyKey)}>
-              {copied === codeBlocks[codeTab].copyKey ? (<><IconCheck size={12} /> Copied</>) : 'Copy snippet'}
-            </Button>
-            <a className="btn btn-outline btn-sm" href={`${origin}/external/acme.html?app=${app!.slug}&form=${formSlug}`} target="_blank" rel="noreferrer">
-              See it on an example external site <IconExternal size={13} />
-            </a>
+        )}
+
+        {rows && (
+          <div className="tpl-grid">
+            {rows.map((t) => {
+              const active = t.id === activeTemplateId && hasCustomDesign;
+              return (
+                <div key={t.id} className={`card tpl-card ${active ? 'active' : ''}`}>
+                  <div className="tpl-card-preview">
+                    <TemplatePreview schema={t.schema} />
+                    {active && <span className="tpl-active-badge"><IconCheck size={11} /> In use</span>}
+                    <span className="tpl-dims-badge">{t.width} × {t.height}</span>
+                  </div>
+                  <div className="tpl-card-body">
+                    <div className="tpl-card-title">
+                      <span className="strong">{t.name}</span>
+                      <span className="chip">{t.category}</span>
+                    </div>
+                    <p className="muted small tpl-card-desc">{t.description}</p>
+                    <div className="tpl-card-features">
+                      {t.features.map((f) => (
+                        <span key={f} className="chip chip-tag">{f}</span>
+                      ))}
+                    </div>
+                    <div className="tpl-card-actions">
+                      {active ? (
+                        <Link className="btn btn-secondary btn-sm" to={`/app/a/${appId}/studio`}>
+                          <IconEdit size={13} /> Customize
+                        </Link>
+                      ) : (
+                        <>
+                          <Button className="btn-sm" disabled={busyId === t.id} onClick={() => requestApply(t)} title="Apply now — the embed switches to this template immediately">
+                            {busyId === t.id ? 'Applying…' : 'Apply now'}
+                          </Button>
+                          <Button variant="secondary" className="btn-sm" disabled={busyId === t.id} onClick={() => void customizeTemplate(t)} title="Preview & customise it in the studio first — nothing goes live until you publish">
+                            Preview &amp; customize
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <p className="muted small" style={{ margin: '8px 0 0' }}>
-            The example page is a <strong>standalone static website</strong> (not this app) embedding the widget with this product's data. Step-by-step verification: <code>docs/integration-test-guide.md</code>.
+        )}
+
+        {pages > 1 && (
+          <nav className="tpl-pager" aria-label="Template pages">
+            <button type="button" className="btn btn-ghost btn-xs" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+              ‹ Prev
+            </button>
+            {Array.from({ length: pages }).map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-current={safePage === i + 1 ? 'page' : undefined}
+                className={`tpl-page-btn ${safePage === i + 1 ? 'active' : ''}`}
+                onClick={() => setPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button type="button" className="btn btn-ghost btn-xs" disabled={safePage >= pages} onClick={() => setPage(safePage + 1)}>
+              Next ›
+            </button>
+            <span className="muted small" style={{ marginLeft: 6 }}>
+              {templates?.length ?? 0} templates
+            </span>
+          </nav>
+        )}
+      </section>
+
+      <ConfirmDialog
+        open={confirmApply !== null}
+        title={`Switch to ${confirmApply?.name ?? 'this template'}?`}
+        body={
+          <p className="muted" style={{ margin: 0 }}>
+            Applying <strong>{confirmApply?.name}</strong> replaces this product&apos;s current widget design with a
+            fresh copy of the template. Your reviews, forms and moderation queue are untouched.
           </p>
-
-          <button type="button" className="collapse-toggle" onClick={() => setOpen((o) => ({ ...o, collect: !o.collect }))} aria-expanded={open.collect}>
-            3 · Collect reviews on that website
-            <IconChevronDown className={open.collect ? 'flip' : ''} />
-          </button>
-          {open.collect && (
-            <div className="collapse-body">
-              <div className="link-row">
-                <div>
-                  <div className="small strong">Review form link</div>
-                  <div className="muted small">Link your “Leave a review” button to this URL.</div>
-                </div>
-                <div className="link-copy">
-                  <code>{`/forms/${formSlug}`}</code>
-                  <Button variant="outline" className="btn-xs" onClick={() => void copy(formUrl, 'form')}>
-                    {copied === 'form' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
-                  </Button>
-                </div>
-              </div>
-              <div className="link-row">
-                <div>
-                  <div className="small strong">Review button snippet</div>
-                  <div className="muted small">Styled with this product's colour ({primary}).</div>
-                </div>
-                <Button variant="outline" className="btn-xs" onClick={() => void copy(buttonSnippet, 'btn2')}>
-                  {copied === 'btn2' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
-                </Button>
-              </div>
-              {!form?.published && <p className="muted small">Tip: publish a form on the Forms page to accept submissions first.</p>}
-            </div>
-          )}
-
-          <button type="button" className="collapse-toggle" onClick={() => setOpen((o) => ({ ...o, details: !o.details }))} aria-expanded={open.details}>
-            4 · IDs, security &amp; developer notes
-            <IconChevronDown className={open.details ? 'flip' : ''} />
-          </button>
-          {open.details && (
-            <div className="collapse-body">
-              <div className="ids-box">
-                <div><Label>Product code</Label><code style={{ color: primary }}>{app!.code}</code></div>
-                <div><Label>Product ID (system)</Label><code>{app!.id}</code></div>
-                <div><Label>Wall slug</Label><code>/{app!.slug}</code></div>
-                <div><Label>Form slug</Label><code>/forms/{formSlug}</code></div>
-              </div>
-              <ul className="plain-list connect-security">
-                <li>
-                  <strong>Secure by design</strong> — snippets contain no secret; walls and public GETs serve only approved reviews and the resolved theme.
-                </li>
-                <li>
-                  <strong>One theme, every embed</strong> — template/company/product tokens resolve on every load, so edits appear everywhere instantly.
-                </li>
-                <li>
-                  <strong>Future-proof</strong> — stable IDs mean upgraded widget runtimes slot in behind the same public API.
-                </li>
-              </ul>
-            </div>
-          )}
-        </section>
-      </div>
+        }
+        confirmLabel="Apply template"
+        busy={busyId === confirmApply?.id}
+        onConfirm={() => confirmApply && void applyTemplate(confirmApply)}
+        onCancel={() => setConfirmApply(null)}
+      />
     </div>
   );
 }

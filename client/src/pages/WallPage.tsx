@@ -1,24 +1,28 @@
 /**
- * Public testimonial wall — no login needed. Shows a product's approved
- * reviews using the product's chosen widget design (from the plug-and-play
- * library) with a CTA to the public form.
+ * Public testimonial wall — no login needed.
  *
  * Two modes:
- *   · Full page   — brand header, review count + average, then the design.
- *   · ?embed=1    — widget-only surface used inside the <iframe> created by
- *                   /widget/embed.js. No chrome, transparent background, and
- *                   it posts its rendered height to the parent so embeds are
- *                   never cropped (auto-height iframes).
+ *   · Full page   — brand header, the product's WIDGET (its template-based,
+ *                   studio-edited design cycling live reviews) as the hero,
+ *                   plus the review stats and a link to the form.
+ *   · ?embed=1    — the widget itself, at its exact fixed dimensions, used
+ *                   inside the <iframe> created by /widget/embed.js. No chrome,
+ *                   transparent background. The embed is the product's main
+ *                   output: the same schema the design studio edits, rendered
+ *                   with live records — they can never drift apart.
  */
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import type { PublicWall } from '../lib/types';
-import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, type WidgetItem, type WidgetTokens } from '../widgets';
+import type { StudioRecord } from '../design-studio/types';
+import type { WidgetTokens } from '../widgets';
+import { TemplateWidget } from '../widgets/TemplateWidget';
 import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
 import { FONT_OPTIONS } from '../lib/theme';
+import { IconZojatechMark } from '../components/icons/brand';
 
 function useEmbedHeight(enabled: boolean, ready: boolean): void {
   useEffect(() => {
@@ -75,10 +79,32 @@ export default function WallPage() {
     );
   }
   if (!wall) {
+    // Skeleton mirrors the wall: eyebrow, brand header, stat chips, then a
+    // grid of review cards in the classic layout.
     return (
       <div className="wall">
-        <div className="block-center">
-          <span className="spinner spinner-lg" aria-hidden />
+        <div className="wall-card wall-sk" aria-busy="true">
+          <header className="wall-head">
+            <span className="sk" style={{ display: 'inline-block', width: 130, height: 10, borderRadius: 999 }} />
+            <span className="sk" style={{ display: 'block', width: '44%', height: 30, margin: '12px auto 0', borderRadius: 8 }} />
+            <span className="sk" style={{ display: 'block', width: '68%', height: 11, margin: '10px auto 0' }} />
+          </header>
+          <div className="wall-actions">
+            {[110, 84].map((w, i) => (
+              <span key={i} className="sk" style={{ display: 'inline-block', width: w, height: 22, borderRadius: 999 }} />
+            ))}
+          </div>
+          <div className="wall-sk-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="wall-sk-card">
+                <span className="sk" style={{ display: 'block', width: 96, height: 13 }} />
+                <span className="sk" style={{ display: 'block', width: '100%', height: 11, marginTop: 9 }} />
+                <span className="sk" style={{ display: 'block', width: '88%', height: 11, marginTop: 6 }} />
+                <span className="sk" style={{ display: 'block', width: '54%', height: 11, marginTop: 6 }} />
+                <span className="sk" style={{ display: 'block', width: 70, height: 11, marginTop: 12 }} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -98,8 +124,6 @@ export default function WallPage() {
     '--font-stack': FONT_OPTIONS.find((f) => f.id === th?.font)?.stack ?? 'inherit',
   } as React.CSSProperties;
 
-  const designId = (q.get('design') || wall.design || DEFAULT_WIDGET_DESIGN).trim();
-  const { meta, component: Widget } = getWidgetDesign(designId);
   const tokens: WidgetTokens = {
     primary: th?.primary ?? wall.brandColor,
     soft: th?.soft ?? '#e0f5f4',
@@ -107,24 +131,26 @@ export default function WallPage() {
     radiusPx: th?.radiusPx ?? 14,
     font: th?.font ?? 'system',
   };
-  const items: WidgetItem[] = wall.testimonials.map((t) => ({
-    id: t.id,
+  // Records that fill the product's widget template (same shape the studio
+  // preview uses — bound fields resolve from these).
+  const widgetRecords: StudioRecord[] = wall.testimonials.map((t) => ({
     content: t.content,
     authorName: t.authorName ?? 'Anonymous visitor',
-    rating: t.rating ?? null,
+    rating: t.rating ?? 0,
     createdAt: t.createdAt,
   }));
+  const widgetCta = wall.form ? `${window.location.origin}/forms/${wall.form.slug}` : null;
 
-  // Widget mode: no chrome, no header, transparent — designed to be embedded.
+  // Widget mode: the product's template at its exact fixed dimensions —
+  // designed to be embedded on external websites.
   if (embed) {
     return (
-      <div className="wall wall-embed" style={vars}>
-        <div className="sr-only">{meta.name} — {count} review{count === 1 ? '' : 's'}</div>
-        <Widget
-          items={items}
-          tokens={tokens}
-          cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null}
-        />
+      <div className="wall wall-embed wall-template">
+        {wall.widget ? (
+          <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+        ) : (
+          <WidgetEmpty tokens={tokens} cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null} />
+        )}
       </div>
     );
   }
@@ -148,6 +174,13 @@ export default function WallPage() {
           />
         ) : (
           <>
+            {/* The product's widget — its studio-edited template cycling live
+                reviews, exactly as it appears when embedded elsewhere. */}
+            {wall.widget && (
+              <div className="wall-hero-widget">
+                <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+              </div>
+            )}
             <div className="wall-actions">
               <span className="muted small">
                 {count} review{count === 1 ? '' : 's'}
@@ -157,25 +190,20 @@ export default function WallPage() {
                   </>
                 )}
               </span>
-              <span className="muted small chip" title={`Design: ${meta.name}`}>
-                {meta.name}
-              </span>
               {wall.form && (
                 <Link to={`/forms/${wall.form.slug}`} className="btn btn-teal">
                   Add a Review +
                 </Link>
               )}
             </div>
-            <div className="wall-design">
-              <Widget items={items} tokens={tokens} cta={null} />
-            </div>
             <p className="muted small" style={{ textAlign: 'center' }}>
-              Latest review {timeAgo(items[0]?.createdAt ?? '')}
+              Latest review {timeAgo(wall.testimonials[0]?.createdAt ?? '')}
             </p>
           </>
         )}
 
         <footer className="wall-foot">
+          <IconZojatechMark size={15} />
           <span>Powered by Zojatech — collect testimonials on any website.</span>
         </footer>
       </div>

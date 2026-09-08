@@ -1,4 +1,5 @@
 /** Shared API types (shape-compatible with the Express API responses). */
+import type { StudioSchema } from '../design-studio/types';
 
 /** DOC-7 theme types — shape-compatible with server ResolvedTheme / presets. */
 export type ThemeRadiusId = 'sm' | 'md' | 'lg';
@@ -139,6 +140,11 @@ export interface Testimonial {
   authorName?: string | null;
   rating?: number;
   status: TestimonialStatus;
+  /**
+   * Live toggle: when false an approved testimonial is kept in the dashboard
+   * but pulled from every public surface (wall, embeds) until switched back.
+   */
+  visible?: boolean;
   tags: string[];
   createdAt: string;
   updatedAt?: string;
@@ -273,7 +279,11 @@ export interface AppSummary {
   widgetDesign?: string | null;
   designTemplateId?: string | null;
   designVersion?: number;
+  /** >0 once a widget design (applied template or studio save) exists. */
+  studioVersion?: number;
   designOptions?: DesignOptions | null;
+  /** Unpublished studio draft (preview/customise/save without applying). */
+  designDraft?: { templateId: string | null; updatedAt: string | null } | null;
   status: 'active' | 'paused';
   createdAt: string;
   totalTestimonials: number;
@@ -338,6 +348,20 @@ export interface WallTestimonial {
   createdAt: string;
 }
 
+/**
+ * The product's embeddable widget: a fixed-dimension, template-based design
+ * (edited in the studio) that the public embed renders with live review
+ * records. Always present on wall responses — products that never picked a
+ * template serve the default one so the embed code works out of the box.
+ */
+export interface WallWidget {
+  templateId: string | null;
+  name: string;
+  width: number;
+  height: number;
+  schema: StudioSchema;
+}
+
 export interface PublicWall {
   tenantName: string;
   tenantSlug: string;
@@ -349,7 +373,20 @@ export interface PublicWall {
   designVersion?: number;
   app: { id: string; name: string; slug: string; websiteUrl: string | null };
   form: { slug: string; name: string } | null;
+  widget: WallWidget | null;
   testimonials: WallTestimonial[];
+}
+
+/** One seeded widget template from the catalogue (schemas included for previews). */
+export interface WidgetTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  width: number;
+  height: number;
+  features: string[];
+  schema: StudioSchema;
 }
 
 export interface LoginResponse {

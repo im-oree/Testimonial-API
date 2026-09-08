@@ -34,7 +34,7 @@ export function ErrorScreen({ title = 'Something went wrong', message }: { title
       <h1>{title}</h1>
       <p className="muted">{message || 'An unexpected error happened while loading this page.'}</p>
       {role ? <p className="muted small">{role} Use the button below to get back to your home screen.</p> : (
-        <p className="muted small">If the problem continues, sign out and back in — the demo runs on an in-memory engine.</p>
+        <p className="muted small">If the problem continues, sign out and back in.</p>
       )}
       <div className="error-actions">
         <Button variant="ghost" onClick={() => navigate(-1)}>

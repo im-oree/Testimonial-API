@@ -4,9 +4,13 @@
  *   npm run dev   -> tsx watch (restarts on file changes)
  *   npm start     -> tsx (single run)
  *
+ * Configuration comes from server/.env (see .env.example) with built-in
+ * defaults for everything — copy the example file to configure.
+ *
  * Data is in-memory and seeded with demo accounts (see demo-data.ts), so
  * every restart resets to the same clean demo state.
  */
+import './env';
 import { createApp } from './app';
 
 const PORT = Number(process.env.PORT ?? 3000);

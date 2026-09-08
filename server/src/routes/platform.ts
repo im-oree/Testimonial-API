@@ -5,6 +5,7 @@
 import { Router, type Request } from 'express';
 import { DEMO, MONTHLY_BY_PLAN, PLATFORM_ROLE_TEMPLATES, WIDGET_DESIGN_IDS, platformPermissionsFor, type DemoTenant, type PlatformRole } from '../demo-data';
 import { badRequest, createSessionToken, forbidden, notFound, paginate, platformStaffOfSession, queryString, requirePlatform, requirePlatformPermission, sessionOf, type Paging } from '../lib';
+import { REQUIRED_WIDGET_FIELDS, widgetTemplateRows } from '../widget-templates';
 import { isValidHexColor, parseThemePatch, RADIUS_IDS, FONT_IDS, type ThemeFont, type ThemeRadius } from '../theme';
 
 export const platformRouter = Router();
@@ -120,6 +121,13 @@ platformRouter.post('/platform/tenants/:tenantId/impersonate', (req, res) => {
 // ---------------------------------------------------------------------------
 
 // GET /v1/platform/design-templates
+// GET /v1/platform/widget-templates — the global widget template catalogue
+// (the same gallery tenants see), for the platform console's template view.
+platformRouter.get('/platform/widget-templates', (req, res) => {
+  requirePlatform(req);
+  res.json({ rows: widgetTemplateRows(), requiredFields: REQUIRED_WIDGET_FIELDS });
+});
+
 platformRouter.get('/platform/design-templates', (req, res) => {
   requirePlatform(req);
   res.json({ rows: DEMO.designTemplates() });

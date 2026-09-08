@@ -6,7 +6,22 @@
  * All routes require a company session (`Authorization: Bearer <token>`).
  */
 import { Router, type Request } from 'express';
-import { COMPANY_ROLE_TEMPLATES, DEMO, WIDGET_DESIGN_IDS, type DemoRole, type DesignOptions, type DesignSort } from '../demo-data';
+import {
+  COMPANY_ROLE_TEMPLATES,
+  DEMO,
+  WIDGET_DESIGN_IDS,
+  type DemoRole,
+  type DemoTestimonial,
+  type DesignOptions,
+  type DesignSort,
+  type TestimonialStatus,
+} from '../demo-data';
+import {
+  missingWidgetFields,
+  REQUIRED_WIDGET_FIELDS,
+  widgetTemplateById,
+  widgetTemplateRows,
+} from '../widget-templates';
 import {
   appOfSession,
   badRequest,
@@ -29,6 +44,7 @@ import {
   type RawQuestion,
 } from '../lib';
 import { parseThemePatch, presetSummary, THEME_PRESETS } from '../theme';
+import { addMediaAsset, mediaOfTenant, removeMediaAsset } from '../demo-data';
 
 export const tenantRouter = Router();
 
@@ -64,6 +80,41 @@ tenantRouter.get('/apps', (req, res) => {
 });
 
 // POST /v1/apps  (create an app for a website)
+// ---------------------------------------------------------------------------
+// Media library — saved image URLs for reuse in designs.
+
+// GET /v1/media
+tenantRouter.get('/media', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({ rows: mediaOfTenant(tenant.id) });
+});
+
+// POST /v1/media  { name, url }
+tenantRouter.post('/media', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  const url = String(req.body?.url ?? '').trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw badRequest('A valid http(s) image URL is required.');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw badRequest('Only http(s) URLs are supported.');
+  }
+  const name = (String(req.body?.name ?? '').trim() || parsed.hostname).slice(0, 80);
+  res.status(201).json({ asset: addMediaAsset(tenant.id, name, url) });
+});
+
+// DELETE /v1/media/:mediaId
+tenantRouter.delete('/media/:mediaId', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!removeMediaAsset(tenant.id, req.params.mediaId)) throw notFound('Media asset not found.');
+  res.json({ ok: true });
+});
+
 tenantRouter.post('/apps', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'apps.manage');
@@ -155,6 +206,48 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
   res.json({ app: DEMO.appSummary(updated) });
 });
 
+// GET /v1/widget-templates — the widget template catalogue. Every template
+// carries the required rating components and fixed dimensions; schemas are
+// included so the picker can render true live previews.
+tenantRouter.get('/widget-templates', (req, res) => {
+  requireCompany(req);
+  res.json({ rows: widgetTemplateRows(), requiredFields: REQUIRED_WIDGET_FIELDS });
+});
+
+// POST /v1/apps/:appId/widget-template/:templateId/apply — apply a template to
+// a product: a fresh copy of its schema becomes the product's widget design
+// (the studio customises it from there) and the embed reflects it immediately.
+tenantRouter.post('/apps/:appId/widget-template/:templateId/apply', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const template = widgetTemplateById(req.params.templateId);
+  if (!template) throw notFound('Template not found.');
+  const updated = DEMO.applyWidgetTemplate(req.params.appId, template);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    app: DEMO.appSummary(updated),
+    template: { id: template.id, name: template.name, width: template.width, height: template.height },
+  });
+});
+
+// POST /v1/apps/:appId/widget-template/:templateId/draft — start an
+// UNPUBLISHED draft from a template: preview & customise & save it in the
+// studio without touching the live embed until an explicit publish.
+tenantRouter.post('/apps/:appId/widget-template/:templateId/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const template = widgetTemplateById(req.params.templateId);
+  if (!template) throw notFound('Template not found.');
+  const updated = DEMO.startDesignDraft(req.params.appId, template);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    app: DEMO.appSummary(updated),
+    template: { id: template.id, name: template.name, width: template.width, height: template.height },
+  });
+});
+
 // GET /v1/dashboard/apps/:appId/design/schema — the product's visual-editor
 // schema draft (DOC 7B). Null until the studio saves one for this product.
 tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
@@ -172,8 +265,10 @@ tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
 });
 
 // PATCH /v1/dashboard/apps/:appId/design/schema — persist a studio save. The
-// schema is validated structurally (object or null) and capped in size; the
-// server never interprets element payloads.
+// schema is validated structurally (object or null) and capped in size, and
+// must keep the required widget components: a design without the rating
+// system (review text, reviewer name, rating stars) is not a widget and never
+// reaches the public embed.
 tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'apps.manage');
@@ -182,6 +277,12 @@ tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
   if (schema !== null && (typeof schema !== 'object' || Array.isArray(schema))) throw badRequest('Schema must be a design JSON object or null.');
   const serialized = JSON.stringify(schema ?? {});
   if (serialized.length > 400_000) throw badRequest('Schema is too large (max 400 KB).');
+  if (schema !== null) {
+    const missing = missingWidgetFields(schema);
+    if (missing.length > 0) {
+      throw badRequest(`A widget must keep its required components — add back: ${missing.join(', ')}.`);
+    }
+  }
   const updated = DEMO.updateStudioSchema(req.params.appId, schema);
   if (!updated) throw notFound('App not found.');
   res.json({
@@ -190,6 +291,76 @@ tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
     updatedAt: updated.studioUpdatedAt ?? null,
     designVersion: updated.designVersion ?? 0,
   });
+});
+
+// GET /v1/dashboard/apps/:appId/design/draft — the unpublished draft the
+// studio is customising (null when the live design is what you see).
+tenantRouter.get('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  res.json({
+    schema: app.designDraft ?? null,
+    templateId: app.designDraftTemplateId ?? null,
+    updatedAt: app.designDraftUpdatedAt ?? null,
+  });
+});
+
+// PATCH /v1/dashboard/apps/:appId/design/draft — save the studio draft. Same
+// contract as the live schema save (size cap + required components), but it
+// never touches the public embed — publishing is a separate explicit step.
+tenantRouter.patch('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const app = DEMO.appById(req.params.appId);
+  if (!app) throw notFound('App not found.');
+  const schema = (req.body as Record<string, unknown> | undefined)?.schema ?? null;
+  if (schema !== null && (typeof schema !== 'object' || Array.isArray(schema))) throw badRequest('Schema must be a design JSON object or null.');
+  const serialized = JSON.stringify(schema ?? {});
+  if (serialized.length > 400_000) throw badRequest('Schema is too large (max 400 KB).');
+  if (schema !== null) {
+    const missing = missingWidgetFields(schema);
+    if (missing.length > 0) {
+      throw badRequest(`A widget must keep its required components — add back: ${missing.join(', ')}.`);
+    }
+  }
+  const updated = DEMO.updateDesignDraft(req.params.appId, schema);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    schema: updated.designDraft ?? null,
+    templateId: updated.designDraftTemplateId ?? null,
+    updatedAt: updated.designDraftUpdatedAt ?? null,
+  });
+});
+
+// POST /v1/dashboard/apps/:appId/design/draft/publish — push the draft live:
+// this is the ONLY studio path that changes what the embed serves.
+tenantRouter.post('/dashboard/apps/:appId/design/draft/publish', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const updated = DEMO.publishDesignDraft(req.params.appId);
+  if (!updated) throw notFound('No draft to publish — save one first.');
+  res.json({
+    schema: updated.studioSchema ?? null,
+    studioVersion: updated.studioVersion ?? 0,
+    updatedAt: updated.studioUpdatedAt ?? null,
+    designVersion: updated.designVersion ?? 0,
+  });
+});
+
+// DELETE /v1/dashboard/apps/:appId/design/draft — throw the draft away and
+// keep serving the live design.
+tenantRouter.delete('/dashboard/apps/:appId/design/draft', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const updated = DEMO.discardDesignDraft(req.params.appId);
+  if (!updated) throw notFound('App not found.');
+  res.json({ app: DEMO.appSummary(updated) });
 });
 
 // GET /v1/dashboard/apps/:appId/design — current versioned design + history.
@@ -262,6 +433,54 @@ tenantRouter.get('/apps/:appId/testimonials', (req, res) => {
   res.json({ rows: sorted.slice((page - 1) * perPage, page * perPage), total: sorted.length });
 });
 
+// POST /v1/apps/:appId/testimonials  (manual create — full CRUD support)
+tenantRouter.post('/apps/:appId/testimonials', (req, res) => {
+  requirePermission(req, 'testimonials.write');
+  const content = String(req.body?.content ?? '').trim().slice(0, 2000);
+  if (!content) throw badRequest('Testimonial content is required.');
+  const authorName = req.body?.authorName == null || req.body.authorName === '' ? null : String(req.body.authorName).trim().slice(0, 120);
+  const rating =
+    req.body?.rating == null || req.body?.rating === '' ? undefined : Math.min(5, Math.max(1, Math.round(Number(req.body.rating)) || 1));
+  const status = (['pending', 'approved', 'rejected', 'archived'] as const).includes(req.body?.status)
+    ? (req.body.status as TestimonialStatus)
+    : 'approved'; // manually added reviews are trusted live by default
+  const tags = Array.isArray(req.body?.tags) ? req.body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30) : [];
+  const visible = req.body?.visible === false ? false : true;
+  const created = DEMO.addTestimonial({ appId: req.params.appId, content, authorName, rating, status, visible, tags });
+  res.status(201).json(created);
+});
+
+// POST /v1/apps/:appId/testimonials/bulk  (bulk management: status, live
+// toggle, delete). ids are capped (DOC 6 §2.9) and every id is resolved
+// through the app-scoped rows so a foreign id can never be touched.
+const BULK_ACTIONS = new Set(['approve', 'reject', 'archive', 'show', 'hide', 'delete']);
+tenantRouter.post('/apps/:appId/testimonials/bulk', (req, res) => {
+  const action = String(req.body?.action ?? '');
+  if (!BULK_ACTIONS.has(action)) throw badRequest('Invalid bulk action.');
+  // Status changes and deletes are destructive moderation work; the live
+  // toggle is a content edit.
+  requirePermission(req, action === 'show' || action === 'hide' ? 'testimonials.write' : 'testimonials.moderate');
+  const rows = rowsForApp(req, req.params.appId);
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : []).slice(0, 100); // DOC 6 §2.9 — bulk caps
+  const scopedIds = new Set(rows.filter((r) => ids.includes(r.id)).map((r) => r.id));
+  let affected = 0;
+  if (action === 'delete') {
+    for (const id of scopedIds) {
+      if (DEMO.deleteTestimonial(id)) affected += 1;
+    }
+  } else if (action === 'show' || action === 'hide') {
+    for (const id of scopedIds) {
+      if (DEMO.updateTestimonial(id, { visible: action === 'show' })) affected += 1;
+    }
+  } else {
+    const status = MODERATION_ACTIONS[action];
+    for (const id of scopedIds) {
+      if (DEMO.updateTestimonial(id, { status })) affected += 1;
+    }
+  }
+  res.json({ ok: true, affected });
+});
+
 // POST /v1/apps/:appId/testimonials/bulk/moderation
 tenantRouter.post('/apps/:appId/testimonials/bulk/moderation', (req, res) => {
   requirePermission(req, 'testimonials.moderate');
@@ -298,14 +517,45 @@ tenantRouter.delete('/apps/:appId/testimonials/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// PATCH /v1/apps/:appId/testimonials/:id  (update tags)
+// PATCH /v1/apps/:appId/testimonials/:id  (full edit: content, author, rating,
+// tags, live toggle — plus status changes for moderators)
 tenantRouter.patch('/apps/:appId/testimonials/:id', (req, res) => {
   requirePermission(req, 'testimonials.write');
   const row = rowOr404(req, req.params.appId, req.params.id);
-  if (!Array.isArray(req.body?.tags)) throw badRequest('tags must be an array.');
-  const tags = req.body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30);
-  DEMO.updateTestimonial(row.id, { tags });
-  res.json({ ok: true });
+  const body = req.body ?? {};
+  const patch: Partial<DemoTestimonial> = {};
+
+  if (body.content !== undefined) {
+    const content = String(body.content ?? '').trim().slice(0, 2000);
+    if (!content) throw badRequest('Testimonial content cannot be empty.');
+    patch.content = content;
+  }
+  if (body.authorName !== undefined) {
+    patch.authorName = body.authorName == null || body.authorName === '' ? null : String(body.authorName).trim().slice(0, 120);
+  }
+  if (body.rating !== undefined) {
+    patch.rating =
+      body.rating == null || body.rating === '' ? undefined : Math.min(5, Math.max(1, Math.round(Number(body.rating)) || 1));
+  }
+  if (body.tags !== undefined) {
+    if (!Array.isArray(body.tags)) throw badRequest('tags must be an array.');
+    patch.tags = body.tags.map((t: unknown) => String(t).slice(0, 40)).slice(0, 30);
+  }
+  if (body.visible !== undefined) {
+    if (typeof body.visible !== 'boolean') throw badRequest('visible must be a boolean.');
+    patch.visible = body.visible;
+  }
+  if (body.status !== undefined) {
+    // Moving a review between moderation states is moderator work, separate
+    // from editing its content.
+    requirePermission(req, 'testimonials.moderate');
+    if (!(['pending', 'approved', 'rejected', 'archived'] as const).includes(body.status)) throw badRequest('Unknown status.');
+    patch.status = body.status;
+  }
+
+  const updated = DEMO.updateTestimonial(row.id, patch);
+  if (!updated) throw notFound('Testimonial not found.');
+  res.json(updated);
 });
 
 // GET /v1/apps/:appId/testimonials/:id

@@ -95,6 +95,14 @@ export interface DemoApp {
   studioSchema?: unknown | null;
   studioVersion?: number;
   studioUpdatedAt?: string | null;
+  /**
+   * Unpublished design draft (preview/customize/save without applying): a
+   * schema being tuned in the studio before an explicit publish pushes it
+   * into studioSchema (the live embed). Null = no draft.
+   */
+  designDraft?: unknown | null;
+  designDraftTemplateId?: string | null;
+  designDraftUpdatedAt?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -107,6 +115,12 @@ export interface DemoTestimonial {
   authorName?: string | null;
   rating?: number;
   status: TestimonialStatus;
+  /**
+   * Live toggle: approved testimonials with visible !== false render on the
+   * public wall. Hiding one keeps it approved in the dashboard but pulls it
+   * from every public surface until it is switched back on.
+   */
+  visible?: boolean;
   tags: string[];
   createdAt: string;
   updatedAt?: string;
@@ -484,6 +498,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: COMPLIMENTS[(i + n) % COMPLIMENTS.length],
         rating: 4 + ((i + n) % 2), // 4 or 5
         status: 'approved',
+        visible: true,
         tags: (i + n) % 2 === 0 ? ['website', 'product'] : ['video-ready'],
         day: 1 + ((i + n) % 8),
       });
@@ -495,6 +510,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: PENDING_TEXT[p % PENDING_TEXT.length],
         rating: 5,
         status: 'pending',
+        visible: true,
         tags: ['new'],
         day: 2 + ((n + p) % 7),
       });
@@ -506,6 +522,7 @@ function seedTestimonials(): DemoTestimonial[] {
         content: 'Buy cheap followers now!!!',
         rating: 1,
         status: 'rejected',
+        visible: true,
         tags: [],
         day: 2,
       });
@@ -825,6 +842,61 @@ export const DEMO = {
     app.designUpdatedAt = new Date().toISOString();
     return { ...app };
   },
+  /**
+   * Apply a widget template to a product: a fresh copy of the template's
+   * fixed-dimension schema becomes the product's studio design (replacing any
+   * previous customisation) and the template id is remembered for the picker.
+   */
+  applyWidgetTemplate(appId: string, template: { id: string; schema: unknown }): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designTemplateId = template.id;
+    const saved = DEMO.updateStudioSchema(appId, JSON.parse(JSON.stringify(template.schema)));
+    return saved ?? { ...app };
+  },
+
+  /** Start an unpublished draft from a template (or the current live design):
+   *  the studio customises it and only an explicit publish touches the embed. */
+  startDesignDraft(appId: string, template: { id: string; schema: unknown } | null): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    const base = template ? JSON.parse(JSON.stringify(template.schema)) : app.studioSchema ?? null;
+    app.designDraft = base;
+    app.designDraftTemplateId = template ? template.id : app.designTemplateId ?? null;
+    app.designDraftUpdatedAt = new Date().toISOString();
+    return { ...app };
+  },
+
+  /** Save the unpublished draft (studio Save button). */
+  updateDesignDraft(appId: string, schema: unknown): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designDraft = schema;
+    app.designDraftUpdatedAt = new Date().toISOString();
+    return { ...app };
+  },
+
+  /** Publish the draft: it becomes the live design the embed serves. */
+  publishDesignDraft(appId: string): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app || app.designDraft == null) return undefined;
+    if (app.designDraftTemplateId) app.designTemplateId = app.designDraftTemplateId;
+    const saved = DEMO.updateStudioSchema(appId, JSON.parse(JSON.stringify(app.designDraft)));
+    app.designDraft = null;
+    app.designDraftTemplateId = null;
+    app.designDraftUpdatedAt = null;
+    return saved ?? { ...app };
+  },
+
+  /** Throw the draft away and keep the live design. */
+  discardDesignDraft(appId: string): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designDraft = null;
+    app.designDraftTemplateId = null;
+    app.designDraftUpdatedAt = null;
+    return { ...app };
+  },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
   appSummary(app: DemoApp) {
     const rows = TESTIMONIALS.filter((r) => r.appId === app.id);
@@ -850,7 +922,11 @@ export const DEMO = {
       widgetDesign: app.widgetDesign ?? null,
       designTemplateId: app.designTemplateId ?? null,
       designVersion: app.designVersion ?? 0,
+      studioVersion: app.studioVersion ?? 0,
       designOptions: app.designOptions ?? null,
+      designDraft: app.designDraft
+        ? { templateId: app.designDraftTemplateId ?? null, updatedAt: app.designDraftUpdatedAt ?? null }
+        : null,
       status: app.status,
       createdAt: app.createdAt,
       totalTestimonials: rows.length,
@@ -930,7 +1006,7 @@ export const DEMO = {
     return TESTIMONIALS.filter((r) => r.appId === appId);
   },
   addTestimonial(t: Omit<DemoTestimonial, 'id' | 'createdAt'>): DemoTestimonial {
-    const row: DemoTestimonial = { ...t, id: `t-${randomUUID().slice(0, 8)}`, createdAt: new Date().toISOString() };
+    const row: DemoTestimonial = { ...t, visible: t.visible ?? true, id: `t-${randomUUID().slice(0, 8)}`, createdAt: new Date().toISOString() };
     TESTIMONIALS.push(row);
     return row;
   },
@@ -1401,7 +1477,46 @@ export class DemoSessions {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Media library — image assets (by URL) a tenant saves for reuse in designs.
+// Deleting an asset never breaks a design: designs store the URL itself, so
+// externally hosted images keep rendering; the library is just the saved list.
+// ---------------------------------------------------------------------------
+
+export interface DemoMediaAsset {
+  id: string;
+  tenantId: string;
+  name: string;
+  url: string;
+  createdAt: string;
+}
+
+const MEDIA: DemoMediaAsset[] = [];
+
 export function demoAccountLabel(role: 'company' | 'platform'): { email: string; password: string } {
   if (role === 'platform') return { email: 'admin@zojatech.test', password: 'demo1234' };
   return { email: 'owner@acme.test', password: 'demo1234' };
+}
+
+export function mediaOfTenant(tenantId: string): DemoMediaAsset[] {
+  return MEDIA.filter((m) => m.tenantId === tenantId).map((m) => ({ ...m }));
+}
+
+export function addMediaAsset(tenantId: string, name: string, url: string): DemoMediaAsset {
+  const asset: DemoMediaAsset = {
+    id: `media-${MEDIA.length + 1}`,
+    tenantId,
+    name,
+    url,
+    createdAt: new Date().toISOString(),
+  };
+  MEDIA.push(asset);
+  return { ...asset };
+}
+
+export function removeMediaAsset(tenantId: string, id: string): boolean {
+  const i = MEDIA.findIndex((m) => m.tenantId === tenantId && m.id === id);
+  if (i === -1) return false;
+  MEDIA.splice(i, 1);
+  return true;
 }

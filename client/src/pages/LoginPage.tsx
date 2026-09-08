@@ -4,6 +4,7 @@
  * the API returns a session token that this app keeps and sends as a Bearer
  * header, so it also works inside embedded preview iframes).
  */
+import { IconZojatechMark } from '../components/icons/brand';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, FullScreenLoading } from '../auth';
@@ -17,14 +18,14 @@ type Mode = 'company' | 'platform';
 const MODE_META: Record<Mode, { title: string; subtitle: string; endpoint: string; home: string; demoLabel: string }> = {
   company: {
     title: 'Sign in to your workspace',
-    subtitle: 'Company / tenant staff',
+    subtitle: 'Products, reviews and widgets — all in one place.',
     endpoint: '/v1/auth/login',
     home: '/app',
     demoLabel: 'Company workspace · Acme Inc',
   },
   platform: {
     title: 'Platform admin',
-    subtitle: 'Zojatech staff',
+    subtitle: 'The Zojatech staff console.',
     endpoint: '/v1/platform/auth/login',
     home: '/platform/overview',
     demoLabel: 'Platform admin · Zojatech',
@@ -107,12 +108,27 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-brand">
-          <span className="brand-dot" />
-          <span>Testimonial API</span>
-        </div>
-        <h1>{cfg.title}</h1>
+      <div className="auth-shell">
+        {/* Brand panel — hidden on small screens (the card shows the mark then). */}
+        <aside className="auth-side" aria-hidden>
+          <div className="auth-side-brand">
+            <IconZojatechMark size={40} color="#ffffff" />
+            <span>Zojatech</span>
+          </div>
+          <h2 className="auth-side-line">Customer voices, beautifully displayed.</h2>
+          <ul className="auth-side-points">
+            <li>Collect reviews from any product</li>
+            <li>Curate them in moderation</li>
+            <li>Embed the widget anywhere</li>
+          </ul>
+          <span className="auth-side-foot">Zojatech · Testimonials</span>
+        </aside>
+        <div className="auth-card">
+          <div className="auth-brand">
+            <IconZojatechMark size={30} />
+            <span>Zojatech</span>
+          </div>
+          <h1>{cfg.title}</h1>
         <p className="muted">{cfg.subtitle}</p>
 
         <ErrorBanner message={error} />
@@ -143,17 +159,21 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <hr className="divider" />
-        <p className="muted small demo-hint">
-          <strong>Demo access</strong> — local in-memory backend. Pick an account to sign in instantly:
-        </p>
-        <div className="demo-list">
-          {DEMO_ACCOUNTS.map((account) => (
-            <Button key={account.email} variant="secondary" type="button" disabled={busy} onClick={() => demoSignIn(account)}>
-              <span className="demo-btn-main">{account.label}</span>
-              <span className="demo-btn-sub">{account.email} · {account.password}</span>
-            </Button>
-          ))}
+        {/* Demo accounts stay out of the way: collapsed below the form. */}
+        <details className="demo-access">
+          <summary>
+            <span className="strong small">Demo accounts</span>
+            <span className="muted small"> — one-click sign-in for exploring</span>
+          </summary>
+          <div className="demo-list">
+            {DEMO_ACCOUNTS.map((account) => (
+              <Button key={account.email} variant="secondary" type="button" disabled={busy} onClick={() => demoSignIn(account)}>
+                <span className="demo-btn-main">{account.label}</span>
+                <span className="demo-btn-sub">{account.email} · {account.password}</span>
+              </Button>
+            ))}
+          </div>
+        </details>
         </div>
       </div>
     </div>

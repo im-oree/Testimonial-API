@@ -18,10 +18,25 @@ export function layoutToCSS(layout: StudioElement['layout']): CSSProperties {
   };
 }
 
+/**
+ * Effective border-radius: per-corner overrides win where defined, `radius`
+ * fills the rest — so linked and unlinked corners mix cleanly.
+ */
+export function radiusOf(style: StudioElement['style']): string {
+  const tl = style.radiusTL ?? style.radius;
+  const tr = style.radiusTR ?? style.radius;
+  const br = style.radiusBR ?? style.radius;
+  const bl = style.radiusBL ?? style.radius;
+  if (tl === tr && tr === br && br === bl) return `${tl}px`;
+  return `${tl}px ${tr}px ${br}px ${bl}px`;
+}
+
 export function styleToCSS(style: StudioElement['style']): CSSProperties {
   const css: CSSProperties = {};
   if (style.background) css.backgroundColor = style.background;
-  if (style.radius > 0) css.borderRadius = style.radius;
+  if (style.radius > 0 || style.radiusTL !== undefined || style.radiusTR !== undefined || style.radiusBR !== undefined || style.radiusBL !== undefined) {
+    css.borderRadius = radiusOf(style);
+  }
   if (style.opacity < 1) css.opacity = style.opacity;
   return css;
 }

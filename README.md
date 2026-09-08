@@ -10,13 +10,50 @@ Data is **in-memory and seeded** on start (demo accounts, forms, testimonials), 
 ## Run it
 
 ```bash
-npm install
-npm run install:all   # installs deps inside server/ and client/
+npm install          # installs EVERYTHING: root + server/ + client/
+                     # (a postinstall hook cascades into both packages)
 
-npm run dev           # starts BOTH: API on :3000, web app on :3001
+npm run dev          # starts BOTH: API on :3000, web app on :3001
 ```
 
 Then open **http://localhost:3001**.
+
+> Installed with `--ignore-scripts`, or the cascade didn't run for some reason?
+> `npm run install:all` does the same thing manually: it installs the
+> dependencies inside `server/` and `client/` (each is its own package — the
+> root install alone only covers the dev orchestrator).
+
+## Configuration (.env)
+
+Everything has working defaults — **no configuration needed to run the demo**.
+When you do want to change something, copy the example files:
+
+```bash
+cp server/.env.example server/.env     # API settings
+cp client/.env.example client/.env     # web app settings
+```
+
+**`server/.env`** (loaded by a tiny built-in reader — no extra dependency;
+real environment variables always win over file values):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `PORT` | `3000` | API port. If you change it, point the web app's `VITE_API_PROXY_TARGET` at it. |
+| `HOST` | `0.0.0.0` | Bind address (`127.0.0.1` = local only). |
+| `SESSION_SECRET` | *(auto)* | Inline token-signing secret. Unset = a secret is generated and persisted to `server/.session-secret`. Set this on read-only/deployed filesystems. |
+| `SESSION_SECRET_FILE` | `server/.session-secret` | Where the auto-generated signing secret lives. |
+| `CORS_ORIGINS` | *(off)* | Comma-separated origins allowed to call the API cross-origin (`*` = any, dev only). Only needed when a frontend on another domain points at this API. |
+
+**`client/.env`** (Vite loads it automatically; only `VITE_`-prefixed vars
+reach the browser):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | `http://127.0.0.1:3000` | Where the dev server forwards `/v1` requests — keep it in sync with the API's `PORT`. |
+| `VITE_API_BASE` | *(same origin)* | Where the browser sends API calls. Leave unset for dev (the proxy handles it); set an absolute URL (e.g. `https://api.example.com`) for a deployed frontend — and allow its origin on the API via `CORS_ORIGINS`. |
+| `VITE_PORT` | `3001` | Port of the Vite dev server. |
+
+`.env` files are git-ignored (`.env.example` is committed as documentation).
 
 | What | Where |
 | --- | --- |
@@ -47,6 +84,78 @@ has its own isolated testimonials, moderation queue and public forms.
   company** drops you into that company's workspace (blue impersonation banner,
   one-click exit), while companies can never see another company's data
   (server-enforced — foreign apps return 404).
+
+## The widget system (the product's output)
+
+The point of the app: **templated, editable widgets** you embed on any website.
+
+- **Templates** (`GET /v1/widget-templates`) — a catalogue of 30
+  fixed-dimension designs: the classics (Quote Card, Spotlight Hero, Slim
+  Strip, Rating Badge, Story Card, Bold Statement), interaction templates
+  (Swipe Deck, Coverflow Deck, Tilt Card, Aurora Glass with a live **GLSL
+  shader** backdrop) and a **twenty-template 3D carousel family** — coverflow
+  depth fans, rotating 3D wheels and swipeable card stacks in palettes from
+  neon to editorial. Every template carries the **required rating
+  components** — `review_text`, `reviewer_name`, `review_rating`.
+- **Pick one** on the product's **Widget** page (paginated, 6 per page) —
+  *Apply now* switches the embed immediately, or *Preview & customize* starts
+  an **unpublished draft** (`POST /v1/apps/:appId/widget-template/:id/draft`)
+  and opens the studio. In the studio, **Save writes the draft and Publish is
+  the only step that changes the live embed** — preview, customise and save
+  without applying.
+- **Connect tab** — the embed hub: the live preview of whatever design the
+  product currently serves (the exact component visitors see, running real
+  reviews), step-by-step instructions and the copy-paste snippets. The
+  auto-sizing script also scales the widget down on narrow screens so a
+  fixed-dimension design never overflows its container.
+- **Templates gallery** (`/app/templates`, workspace-wide) — browse every
+  template with category pills and search, preview it live, then apply it to
+  any product or start a draft — all free, one click. The platform console
+  sees the same catalogue at `/platform/templates`.
+- **Builder** (`/app/builder`) — the no-code wizard: pick a product and
+  template, configure what the widget does with your reviews (mode, timing,
+  count cap), tune the look (colours, radius, text size) with a live preview
+  of your real reviews at every step, then save as a draft or publish.
+- **Designs** (`/app/designs`) — every product's design in one gallery:
+  live mini-previews, draft badges with publish/discard (confirmed), and the
+  "New design" paths to templates, builder or AI.
+- **Media library** (`/app/media`) — the team's saved images by URL: add with
+  a live preview, search, copy into any design; removing an asset only
+  removes it from the list (designs keep their URLs).
+- **Product analytics** — the product overview now has a reviews-over-time
+  line chart (30 days / 90 days / all time, day/week/month buckets) and a
+  collection funnel (received → approved → live on the wall).
+- **AI Studio** (`/app/ai`) — describe the widget you want in plain words
+  ("a dark midnight carousel with gold star ratings"); the generator
+  synthesises a complete design — palette, motion mode, canvas, layout —
+  previews it with your live reviews, and supports regenerate, refine ("make
+  the cards rounder, use violet") and a this-session history. One click
+  takes it to the studio as a draft or straight to the live embed. No
+  external AI service: a deterministic, seeded keyword synthesizer.
+- **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
+  to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
+  an immersive full-bleed stage (app sidebar collapses to the icon rail, the
+  topbar hides), a layers-first left panel with element adding behind a ＋
+  popover, per-corner **or** linked corner radius, GLSL **shader elements**
+  (aurora / plasma / mesh / starfield presets with adjustable speed), and
+  entrance animations with duration/delay.
+- **Widget behavior** — the answer to "what happens when more reviews come in?"
+  Each design carries a `behavior` edited in the studio's properties panel and
+  executed by the live widget: **cycle** (cross-fade, one review at a time),
+  **carousel** (swipeable/draggable slides with touch inertia, dots + arrows),
+  **coverflow** (a 3D depth carousel that leans toward the cursor — drag it or
+  click a side card; gap, depth and rotation adjustable on sliders),
+  **wheel** (a 3D ring of cards rotating around the vertical axis — drag to
+  spin, tilts with the cursor), **stack** (a deck — flick the top card aside
+  and the next review swings in), **tilt** (a mouse-reactive 3D card with
+  cursor glare), or **marquee** (a continuous stream — direction left/right
+  and speed adjustable, pauses on hover). Auto-advance interval and a
+  max-records cap keep heavy review counts light.
+- **Embed it** — the Widget page hands you the drop-in iframe and auto-sizing
+  script. The embed (`/widget/embed.js`) sizes itself to the template's exact
+  dimensions, and the wall inside renders the product's saved schema with its
+  behavior over its live approved reviews — the same runtime the studio preview
+  uses, so editing and live output can never drift apart.
 
 ## Try the full loop
 
@@ -92,7 +201,16 @@ Everything is under `/v1` (public docs live in the code — see `server/src/rout
 
 - `POST /v1/auth/login`, `POST /v1/platform/auth/login`, `GET /v1/auth/me`
 - `GET|POST /v1/apps`, `PATCH /v1/apps/:appId` (company's apps — one per website)
-- `GET|PATCH /v1/apps/:appId/testimonials[...]` (list, moderate, tags, export)
+- `GET /v1/widget-templates`, `POST /v1/apps/:appId/widget-template/:templateId/apply`,
+  `POST /v1/apps/:appId/widget-template/:templateId/draft`,
+  `GET|PATCH /v1/dashboard/apps/:appId/design/draft`, `POST .../design/draft/publish`,
+  `DELETE .../design/draft` (catalogue + apply; draft/customise/publish flow —
+  `PATCH .../design/schema` and draft saves both enforce the required
+  components — review text, reviewer name, rating)
+- `GET|POST|PATCH|DELETE /v1/apps/:appId/testimonials[...]` — list (paged, filtered, searchable),
+  manual create, full edit (content/author/rating/tags), live on-wall toggle (`visible`),
+  moderation moves, delete, `POST .../bulk` (approve/reject/archive/show/hide/delete)
+  and `POST .../bulk/moderation`
 - `GET|POST|PATCH /v1/apps/:appId/forms[...]` (list, create, publish)
 - `GET /v1/platform/overview`, `GET|PATCH /v1/platform/tenants[...]`,
   `POST /v1/platform/tenants/:tenantId/impersonate`, `POST /v1/auth/impersonation/exit`

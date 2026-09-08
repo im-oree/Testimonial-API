@@ -13,8 +13,10 @@
  *   /platform/...              -> platform console (guarded)
  *   anything else              -> role-aware 404 page
  */
+import { useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './auth';
+import { AppIntro } from './components/brand/AppIntro';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppLayout, PlatformLayout } from './components/layout';
 import LoginPage from './pages/LoginPage';
@@ -22,7 +24,11 @@ import AppsHomePage from './pages/AppsHomePage';
 import CompanyOverviewPage from './pages/CompanyOverviewPage';
 import SettingsPage from './pages/SettingsPage';
 import ThemePage from './pages/ThemePage';
-import ThemeMarketplacePage from './pages/ThemeMarketplacePage';
+import WidgetTemplatesPage from './pages/TemplatesPage';
+import BuilderPage from './pages/BuilderPage';
+import DesignsPage from './pages/DesignsPage';
+import AiPage from './pages/AiPage';
+import MediaPage from './pages/MediaPage';
 import DesignStudioPage from './pages/DesignStudioPage';
 import AccountPage from './pages/AccountPage';
 import OverviewPage from './pages/OverviewPage';
@@ -30,6 +36,7 @@ import TestimonialsPage from './pages/TestimonialsPage';
 import ModerationPage from './pages/ModerationPage';
 import FormsPage from './pages/FormsPage';
 import ConnectPage from './pages/ConnectPage';
+import EmbedPage from './pages/EmbedPage';
 import TeamPage from './pages/TeamPage';
 import AuditPage from './pages/AuditPage';
 import PublicFormPage from './pages/PublicFormPage';
@@ -43,9 +50,25 @@ import TemplatesPage from './pages/platform/TemplatesPage';
 import PlatformStaffPage from './pages/platform/PlatformStaffPage';
 
 export default function App() {
+  // Boot intro: plays on every page load (tab open + hard refresh) and never
+  // on client-side navigation — the app only remounts on a real load.
+  // Public surfaces (embeds, walls, forms) skip it: speed beats ceremony there.
+  const { pathname } = useLocation();
+  const isPublicSurface = useRef(pathname.startsWith('/wall') || pathname.startsWith('/forms')).current;
+  const [revealed, setRevealed] = useState(false);
+  const [introDone, setIntroDone] = useState(isPublicSurface);
+
   return (
     <AuthProvider>
-      <AppRoutes />
+      {!introDone && <AppIntro onReveal={() => setRevealed(true)} onDone={() => setIntroDone(true)} />}
+      <div
+        className={
+          introDone || isPublicSurface ? 'app-root' : `app-root app-boot ${revealed ? 'is-in' : ''}`
+        }
+        style={introDone ? undefined : { pointerEvents: 'none' }}
+      >
+        <AppRoutes />
+      </div>
     </AuthProvider>
   );
 }
@@ -76,7 +99,11 @@ function AppRoutes() {
           <Route path="products" element={<AppsHomePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/theme" element={<ThemePage />} />
-          <Route path="settings/theme/marketplace" element={<ThemeMarketplacePage />} />
+          <Route path="templates" element={<WidgetTemplatesPage />} />
+          <Route path="designs" element={<DesignsPage />} />
+          <Route path="builder" element={<BuilderPage />} />
+          <Route path="ai" element={<AiPage />} />
+          <Route path="media" element={<MediaPage />} />
           <Route path="settings/account" element={<AccountPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="audit" element={<AuditPage />} />
@@ -87,6 +114,7 @@ function AppRoutes() {
           {/* One product = one website. Everything below is scoped to :appId. */}
           <Route path="a/:appId/overview" element={<OverviewPage />} />
           <Route path="a/:appId/connect" element={<ConnectPage />} />
+          <Route path="a/:appId/embed" element={<EmbedPage />} />
           <Route path="a/:appId/studio" element={<DesignStudioPage />} />
           <Route path="a/:appId/testimonials" element={<TestimonialsPage />} />
           <Route path="a/:appId/testimonials/moderation" element={<ModerationPage />} />

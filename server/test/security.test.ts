@@ -459,3 +459,296 @@ describe('DOC 6 — company settings surface (workspace profile)', () => {
     assert.equal((await req('PATCH', '/v1/settings/workspace', { token: owner, body: { name: 'Acme Inc' } })).status, 200);
   });
 });
+
+describe('DOC 6 — testimonial CRUD, live toggle & bulk management', () => {
+  it('viewer cannot create/edit/delete testimonials (write permission required)', async () => {
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials', { token: viewerToken, body: { content: 'nope' } })).status,
+      401,
+    );
+    assert.equal(
+      (
+        await req('PATCH', '/v1/apps/app-acme-1/testimonials/t-app-acme-1-a-0', {
+          token: viewerToken,
+          body: { content: 'nope' },
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (await req('DELETE', '/v1/apps/app-acme-1/testimonials/t-app-acme-1-a-0', { token: viewerToken })).status,
+      401,
+    );
+  });
+
+  it('editor can create and edit content but cannot change moderation status', async () => {
+    const created = await req('POST', '/v1/apps/app-acme-1/testimonials', {
+      token: editorToken,
+      body: { content: 'Editor-written review', authorName: 'Editor', rating: 4 },
+    });
+    assert.equal(created.status, 201);
+    const id = (created.json as { id: string }).id;
+    const edited = await req('PATCH', `/v1/apps/app-acme-1/testimonials/${id}`, {
+      token: editorToken,
+      body: { content: 'Editor-written review (edited)' },
+    });
+    assert.equal(edited.status, 200);
+    // status changes need testimonials.moderate
+    assert.equal(
+      (await req('PATCH', `/v1/apps/app-acme-1/testimonials/${id}`, { token: editorToken, body: { status: 'rejected' } })).status,
+      401,
+    );
+    // cleanup
+    assert.equal((await req('DELETE', `/v1/apps/app-acme-1/testimonials/${id}`, { token: ownerToken })).status, 200);
+  });
+
+  it('create clamps ratings and caps content length (write-time hygiene)', async () => {
+    const created = await req('POST', '/v1/apps/app-acme-1/testimonials', {
+      token: ownerToken,
+      body: { content: 'x', authorName: 'Hygiene', rating: 99 },
+    });
+    assert.equal(created.status, 201);
+    const row = created.json as { rating: number };
+    assert.equal(row.rating, 5);
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials', { token: ownerToken, body: { content: '   ' } })).status,
+      400,
+    );
+  });
+
+  it('live toggle pulls a review from the public wall without changing its status', async () => {
+    const list = await req('GET', '/v1/apps/app-acme-1/testimonials?status=approved&perPage=1', { token: ownerToken });
+    const victim = (list.json as { rows: Array<{ id: string }> }).rows[0];
+    const wallBefore = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const beforeIds = (wallBefore.json as { testimonials: Array<{ id: string }> }).testimonials.map((t) => t.id);
+    assert.ok(beforeIds.includes(victim.id), 'seeded approved review should be on the wall');
+
+    const hidden = await req('PATCH', `/v1/apps/app-acme-1/testimonials/${victim.id}`, { token: ownerToken, body: { visible: false } });
+    assert.equal(hidden.status, 200);
+    const wallAfter = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const afterIds = (wallAfter.json as { testimonials: Array<{ id: string }> }).testimonials.map((t) => t.id);
+    assert.ok(!afterIds.includes(victim.id), 'hidden review must not render on the wall');
+    assert.equal((hidden.json as { status: string }).status, 'approved', 'hiding must not change moderation state');
+
+    // restore
+    assert.equal(
+      (await req('PATCH', `/v1/apps/app-acme-1/testimonials/${victim.id}`, { token: ownerToken, body: { visible: true } })).status,
+      200,
+    );
+  });
+
+  it('bulk actions are permission-checked, capped and app-scoped', async () => {
+    // viewer cannot bulk-anything
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: viewerToken, body: { action: 'approve', ids: [] } }))
+        .status,
+      401,
+    );
+    // editor cannot bulk-delete (moderate required) but can toggle visibility
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: editorToken, body: { action: 'delete', ids: [] } })).status,
+      401,
+    );
+    const ids = ['t-app-acme-1-a-1', 't-app-acme-1-a-2'];
+    const bulkHide = await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: ownerToken, body: { action: 'hide', ids } });
+    assert.equal(bulkHide.status, 200);
+    assert.equal((bulkHide.json as { affected: number }).affected, 2);
+    // foreign ids silently resolve to nothing (no IDOR, no error leak)
+    const foreign = await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', {
+      token: ownerToken,
+      body: { action: 'hide', ids: ['t-app-lumen-1-a-0'] },
+    });
+    assert.equal(foreign.status, 200);
+    assert.equal((foreign.json as { affected: number }).affected, 0);
+    // restore
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/testimonials/bulk', { token: ownerToken, body: { action: 'show', ids } })).status,
+      200,
+    );
+  });
+});
+
+describe('DOC 6 — widget templates: catalogue, apply & the widget contract', () => {
+  it('template catalogue requires a company session; cross-kind tokens are rejected', async () => {
+    assert.equal((await req('GET', '/v1/widget-templates')).status, 401);
+    assert.equal((await req('GET', '/v1/widget-templates', { token: platformToken })).status, 401);
+    const list = await req('GET', '/v1/widget-templates', { token: ownerToken });
+    assert.equal(list.status, 200);
+    const rows = (list.json as { rows: Array<{ id: string; width: number; height: number; schema: { elements: unknown[] } }> }).rows;
+    assert.ok(rows.length >= 5, 'catalogue should ship multiple templates');
+    for (const t of rows) {
+      assert.ok(Number.isFinite(t.width) && t.width > 0, 'templates must declare fixed dimensions');
+      assert.ok(Number.isFinite(t.height) && t.height > 0, 'templates must declare fixed dimensions');
+    }
+    assert.ok((list.json as { requiredFields: string[] }).requiredFields.includes('review_rating'));
+  });
+
+  it('applying a template requires apps.manage and is app-scoped', async () => {
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/widget-template/quote-card/apply', { token: viewerToken })).status,
+      401,
+    );
+    // foreign tenant's app id -> 404, never a leak
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/quote-card/apply', { token: lumen })).status, 404);
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/nope/apply', { token: ownerToken })).status, 404);
+
+    const applied = await req('POST', '/v1/apps/app-acme-1/widget-template/hero-banner/apply', { token: ownerToken });
+    assert.equal(applied.status, 200);
+    const body = applied.json as { app: { designTemplateId: string; studioVersion: number }; template: { width: number; height: number } };
+    assert.equal(body.app.designTemplateId, 'hero-banner');
+    assert.ok(body.app.studioVersion >= 1, 'applying bumps the studio version');
+    assert.equal(body.template.width, 1200);
+
+    // the public wall now serves the applied template as the product's widget
+    const wall = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const widget = (wall.json as { widget: { templateId: string; width: number; height: number } }).widget;
+    assert.equal(widget.templateId, 'hero-banner');
+    assert.equal(widget.width, 1200);
+    assert.equal(widget.height, 420);
+  });
+
+  it('a saved design must keep the required widget components (widget contract)', async () => {
+    // strip every binding -> no longer a widget -> 400
+    const schema = {
+      name: 'Broken',
+      canvas: { width: 720, height: 560, background: '#fff' },
+      version: 1,
+      elements: [{ id: 'e1', type: 'text', layout: { x: 0, y: 0, width: 100, height: 40, z: 1 }, text: 'no bindings' }],
+    };
+    const res = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', { token: ownerToken, body: { schema } });
+    assert.equal(res.status, 400);
+    assert.ok(String((res.json as { error?: { message?: string } }).error?.message ?? '').includes('review_text'));
+
+    // a design that keeps the three bound components saves fine
+    const valid = {
+      name: 'Valid widget',
+      canvas: { width: 540, height: 760, background: '#0ea5a0' },
+      version: 2,
+      elements: [
+        { id: 'a', type: 'text', visible: true, name: 'Review', layout: { x: 80, y: 300, width: 380, height: 200, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: { fontSize: 18, fontWeight: 500, color: '#fff', align: 'center' }, text: 'sample', imageUrl: null, binding: { bindingKey: 'review_text', property: 'text' }, animation: null },
+        { id: 'b', type: 'heading', visible: true, name: 'Reviewer', layout: { x: 80, y: 520, width: 380, height: 30, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: { fontSize: 16, fontWeight: 700, color: '#fff', align: 'center' }, text: 'sample', imageUrl: null, binding: { bindingKey: 'reviewer_name', property: 'text' }, animation: null },
+        { id: 'c', type: 'rating-stars', visible: true, name: 'Rating', layout: { x: 210, y: 240, width: 120, height: 30, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: null, text: null, imageUrl: null, binding: { bindingKey: 'review_rating', property: 'rating' }, animation: null },
+      ],
+    };
+    const ok = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', { token: ownerToken, body: { schema: valid } });
+    assert.equal(ok.status, 200);
+    assert.ok((ok.json as { studioVersion: number }).studioVersion >= 1);
+    // the public embed now serves the customised widget
+    const wall = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const w = (wall.json as { widget: { width: number; height: number; schema: { canvas: { background: string } } } }).widget;
+    assert.equal(w.width, 540);
+    assert.equal(w.schema.canvas.background, '#0ea5a0');
+
+    // viewer cannot save either
+    assert.equal(
+      (
+        await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', {
+          token: viewerToken,
+          body: { schema: null },
+        })
+      ).status,
+      401,
+    );
+  });
+});
+
+describe('DOC 7C — media library', () => {
+  it('requires a company session and validates URLs', async () => {
+    assert.equal((await req('GET', '/v1/media')).status, 401);
+    assert.equal((await req('GET', '/v1/media', { token: platformToken })).status, 401);
+    const bad = await req('POST', '/v1/media', { token: ownerToken, body: { url: 'javascript:alert(1)' } });
+    assert.equal(bad.status, 400);
+    const ok = await req('POST', '/v1/media', { token: ownerToken, body: { url: 'https://cdn.example.com/a.png', name: 'Logo' } });
+    assert.equal(ok.status, 201);
+    const id = (ok.json as { asset: { id: string } }).asset.id;
+    const list = await req('GET', '/v1/media', { token: ownerToken });
+    assert.equal(list.status, 200);
+    assert.ok((list.json as { rows: unknown[] }).rows.some((r) => (r as { id: string }).id === id));
+    // Another tenant cannot delete it.
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('DELETE', `/v1/media/${id}`, { token: lumen })).status, 404);
+    assert.equal((await req('DELETE', `/v1/media/${id}`, { token: ownerToken })).status, 200);
+  });
+});
+
+describe('DOC 7C — platform template catalogue', () => {
+  it('the global widget catalogue is platform-only', async () => {
+    assert.equal((await req('GET', '/v1/platform/widget-templates')).status, 401);
+    assert.equal((await req('GET', '/v1/platform/widget-templates', { token: ownerToken })).status, 401);
+    const res = await req('GET', '/v1/platform/widget-templates', { token: platformToken });
+    assert.equal(res.status, 200);
+    const rows = (res.json as { rows: Array<{ id: string; width: number }> }).rows;
+    assert.ok(rows.length >= 30, 'the full catalogue is visible to the platform');
+  });
+});
+
+describe('DOC 6 — design drafts: preview, customise and publish without applying', () => {
+  it('draft endpoints require a company session with apps.manage and are app-scoped', async () => {
+    assert.equal((await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft')).status, 401);
+    assert.equal((await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: platformToken })).status, 401);
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: viewerToken })).status, 401);
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: lumen })).status, 404);
+    assert.equal((await req('PATCH', '/v1/dashboard/apps/app-lumen-1/design/draft', { token: ownerToken, body: { schema: {} } })).status, 404);
+  });
+
+  it('a draft never touches the live embed until it is published', async () => {
+    // The live widget before any draft work (set by the earlier tests).
+    const before = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const beforeWidget = (before.json as { widget: { templateId: string | null; width: number } }).widget;
+
+    // 1. Start a draft from the coverflow template.
+    const started = await req('POST', '/v1/apps/app-acme-1/widget-template/coverflow-deck/draft', { token: ownerToken });
+    assert.equal(started.status, 200);
+    assert.equal((started.json as { app: { designDraft: { templateId: string } | null } }).app.designDraft?.templateId, 'coverflow-deck');
+
+    // 2. The studio loads the draft; the embed still serves the live design.
+    const draft = await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal(draft.status, 200);
+    const draftSchema = (draft.json as { schema: { name: string } | null; templateId: string | null }).schema;
+    assert.ok(draftSchema, 'draft schema should be present');
+    assert.equal((draft.json as { templateId: string | null }).templateId, 'coverflow-deck');
+    const mid = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((mid.json as { widget: { width: number } }).widget.width, beforeWidget.width, 'draft must not change the live embed');
+
+    // 3. Saving the draft keeps the embed untouched.
+    const saved = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/draft', {
+      token: ownerToken,
+      body: { schema: { ...draftSchema, name: 'Tuned coverflow' } },
+    });
+    assert.equal(saved.status, 200);
+    const still = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((still.json as { widget: { width: number } }).widget.width, beforeWidget.width, 'saving a draft must not publish it');
+
+    // 4. Draft saves enforce the widget contract too.
+    const broken = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/draft', {
+      token: ownerToken,
+      body: { schema: { name: 'Broken', canvas: { width: 300, height: 200, background: '#fff' }, version: 1, elements: [] } },
+    });
+    assert.equal(broken.status, 400);
+
+    // 5. Publish: the only path that changes the embed.
+    const published = await req('POST', '/v1/dashboard/apps/app-acme-1/design/draft/publish', { token: ownerToken });
+    assert.equal(published.status, 200);
+    assert.ok((published.json as { studioVersion: number }).studioVersion >= 1);
+    const after = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const afterWidget = (after.json as { widget: { templateId: string | null; width: number; schema: { name: string } } }).widget;
+    assert.equal(afterWidget.templateId, 'coverflow-deck');
+    assert.equal(afterWidget.width, 960);
+    assert.equal(afterWidget.schema.name, 'Tuned coverflow');
+
+    // 6. Publishing consumed the draft.
+    const empty = await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal((empty.json as { schema: unknown }).schema, null);
+    assert.equal((await req('POST', '/v1/dashboard/apps/app-acme-1/design/draft/publish', { token: ownerToken })).status, 404);
+
+    // 7. A discard keeps the live design.
+    const again = await req('POST', '/v1/apps/app-acme-1/widget-template/tilt-card/draft', { token: ownerToken });
+    assert.equal(again.status, 200);
+    const discarded = await req('DELETE', '/v1/dashboard/apps/app-acme-1/design/draft', { token: ownerToken });
+    assert.equal(discarded.status, 200);
+    const final = await req('GET', '/v1/public/walls/acme-marketing-site');
+    assert.equal((final.json as { widget: { templateId: string | null } }).widget.templateId, 'coverflow-deck', 'discard keeps the live design');
+  });
+});

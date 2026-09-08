@@ -11,6 +11,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import './env';
 
 export type SessionKind = 'company' | 'platform';
 export interface Session {
@@ -31,6 +32,13 @@ let secret: string | null = null;
 
 function getSecret(): string {
   if (secret) return secret;
+  // SESSION_SECRET (from .env / environment) wins — for deployments where
+  // writing the auto-generated secret file isn't possible.
+  const inline = process.env.SESSION_SECRET?.trim();
+  if (inline) {
+    secret = inline;
+    return secret;
+  }
   try {
     const existing = fs.readFileSync(SECRET_PATH, 'utf8').trim();
     if (existing) {
