@@ -45,6 +45,10 @@ export interface DemoTenant {
   seatsLimit: number;
 }
 
+/** Widget design ids the widget library ships (client/src/widgets/index.tsx). */
+export const WIDGET_DESIGN_IDS = ['classic', 'spotlight', 'carousel', 'wall', 'marquee', 'orbit'] as const;
+export type WidgetDesignId = (typeof WIDGET_DESIGN_IDS)[number];
+
 /**
  * An App/Product = one website or collection surface where a tenant collects
  * testimonials. A tenant can own many; every testimonial, form, widget,
@@ -65,6 +69,8 @@ export interface DemoApp {
   themeAccent?: string | null;
   themeRadius?: string | null;
   themeFont?: string | null;
+  /** Per-product widget design from the plug-and-play library. */
+  widgetDesign?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -629,6 +635,7 @@ export const DEMO = {
       themeAccent?: string | null;
       themeRadius?: string | null;
       themeFont?: string | null;
+      widgetDesign?: string | null;
     },
   ): DemoApp | undefined {
     const app = APPS.find((a) => a.id === appId);
@@ -640,6 +647,7 @@ export const DEMO = {
     if (patch.themeAccent !== undefined) app.themeAccent = patch.themeAccent;
     if (patch.themeRadius !== undefined) app.themeRadius = patch.themeRadius;
     if (patch.themeFont !== undefined) app.themeFont = patch.themeFont;
+    if (patch.widgetDesign !== undefined) app.widgetDesign = patch.widgetDesign?.trim() || null;
     return { ...app };
   },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
@@ -664,6 +672,7 @@ export const DEMO = {
         radius: app.themeRadius ?? null,
         font: app.themeFont ?? null,
       },
+      widgetDesign: app.widgetDesign ?? null,
       status: app.status,
       createdAt: app.createdAt,
       totalTestimonials: rows.length,

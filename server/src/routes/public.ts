@@ -32,6 +32,7 @@ function themeForApp(appSlug: string) {
     app: { id: app.id, name: app.name, slug: app.slug, websiteUrl: app.websiteUrl },
     tenantName: tenant.name,
     logoUrl: tenant.logoUrl ?? null,
+    design: app.widgetDesign ?? 'classic',
     theme: { ...base, primary, soft: hexSoft(primary), accent, radius, radiusPx: RADIUS_PX[radius], font },
   };
 }
@@ -86,6 +87,7 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
     brandColor: app.accentColor ?? tenant.brandColor ?? '#0ea5a0',
     logoUrl: tenant.logoUrl ?? null,
     theme: themed?.theme ?? null,
+    design: app.widgetDesign ?? 'classic',
     app: { id: app.id, name: app.name, slug: app.slug, websiteUrl: app.websiteUrl },
     form: publishedForm ? { slug: publishedForm.slug, name: publishedForm.name } : null,
     testimonials: approved.map((t) => ({

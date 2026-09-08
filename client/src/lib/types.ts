@@ -212,6 +212,7 @@ export interface AppSummary {
   adminEmail: string | null;
   accentColor: string | null;
   themeOverride?: { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null } | null;
+  widgetDesign?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
   totalTestimonials: number;
@@ -280,6 +281,7 @@ export interface PublicWall {
   brandColor: string;
   logoUrl: string | null;
   theme?: ResolvedTheme | null;
+  design?: string | null;
   app: { id: string; name: string; slug: string; websiteUrl: string | null };
   form: { slug: string; name: string } | null;
   testimonials: WallTestimonial[];

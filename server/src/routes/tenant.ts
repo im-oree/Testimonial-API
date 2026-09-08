@@ -6,7 +6,7 @@
  * All routes require a company session (`Authorization: Bearer <token>`).
  */
 import { Router, type Request } from 'express';
-import { DEMO, type DemoRole } from '../demo-data';
+import { DEMO, WIDGET_DESIGN_IDS, type DemoRole } from '../demo-data';
 import {
   appOfSession,
   badRequest,
@@ -100,6 +100,7 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     themeAccent?: string | null;
     themeRadius?: string | null;
     themeFont?: string | null;
+    widgetDesign?: string | null;
   } = {};
   if (typeof req.body?.name === 'string') patch.name = req.body.name.trim().slice(0, 80);
   if (typeof req.body?.websiteUrl === 'string') patch.websiteUrl = req.body.websiteUrl.trim().slice(0, 300) || null;
@@ -121,6 +122,12 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     if (req.body.themeFont === null || req.body.themeFont === '') patch.themeFont = null;
     else if (['system', 'serif', 'mono'].includes(String(req.body.themeFont))) patch.themeFont = String(req.body.themeFont);
     else throw badRequest('Per-product font must be system, serif or mono.');
+  }
+  if (req.body?.widgetDesign !== undefined) {
+    const id = typeof req.body.widgetDesign === 'string' ? req.body.widgetDesign.trim() : '';
+    if (id === '' || req.body.widgetDesign === null) patch.widgetDesign = null;
+    else if ((WIDGET_DESIGN_IDS as readonly string[]).includes(id)) patch.widgetDesign = id;
+    else throw badRequest('Unknown widget design id.');
   }
   const updated = DEMO.updateApp(req.params.appId, patch);
   if (!updated) throw notFound('App not found.');

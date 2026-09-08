@@ -1,26 +1,57 @@
 /**
  * Public testimonial wall — no login needed. Shows a product's approved
- * reviews with an empty state and a teal "Add a Review +" CTA that opens the
- * product's public form. Mirrors the embeddable widget surface in a browser.
+ * reviews using the product's chosen widget design (from the plug-and-play
+ * library) with a CTA to the public form.
+ *
+ * Two modes:
+ *   · Full page   — brand header, review count + average, then the design.
+ *   · ?embed=1    — widget-only surface used inside the <iframe> created by
+ *                   /widget/embed.js. No chrome, transparent background, and
+ *                   it posts its rendered height to the parent so embeds are
+ *                   never cropped (auto-height iframes).
  */
-import { IconStar } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import type { PublicWall } from '../lib/types';
+import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, type WidgetItem, type WidgetTokens } from '../widgets';
+import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
 import { FONT_OPTIONS } from '../lib/theme';
 
+function useEmbedHeight(enabled: boolean, ready: boolean): void {
+  useEffect(() => {
+    if (!enabled || !ready) return;
+    const send = () => {
+      const h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      window.parent.postMessage({ zojatech: { height: h } }, '*');
+    };
+    send();
+    const t = window.setTimeout(send, 150);
+    const ro = new ResizeObserver(send);
+    ro.observe(document.body);
+    window.addEventListener('resize', send);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('resize', send);
+      ro.disconnect();
+    };
+  }, [enabled, ready]);
+}
+
 export default function WallPage() {
   const { appSlug = '' } = useParams();
-
   const [wall, setWall] = useState<PublicWall | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const q = new URLSearchParams(window.location.search);
+  const embed = q.get('embed') === '1';
 
   useEffect(() => {
     let alive = true;
     setError(null);
+    setWall(null);
     api
       .get<PublicWall>(`/v1/public/walls/${appSlug}`)
       .then((w) => {
@@ -33,6 +64,8 @@ export default function WallPage() {
       alive = false;
     };
   }, [appSlug]);
+
+  useEmbedHeight(embed, Boolean(wall));
 
   if (error) {
     return (
@@ -55,8 +88,8 @@ export default function WallPage() {
   const rated = wall.testimonials.filter((t) => t.rating);
   const avgRating = rated.length ? Math.round((rated.reduce((s, t) => s + (t.rating as number), 0) / rated.length) * 10) / 10 : null;
 
-  // DOC-7 theme: the API sends pre-resolved tokens; every value below falls
-  // back to the previous look so older payloads still render identically.
+  // DOC-7 theme: pre-resolved tokens from the API; falls back to the classic
+  // look for older payloads.
   const th = wall.theme;
   const vars = {
     '--brand': th?.primary ?? wall.brandColor,
@@ -64,6 +97,37 @@ export default function WallPage() {
     '--radius': th ? `${th.radiusPx}px` : '14px',
     '--font-stack': FONT_OPTIONS.find((f) => f.id === th?.font)?.stack ?? 'inherit',
   } as React.CSSProperties;
+
+  const designId = (q.get('design') || wall.design || DEFAULT_WIDGET_DESIGN).trim();
+  const { meta, component: Widget } = getWidgetDesign(designId);
+  const tokens: WidgetTokens = {
+    primary: th?.primary ?? wall.brandColor,
+    soft: th?.soft ?? '#e0f5f4',
+    accent: th?.accent ?? '#0ea5a0',
+    radiusPx: th?.radiusPx ?? 14,
+    font: th?.font ?? 'system',
+  };
+  const items: WidgetItem[] = wall.testimonials.map((t) => ({
+    id: t.id,
+    content: t.content,
+    authorName: t.authorName ?? 'Anonymous visitor',
+    rating: t.rating ?? null,
+    createdAt: t.createdAt,
+  }));
+
+  // Widget mode: no chrome, no header, transparent — designed to be embedded.
+  if (embed) {
+    return (
+      <div className="wall wall-embed" style={vars}>
+        <div className="sr-only">{meta.name} — {count} review{count === 1 ? '' : 's'}</div>
+        <Widget
+          items={items}
+          tokens={tokens}
+          cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="wall" style={vars}>
@@ -78,16 +142,10 @@ export default function WallPage() {
         </header>
 
         {count === 0 ? (
-          <div className="wall-empty">
-            <div className="wall-empty-icon"><IconStar size={30} /></div>
-            <h2>No reviews yet</h2>
-            <p className="muted">Be the first to share your experience with {wall.app.name}. It takes less than a minute.</p>
-            {wall.form && (
-              <Link to={`/forms/${wall.form.slug}`} className="btn btn-teal">
-                Add a Review +
-              </Link>
-            )}
-          </div>
+          <WidgetEmpty
+            tokens={tokens}
+            cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null}
+          />
         ) : (
           <>
             <div className="wall-actions">
@@ -99,24 +157,21 @@ export default function WallPage() {
                   </>
                 )}
               </span>
+              <span className="muted small chip" title={`Design: ${meta.name}`}>
+                {meta.name}
+              </span>
               {wall.form && (
                 <Link to={`/forms/${wall.form.slug}`} className="btn btn-teal">
                   Add a Review +
                 </Link>
               )}
             </div>
-            <ul className="wall-list">
-              {wall.testimonials.map((t) => (
-                <li key={t.id} className="wall-item">
-                  <div className="wall-item-head">
-                    <RatingStars value={t.rating ?? undefined} size="sm" />
-                    <span className="muted small">{timeAgo(t.createdAt)}</span>
-                  </div>
-                  <p className="wall-quote">“{t.content}”</p>
-                  <div className="muted small strong">— {t.authorName}</div>
-                </li>
-              ))}
-            </ul>
+            <div className="wall-design">
+              <Widget items={items} tokens={tokens} cta={null} />
+            </div>
+            <p className="muted small" style={{ textAlign: 'center' }}>
+              Latest review {timeAgo(items[0]?.createdAt ?? '')}
+            </p>
           </>
         )}
 
