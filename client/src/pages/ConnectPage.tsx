@@ -1,37 +1,60 @@
 /**
- * Product "Connect & design" — the tenant flow for putting testimonials to
- * work: product/testimonial IDs, the collect link for the website, the
- * display wall/embed snippet, and the design (accent colour) with live preview.
+ * Product "Connect & design" — pick the widget design, fine-tune this
+ * product's look (layered over the company theme), preview with live data and
+ * copy the embed code. Noise (IDs, security notes, developer API) is tucked
+ * into collapsible sections so the useful part sits on top and the page stays
+ * responsive — the preview reflows instead of cropping.
  */
-import { IconCheck, IconExternal, IconRefresh, IconStar } from '../components/icons';
+import { IconCheck, IconChevronDown, IconExternal } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { AppSummary, FormRow, ThemeFontId, ThemeRadiusId } from '../lib/types';
+import type { AppSummary, FormRow, PublicWall, ThemeFontId, ThemeRadiusId } from '../lib/types';
 import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader, Select } from '../components/ui';
 import { SkeletonCards } from '../components/Skeleton';
+import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, SAMPLE_ITEMS, WIDGET_DESIGNS, type WidgetItem, type WidgetTokens } from '../widgets';
+import { RADIUS_OPTIONS, softOf } from '../lib/theme';
+
+interface Override {
+  primary: string | null;
+  accent: string | null;
+  radius: ThemeRadiusId | null;
+  font: ThemeFontId | null;
+}
+const NONE: Override = { primary: null, accent: null, radius: null, font: null };
+
+interface CompanyTheme {
+  primary: string;
+  accent: string;
+  radius: ThemeRadiusId;
+  font: ThemeFontId;
+}
+
+const FALLBACK: CompanyTheme = { primary: '#0ea5a0', accent: '#7c6fe0', radius: 'md', font: 'system' };
 
 export default function ConnectPage() {
   const { appId = '' } = useParams();
   const [app, setApp] = useState<AppSummary | null>(null);
   const [form, setForm] = useState<FormRow | null>(null);
-  interface Override { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null; }
-  const NONE: Override = { primary: null, accent: null, radius: null, font: null };
+  const [wall, setWall] = useState<PublicWall | null>(null);
+  const [company, setCompany] = useState<CompanyTheme | null>(null);
   const [ov, setOv] = useState<Override>(NONE);
-  const [company, setCompany] = useState<{ primary: string; accent: string; radius: ThemeRadiusId; font: ThemeFontId } | null>(null);
+  const [designSel, setDesignSel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [demoKey, setDemoKey] = useState(0);
+  const [codeTab, setCodeTab] = useState<'widget' | 'iframe' | 'button' | 'api'>('widget');
+  const [open, setOpen] = useState<{ collect: boolean; details: boolean }>({ collect: false, details: false });
 
   const load = useCallback(() => {
     setError(null);
     Promise.all([
       api.get<{ rows: AppSummary[] }>('/v1/apps?perPage=200').then((d) => d.rows.find((a) => a.id === appId) ?? null),
       api.get<{ rows: FormRow[] }>(`/v1/apps/${appId}/forms`),
+      api.get<{ theme: CompanyTheme }>('/v1/settings/theme'),
     ])
-      .then(([appRow, formsData]) => {
+      .then(([appRow, formsData, themeRes]) => {
         if (!appRow) {
           setError('This product does not exist or you do not have access to it.');
           return;
@@ -40,17 +63,29 @@ export default function ConnectPage() {
         setForm(formsData.rows.find((f) => f.published) ?? formsData.rows[0] ?? null);
         const o = appRow.themeOverride;
         setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
-        api
-          .get<{ theme: { primary: string; accent: string; radius: ThemeRadiusId; font: ThemeFontId } }>(`/v1/public/theme/${appRow.slug}`)
-          .then((t) => {
-            if (t.theme) setCompany({ primary: t.theme.primary, accent: t.theme.accent, radius: t.theme.radius, font: t.theme.font });
-          })
-          .catch(() => undefined);
+        setDesignSel(appRow.widgetDesign ?? null);
+        if (themeRes?.theme) {
+          setCompany({
+            primary: themeRes.theme.primary,
+            accent: themeRes.theme.accent,
+            radius: themeRes.theme.radius,
+            font: themeRes.theme.font,
+          });
+        }
+        return appRow.slug;
+      })
+      .then((slug) => {
+        if (slug) {
+          api
+            .get<PublicWall>(`/v1/public/walls/${slug}`)
+            .then((w) => setWall(w))
+            .catch(() => undefined);
+        }
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load this product.'));
   }, [appId]);
 
-  useEffect(() => {
+    useEffect(() => {
     load();
   }, [load]);
 
@@ -60,40 +95,24 @@ export default function ConnectPage() {
     setError(null);
     setNotice(null);
     try {
-      const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, {
+      const patch: Record<string, unknown> = {
         accentColor: ov.primary ?? null,
         themeAccent: ov.accent,
         themeRadius: ov.radius,
         themeFont: ov.font,
-      });
+      };
+      if ((designSel ?? null) !== (app.widgetDesign ?? null)) patch.widgetDesign = designSel ?? null;
+      const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, patch);
       setApp(res.app);
       const o = res.app.themeOverride;
       setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
-      setNotice('Product design saved — this product now layers these tokens over the company theme.');
+      setNotice(`Saved — design "${getWidgetDesign(res.app.widgetDesign ?? null).meta.name}" and this product's look are live on its wall and every embed.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the design.');
     } finally {
       setBusy(false);
     }
   }
-
-  // Live widget demo: actually loads /widget/embed.js like a real site would.
-  useEffect(() => {
-    if (!app) return;
-    const host = document.getElementById('connect-widget-demo');
-    if (!host) return;
-    host.innerHTML = '';
-    const sc = document.createElement('script');
-    sc.src = `${window.location.origin}/widget/embed.js?demo=${demoKey}`;
-    sc.setAttribute('data-app', app.slug);
-    sc.setAttribute('data-container', 'connect-widget-demo');
-    sc.setAttribute('data-height', '320');
-    sc.async = true;
-    host.appendChild(sc);
-    return () => {
-      host.innerHTML = '';
-    };
-  }, [app?.slug, app, demoKey]);
 
   async function copy(text: string, key: string): Promise<void> {
     try {
@@ -105,58 +124,94 @@ export default function ConnectPage() {
     window.setTimeout(() => setCopied(null), 1800);
   }
 
-  if (error && !app) return <ErrorBanner message={error} onRetry={load} />;
-  if (!app)
-    return (
+  const loadingSkeleton =
+    !app ? (
       <div>
         <div className="card" style={{ padding: 18 }}>
-          <span className="sk" style={{ display: "block", width: "38%", height: 17 }} />
-          <span className="sk" style={{ display: "block", width: "66%", height: 11, marginTop: 9 }} />
+          <span className="sk" style={{ display: 'block', width: '38%', height: 17 }} />
+          <span className="sk" style={{ display: 'block', width: '66%', height: 11, marginTop: 9 }} />
         </div>
-        <SkeletonCards count={3} height={140} wrap="grid" />
-        <div className="card stack">
-          <span className="sk" style={{ display: "block", width: "45%", height: 14 }} />
-          <span className="sk" style={{ display: "block", width: "100%", height: 70 }} />
-          <span className="sk" style={{ display: "block", width: "100%", height: 70 }} />
-        </div>
+        <SkeletonCards count={3} height={150} wrap="grid" />
       </div>
-    );
+    ) : null;
 
-  const effPrimary = ov.primary ?? company?.primary ?? '#0ea5a0';
-  const accent = effPrimary; // legacy var name — everything primary-branded follows it
+  if (error && !app) return <ErrorBanner message={error} onRetry={load} />;
+  if (loadingSkeleton) return loadingSkeleton;
+
+  const comp = company ?? FALLBACK;
+  const primary = ov.primary ?? comp.primary;
+  const accent = ov.accent ?? comp.accent;
+  const radius = ov.radius ?? comp.radius;
+  const font = ov.font ?? comp.font;
   const dirtyDesign =
-    ov.primary !== (app.themeOverride?.primary ?? null) ||
-    ov.accent !== (app.themeOverride?.accent ?? null) ||
-    ov.radius !== (app.themeOverride?.radius ?? null) ||
-    ov.font !== (app.themeOverride?.font ?? null);
+    ov.primary !== (app!.themeOverride?.primary ?? null) ||
+    ov.accent !== (app!.themeOverride?.accent ?? null) ||
+    ov.radius !== (app!.themeOverride?.radius ?? null) ||
+    ov.font !== (app!.themeOverride?.font ?? null) ||
+    (designSel ?? null) !== (app!.widgetDesign ?? null);
 
   const origin = window.location.origin;
-  const formSlug = form?.slug ?? `${app.slug}-review`;
+  const formSlug = form?.slug ?? `${app!.slug}-review`;
   const formUrl = `${origin}/forms/${formSlug}`;
-  const wallUrl = `${origin}/wall/${app.slug}`;
-  const iframeSnippet = `<!-- Zojatech testimonials: product ${app.code} -->\n<iframe\n  src="${wallUrl}"\n  title="Reviews for ${app.name}"\n  loading="lazy"\n  style="width:100%;max-width:680px;border:0;border-radius:14px;min-height:420px;background:transparent">\n</iframe>`;
-  const buttonSnippet = `<a href="${formUrl}" style="display:inline-block;background:${accent};color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Leave a review</a>`;
-  const widgetSnippet = `<!-- Zojatech widget — product ${app.code}: approved reviews only -->
-<div id="zojatech-wall-${app.slug}"></div>
-<script src="${origin}/widget/embed.js" data-app="${app.slug}" async></script>`;
+  const wallEmbedUrl = `${origin}/wall/${app!.slug}?embed=1`;
+
+  const widgetSnippet = `<!-- Zojatech widget — ${app!.name}: approved reviews only -->
+<div id="zojatech-wall-${app!.slug}"></div>
+<script src="${origin}/widget/embed.js" data-app="${app!.slug}" async></script>`;
+  const iframeSnippet = `<!-- Zojatech wall (auto-height embed) — product ${app!.code} -->
+<iframe
+  src="${wallEmbedUrl}"
+  title="Reviews for ${app!.name}"
+  loading="lazy"
+  style="width:100%;max-width:680px;border:0;min-height:300px;background:transparent"
+></iframe>`;
+  const buttonSnippet = `<a href="${formUrl}" style="display:inline-block;background:${primary};color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600">Leave a review</a>`;
   const apiSnippet = `// Developer path — CORS-open public GETs, no secret needed (approved data only)
-const theme = await fetch("${origin}/v1/public/theme/${app.slug}").then((r) => r.json());
-const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.json());`;
+const theme = await fetch("${origin}/v1/public/theme/${app!.slug}").then((r) => r.json());
+const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r.json());
+// wall.design selects the widget design; wall.theme carries the tokens.`;
+
+  const tokens: WidgetTokens = {
+    primary,
+    soft: softOf(primary),
+    accent,
+    radiusPx: RADIUS_OPTIONS.find((r) => r.id === radius)?.px ?? 12,
+    font,
+  };
+
+  const realItems: WidgetItem[] = (wall?.testimonials ?? []).map((t) => ({
+    id: t.id,
+    content: t.content,
+    authorName: t.authorName,
+    rating: t.rating,
+    createdAt: t.createdAt,
+  }));
+  const previewItems = realItems.length > 0 ? realItems : SAMPLE_ITEMS;
+  const usingSample = realItems.length === 0;
+  const designId = designSel ?? app!.widgetDesign ?? DEFAULT_WIDGET_DESIGN;
+  const { meta: designMeta, component: DesignWidget } = getWidgetDesign(designId);
+
+  const codeBlocks: Record<string, { label: string; hint: string; code: string; copyKey: string }> = {
+    widget: { label: 'Widget — one script tag', hint: 'Best for any site: WordPress, Webflow, Shopify, plain HTML. Auto-height, no crop.', code: widgetSnippet, copyKey: 'widget' },
+    iframe: { label: 'Iframe embed', hint: 'Drop-in iframe that resizes to the wall height automatically.', code: iframeSnippet, copyKey: 'embed' },
+    button: { label: 'Review button', hint: 'Point your "Leave a review" button at the public form.', code: buttonSnippet, copyKey: 'btn' },
+    api: { label: 'Developer API', hint: 'Little-code path: fetch approved reviews + resolved theme directly.', code: apiSnippet, copyKey: 'api' },
+  };
 
   return (
     <div>
       <Breadcrumbs
         items={[
           { label: 'Products', to: '/app/products' },
-          { label: app.name, to: `/app/a/${app.id}/overview` },
+          { label: app!.name, to: `/app/a/${app!.id}/overview` },
           { label: 'Connect & design' },
         ]}
       />
       <PageHeader
         title="Connect & design"
-        subtitle={`Wire "${app.name}" to a website and show its testimonials — three short steps, everything has an ID.`}
+        subtitle={`${app!.name} — pick a look from the widget library, fine-tune it for this product, preview with live reviews, then copy the snippet.`}
         actions={
-          <Link className="btn btn-secondary" to={`/wall/${app.slug}`} target="_blank" rel="noreferrer">
+          <Link className="btn btn-secondary" to={`/wall/${app!.slug}`} target="_blank" rel="noreferrer">
             Preview wall <IconExternal size={13} />
           </Link>
         }
@@ -165,275 +220,224 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
       {error && <ErrorBanner message={error} />}
       {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
-      <div className="stack connect-steps">
-        {/* Step 1 — IDs */}
-        <section className="card connect-step">
-          <div className="connect-step-head">
-            <span className="connect-num">1</span>
+      <div className="stack" style={{ gap: 16 }}>
+        {/* ---- Design picker ---- */}
+        <section className="card" style={{ padding: 18 }}>
+          <div className="section-head">
             <div>
-              <h2 style={{ margin: 0 }}>Your testimonial IDs</h2>
+              <h2 style={{ margin: 0 }}>1 · Pick the look</h2>
               <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Every product has a stable set of IDs — you&apos;ll use them in the snippets below.
-              </p>
-            </div>
-          </div>
-          <div className="ids-box">
-            <div>
-              <Label>Product ID (code)</Label>
-              <code style={{ color: accent }}>{app.code}</code>
-            </div>
-            <div>
-              <Label>Product ID (system)</Label>
-              <code>{app.id}</code>
-            </div>
-            <div>
-              <Label>Wall slug</Label>
-              <code>/{app.slug}</code>
-            </div>
-            <div>
-              <Label>Form slug</Label>
-              <code>/forms/{formSlug}</code>
-            </div>
-          </div>
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            The ID stays the same for the life of the product — remove it and the reviews on your site stop updating.
-          </p>
-        </section>
-
-        {/* Step 2 — Collect */}
-        <section className="card connect-step">
-          <div className="connect-step-head">
-            <span className="connect-num">2</span>
-            <div>
-              <h2 style={{ margin: 0 }}>Collect reviews on that website</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Put the review form on the site you want testimonials from — visitors submit, you approve in Moderation.
-              </p>
-            </div>
-          </div>
-          <div className="link-row">
-            <div>
-              <div className="small strong">Review form link</div>
-              <div className="muted small">Link your "Leave a review" button to this URL.</div>
-            </div>
-            <div className="link-copy">
-              <code>{`/forms/${formSlug}`}</code>
-              <Button variant="outline" className="btn-xs" onClick={() => void copy(formUrl, 'form')}>
-                {copied === 'form' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
-              </Button>
-            </div>
-          </div>
-          <div className="link-row">
-            <div>
-              <div className="small strong">Styled button snippet</div>
-              <div className="muted small">Paste anywhere in your site HTML — styled to your brand.</div>
-            </div>
-            <Button variant="outline" className="btn-xs" onClick={() => void copy(buttonSnippet, 'btn')}>
-              {copied === 'btn' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
-            </Button>
-          </div>
-          {!form?.published && <p className="muted small">Tip: publish a form on the Forms page to accept submissions first.</p>}
-        </section>
-
-        {/* Step 3 — Display + design */}
-        <section className="card connect-step">
-          <div className="connect-step-head">
-            <span className="connect-num">3</span>
-            <div>
-              <h2 style={{ margin: 0 }}>Show testimonials anywhere — design it</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Embed your live wall on any other site. Approved reviews flow in automatically; nothing to rebuild.
+                Every design shows the same things — reviewer, rating, message, time — in its own layout. One file per design, all plug-and-play.
               </p>
             </div>
           </div>
 
-          <div className="two-col" style={{ marginBottom: 0 }}>
-            <div>
-              <Label>Embed snippet (copy into &lt;body&gt;)</Label>
-              <pre className="code-block">
-                <code>{iframeSnippet}</code>
-              </pre>
-              <Button variant="secondary" className="btn-xs" onClick={() => void copy(iframeSnippet, 'embed')}>
-                {copied === 'embed' ? (<><IconCheck size={12} /> Copied</>) : 'Copy embed snippet'}
-              </Button>
+          <div className="design-layout">
+            <div className="design-tiles">
+              {WIDGET_DESIGNS.map((d) => {
+                const active = d.meta.id === designId;
+                return (
+                  <button
+                    key={d.meta.id}
+                    type="button"
+                    onClick={() => setDesignSel(d.meta.id)}
+                    aria-pressed={active}
+                    className={`design-tile${active ? ' active' : ''}`}
+                    style={active ? { borderColor: primary, boxShadow: `0 0 0 3px ${primary}22` } : undefined}
+                  >
+                    <span className="design-tile-head">
+                      <span className="strong">{d.meta.name}</span>
+                      {active && <IconCheck size={13} />}
+                    </span>
+                    <span className="design-tile-tag muted small">{d.meta.tagline}</span>
+                    <span className="design-tile-feats">
+                      {d.meta.features.slice(0, 2).map((f) => (
+                        <span key={f} className="chip">{f}</span>
+                      ))}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="stack" style={{ minWidth: 0 }}>
-              <div className="muted small" style={{ lineHeight: 1.6 }}>
-                This product can <strong>layer overrides</strong> on top of your company theme (set in{' '}
-                <Link to="/app/settings/theme">Settings → Appearance &amp; theme</Link>). Leave a field on “Company” to inherit.
+
+            <div className="design-appearance card-soft">
+              <div className="section-sub">
+                <div className="strong">Fine-tune for this product</div>
+                <div className="muted small">Leave a field on “Company” to inherit {app!.name === 'Acme' ? 'the company theme' : 'your company theme'}.</div>
               </div>
 
-              {company && (
+              {company ? (
                 <div className="company-theme-line">
                   <span className="color-dots">
                     <i style={{ background: company.primary }} />
                     <i style={{ background: company.accent }} />
                   </span>
-                  <span className="muted small">
-                    Company theme now: {company.primary} · radius {company.radius} · font {company.font}
-                  </span>
+                  <span className="muted small">Company theme: {company.primary} · {company.radius} corners · {company.font} font</span>
                 </div>
+              ) : (
+                <div className="muted small">Loading company theme…</div>
               )}
 
-              <div className="override-row">
-                <Label>Product colour (primary)</Label>
-                <div className="link-copy">
-                  <input
-                    type="color"
-                    aria-label="Product primary colour"
-                    value={ov.primary ?? company?.primary ?? '#0ea5a0'}
-                    onChange={(e) => setOv((d) => ({ ...d, primary: e.target.value }))}
-                  />
-                  {ov.primary ? (
-                    <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, primary: null }))}>
-                      Inherit company
-                    </Button>
-                  ) : (
-                    <span className="chip chip-approved">Company</span>
-                  )}
+              <div className="mini-grid">
+                <div>
+                  <Label>Product colour</Label>
+                  <div className="link-copy">
+                    <input type="color" aria-label="Product primary colour" value={primary}
+                      onChange={(e) => setOv((d) => ({ ...d, primary: e.target.value }))} />
+                    {ov.primary ? (
+                      <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, primary: null }))}>Inherit company</Button>
+                    ) : <span className="chip chip-approved">Company</span>}
+                  </div>
+                </div>
+                <div>
+                  <Label>Accent colour</Label>
+                  <div className="link-copy">
+                    <input type="color" aria-label="Product accent colour" value={accent}
+                      onChange={(e) => setOv((d) => ({ ...d, accent: e.target.value }))} />
+                    {ov.accent ? (
+                      <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, accent: null }))}>Inherit company</Button>
+                    ) : <span className="chip chip-approved">Company</span>}
+                  </div>
+                </div>
+                <div>
+                  <Label>Corners</Label>
+                  <Select value={ov.radius ?? ''} onChange={(e) => setOv((d) => ({ ...d, radius: (e.target.value || null) as ThemeRadiusId | null }))}>
+                    <option value="">Company ({company?.radius ?? 'md'})</option>
+                    <option value="sm">Sharp</option>
+                    <option value="md">Soft</option>
+                    <option value="lg">Rounded</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Font</Label>
+                  <Select value={ov.font ?? ''} onChange={(e) => setOv((d) => ({ ...d, font: (e.target.value || null) as ThemeFontId | null }))}>
+                    <option value="">Company ({company?.font ?? 'system'})</option>
+                    <option value="system">System</option>
+                    <option value="serif">Serif</option>
+                    <option value="mono">Mono</option>
+                  </Select>
                 </div>
               </div>
 
-              <div className="override-row">
-                <Label>Accent colour</Label>
-                <div className="link-copy">
-                  <input
-                    type="color"
-                    aria-label="Product accent colour"
-                    value={ov.accent ?? company?.accent ?? '#0ea5a0'}
-                    onChange={(e) => setOv((d) => ({ ...d, accent: e.target.value }))}
-                  />
-                  {ov.accent ? (
-                    <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, accent: null }))}>
-                      Inherit company
-                    </Button>
-                  ) : (
-                    <span className="chip chip-approved">Company</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="override-row">
-                <Label>Corner radius</Label>
-                <Select value={ov.radius ?? ''} onChange={(e) => setOv((d) => ({ ...d, radius: (e.target.value || null) as ThemeRadiusId | null }))}>
-                  <option value="">Company ({company?.radius ?? 'md'})</option>
-                  <option value="sm">Sharp · 8</option>
-                  <option value="md">Soft · 12</option>
-                  <option value="lg">Rounded · 18</option>
-                </Select>
-              </div>
-
-              <div className="override-row">
-                <Label>Font</Label>
-                <Select value={ov.font ?? ''} onChange={(e) => setOv((d) => ({ ...d, font: (e.target.value || null) as ThemeFontId | null }))}>
-                  <option value="">Company ({company?.font ?? 'system'})</option>
-                  <option value="system">System</option>
-                  <option value="serif">Serif</option>
-                  <option value="mono">Mono</option>
-                </Select>
-              </div>
-
-              <div className="modal-actions">
-                <Button variant="outline" className="btn-xs" disabled={busy || !dirtyDesign} onClick={() => void saveDesign()}>
-                  {busy ? 'Saving…' : 'Save product design'}
+              <div className="modal-actions" style={{ marginTop: 10 }}>
+                <Button variant="secondary" disabled={busy || !dirtyDesign} onClick={() => void saveDesign()}>
+                  {busy ? 'Saving…' : dirtyDesign ? 'Save product design' : 'Saved — up to date'}
                 </Button>
-                {!company && <span className="muted small">Loading company theme…</span>}
-              </div>
-              <div className="muted small">
-                Changes apply instantly to this product&apos;s form, wall and embeds (theme version bumps server-side).
               </div>
             </div>
           </div>
 
-          <div>
-            <Label>Live preview</Label>
-            <div className="wall-preview">
-              <div className="wall-preview-bar" style={{ background: accent }} />
-              <div className="wall-preview-body">
-                <div className="strong" style={{ color: accent }}>
-                  {app.name}
-                </div>
-                <div className="stars">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <span key={n} className="star on">
-                      <IconStar />
-                    </span>
-                  ))}
-                </div>
-                <p className="wall-preview-quote">“Absolutely love it — onboarding took minutes and support is superb.”</p>
-                <div className="muted small">— Sara Okafor · 2 days ago</div>
-                <button type="button" className="btn" style={{ background: accent, color: '#fff' }}>
-                  Add a Review +
-                </button>
+          {/* ---- Live preview: real render of the chosen design, never cropped ---- */}
+          <div style={{ marginTop: 18 }}>
+            <div className="section-sub" style={{ marginBottom: 6 }}>
+              <span className="strong">Live preview — {designMeta.name}</span>
+              <span className="muted small" style={{ marginLeft: 8 }}>{designMeta.tagline}</span>
+            </div>
+            {usingSample && (
+              <p className="muted small" style={{ margin: '0 0 8px' }}>
+                No approved reviews yet, so you are seeing sample content. Approve a few in Moderation and this preview switches to real reviews.
+              </p>
+            )}
+            <div className="preview-frame">
+              <div className="preview-frame-bar">
+                <i /><i /><i />
+                <span className="muted small">{wallEmbedUrl}</span>
+              </div>
+              <div className="preview-frame-body">
+                <DesignWidget items={previewItems} tokens={tokens} cta={form ? { href: formUrl, label: 'Add a Review +' } : null} />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Step 4 — Widget, no-code, secure */}
-        <section className="card connect-step">
-          <div className="connect-step-head">
-            <span className="connect-num">4</span>
+        {/* ---- 2 · Get the code (open) ---- */}
+        <section className="card" style={{ padding: 18 }}>
+          <div className="section-head">
             <div>
-              <h2 style={{ margin: 0 }}>Widget — one script tag, no code</h2>
+              <h2 style={{ margin: 0 }}>2 · Get the code</h2>
               <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Drop a <code>div</code> + <code>script</code> into any website (WordPress, Webflow, Shopify, plain HTML). No build step, no npm, no API keys.
+                Paste on the website where {app!.name} reviews should appear. {usingSample ? 'Live approved reviews' : `${realItems.length} approved review${realItems.length === 1 ? '' : 's'} live now`} — nothing to rebuild when new ones are approved.
               </p>
             </div>
           </div>
 
-          <div className="two-col" style={{ marginBottom: 0 }}>
-            <div className="stack">
-              <div>
-                <Label>Copy-paste snippet</Label>
-                <pre className="code-block">
-                  <code>{widgetSnippet}</code>
-                </pre>
-                <Button variant="secondary" className="btn-xs" onClick={() => void copy(widgetSnippet, 'widget')}>
-                  {copied === 'widget' ? (<><IconCheck size={12} /> Copied</>) : 'Copy widget snippet'}
+          <div className="segmented" role="tablist" aria-label="Embed options">
+            {(Object.keys(codeBlocks) as ('widget' | 'iframe' | 'button' | 'api')[]).map((k) => (
+              <button key={k} type="button" role="tab" aria-selected={codeTab === k} className={`segment ${codeTab === k ? 'active' : ''}`} onClick={() => setCodeTab(k)}>
+                {codeBlocks[k].label.split('—')[0].trim()}
+              </button>
+            ))}
+          </div>
+          <p className="muted small" style={{ marginTop: 6 }}>{codeBlocks[codeTab].hint}</p>
+          <pre className="code-block" style={{ marginTop: 8 }}><code>{codeBlocks[codeTab].code}</code></pre>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+            <Button variant="secondary" className="btn-sm" onClick={() => void copy(codeBlocks[codeTab].code, codeBlocks[codeTab].copyKey)}>
+              {copied === codeBlocks[codeTab].copyKey ? (<><IconCheck size={12} /> Copied</>) : 'Copy snippet'}
+            </Button>
+            <a className="btn btn-outline btn-sm" href={`${origin}/external/acme.html?app=${app!.slug}&form=${formSlug}`} target="_blank" rel="noreferrer">
+              See it on an example external site <IconExternal size={13} />
+            </a>
+          </div>
+          <p className="muted small" style={{ margin: '8px 0 0' }}>
+            The example page is a <strong>standalone static website</strong> (not this app) embedding the widget with this product's data. Step-by-step verification: <code>docs/integration-test-guide.md</code>.
+          </p>
+
+          <button type="button" className="collapse-toggle" onClick={() => setOpen((o) => ({ ...o, collect: !o.collect }))} aria-expanded={open.collect}>
+            3 · Collect reviews on that website
+            <IconChevronDown className={open.collect ? 'flip' : ''} />
+          </button>
+          {open.collect && (
+            <div className="collapse-body">
+              <div className="link-row">
+                <div>
+                  <div className="small strong">Review form link</div>
+                  <div className="muted small">Link your “Leave a review” button to this URL.</div>
+                </div>
+                <div className="link-copy">
+                  <code>{`/forms/${formSlug}`}</code>
+                  <Button variant="outline" className="btn-xs" onClick={() => void copy(formUrl, 'form')}>
+                    {copied === 'form' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
+                  </Button>
+                </div>
+              </div>
+              <div className="link-row">
+                <div>
+                  <div className="small strong">Review button snippet</div>
+                  <div className="muted small">Styled with this product's colour ({primary}).</div>
+                </div>
+                <Button variant="outline" className="btn-xs" onClick={() => void copy(buttonSnippet, 'btn2')}>
+                  {copied === 'btn2' ? (<><IconCheck size={12} /> Copied</>) : 'Copy'}
                 </Button>
               </div>
-              <div>
-                <Label>Live widget demo (this page)</Label>
-                <div id="connect-widget-demo" className="widget-demo" />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
-                  <Button variant="ghost" className="btn-xs" onClick={() => setDemoKey((k) => k + 1)}>
-                    <IconRefresh size={12} /> Re-mount demo
-                  </Button>
-                  <a className="btn btn-secondary btn-xs" href={`${origin}/external/acme.html?app=${app.slug}&form=${formSlug}`} target="_blank" rel="noreferrer">
-                    Open example external site <IconExternal size={13} />
-                  </a>
-                </div>
-                <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  That page is a <strong>standalone external website</strong> (static HTML, no app) — it embeds Acme’s wall exactly like a
-                  real third-party site would. Change the theme in Settings, then reload it.
-                </p>
-              </div>
+              {!form?.published && <p className="muted small">Tip: publish a form on the Forms page to accept submissions first.</p>}
             </div>
+          )}
 
-            <div className="stack">
-              <div>
-                <Label>Developer path (little code)</Label>
-                <pre className="code-block">
-                  <code>{apiSnippet}</code>
-                </pre>
+          <button type="button" className="collapse-toggle" onClick={() => setOpen((o) => ({ ...o, details: !o.details }))} aria-expanded={open.details}>
+            4 · IDs, security &amp; developer notes
+            <IconChevronDown className={open.details ? 'flip' : ''} />
+          </button>
+          {open.details && (
+            <div className="collapse-body">
+              <div className="ids-box">
+                <div><Label>Product code</Label><code style={{ color: primary }}>{app!.code}</code></div>
+                <div><Label>Product ID (system)</Label><code>{app!.id}</code></div>
+                <div><Label>Wall slug</Label><code>/{app!.slug}</code></div>
+                <div><Label>Form slug</Label><code>/forms/{formSlug}</code></div>
               </div>
               <ul className="plain-list connect-security">
                 <li>
-                  <strong>Secure by design</strong> — the snippet contains no secret: the wall and these GET endpoints only ever serve{' '}
-                  <em>approved</em> reviews and your resolved theme. Moderation happens server-side before anything is published.
+                  <strong>Secure by design</strong> — snippets contain no secret; walls and public GETs serve only approved reviews and the resolved theme.
                 </li>
                 <li>
-                  <strong>One theme, every embed</strong> — walls resolve your tenant theme on every load, so preset/token/logo edits in
-                  Settings (or by Zojatech) appear on all sites automatically. The accent colour you saved above is this product&apos;s override.
+                  <strong>One theme, every embed</strong> — template/company/product tokens resolve on every load, so edits appear everywhere instantly.
                 </li>
                 <li>
-                  <strong>Future-proof</strong> — this product ID ({app.id}) and slug (<code>{app.slug}</code>) are stable for life; upgraded
-                  widget runtimes (React, carousels, marketplace templates) slot in behind the same public API.
+                  <strong>Future-proof</strong> — stable IDs mean upgraded widget runtimes slot in behind the same public API.
                 </li>
               </ul>
             </div>
-          </div>
+          )}
         </section>
       </div>
     </div>

@@ -43,7 +43,7 @@
     s.parentNode.insertBefore(container, s.nextSibling);
   }
 
-  var wall = host + '/wall/' + encodeURIComponent(app) + (height ? '?h=' + height : '');
+  var wall = host + '/wall/' + encodeURIComponent(app) + (height ? '?h=' + height : '') + '&embed=1';
   var frame = document.createElement('iframe');
   frame.src = wall;
   frame.title = 'Reviews';
@@ -53,7 +53,25 @@
   frame.style.maxWidth = '680px';
   frame.style.border = '0';
   frame.style.display = 'block';
-  frame.style.minHeight = (height ? height : 420) + 'px';
+  frame.style.minHeight = (height ? height : 320) + 'px';
+  frame.style.height = 'auto';
   frame.style.background = 'transparent';
   container.appendChild(frame);
+
+  // Auto-height: the wall page reports its rendered height, so long designs
+  // are never cropped inside the iframe.
+  window.addEventListener('message', function (ev) {
+    var d = ev && ev.data;
+    if (!d || !d.zojatech || typeof d.zojatech.height !== 'number') return;
+    if (!ev.source) return;
+    try {
+      // Only trust the wall we opened (same origin as this script).
+      var src = String(ev.source.location.href || '');
+      if (src.indexOf(host) !== 0) return;
+    } catch (err) {
+      return; // cross-origin sender — ignore
+    }
+    frame.style.height = d.zojatech.height + 'px';
+    frame.style.minHeight = '0px';
+  });
 })();
