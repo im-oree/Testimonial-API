@@ -285,3 +285,40 @@ product's design version and public payloads carry the template marker.
    affect that product until a new template is copied onto it.
 4. Each marketplace card renders the real widget design with the template's
    tokens (no mock screenshots); adopting does not remove per-product designs.
+
+## 10 · Design studio (DOC 7B engine) — per product
+
+The visual editor engine lives in `client/src/design-studio/`: a Zustand +
+Immer editor store (selection, history, dirty/save), an element factory, pure
+layout/style/typography→CSS converters, a snap engine (8px grid + smart guides),
+animation presets, a data-binding resolver and a schema surface renderer that
+both the canvas and the preview share. `Save` persists the schema JSON to the
+product and bumps its design version.
+
+Walkthrough:
+
+1. Products -> any product -> Connect & design -> **Design studio** (or go
+   straight to `/app/a/:appId/studio`). With no saved schema the studio opens a
+   starter draft marked *Unsaved*.
+2. Canvas: drag elements (grid + guide snapping), drag corner handles to
+   resize, use Layers to select/focus, Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo,
+   Delete removes, Ctrl/Cmd+D duplicates, arrow keys nudge (Shift = 8px).
+3. Properties: rename, x/y/width/height, text, typography, colour swatches,
+   background/radius/opacity, z-order, front/back, duplicate/delete.
+4. Data binding: select a heading/text and bind to `content` or `authorName`;
+   rating-stars bind to `rating` by design. **Preview** cycles the product's
+   real approved reviews through the bound elements.
+5. Save the draft:
+   ```bash
+   curl -X PATCH http://localhost:3000/v1/dashboard/apps/app-acme-2/design/schema \
+        -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+        -d '{"schema":{"name":"quote hero","canvas":{"width":720,"height":560,
+             "background":"#f6f7fc"},"version":0,"elements":[]}}'
+   curl http://localhost:3000/v1/dashboard/apps/app-acme-2/design/schema \
+        -H "authorization: Bearer $TOKEN"     # schema + studioVersion + designVersion
+   ```
+   Every save returns a new `studioVersion` and bumps `designVersion` (embed
+   cache invalidation stays consistent with the other design saves). Payloads
+   are capped at 400 KB and non-object payloads are rejected with 400.
+6. Passing `{"schema": null}` clears the custom draft; products with no draft
+   keep rendering their widget-library design.

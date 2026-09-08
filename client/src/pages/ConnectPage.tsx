@@ -232,9 +232,14 @@ const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r
         title="Connect & design"
         subtitle={`${app!.name} — pick a look from the widget library, fine-tune it for this product, preview with live reviews, then copy the snippet.`}
         actions={
-          <Link className="btn btn-secondary" to={`/wall/${app!.slug}`} target="_blank" rel="noreferrer">
-            Preview wall <IconExternal size={13} />
-          </Link>
+          <>
+            <Link className="btn btn-secondary" to={`/app/a/${app!.id}/studio`}>
+              Design studio
+            </Link>
+            <Link className="btn btn-secondary" to={`/wall/${app!.slug}`} target="_blank" rel="noreferrer">
+              Preview wall <IconExternal size={13} />
+            </Link>
+          </>
         }
       />
 

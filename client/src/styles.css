@@ -1177,3 +1177,103 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .tpl-app-row:hover { background: var(--lav-soft); }
 .tpl-app-row > span:first-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .tpl-app-row:disabled { cursor: default; opacity: 0.75; }
+
+/* ---- Design studio (DOC 7B engine demo canvas) ------------------------- */
+.studio-page { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.studio-toolbar {
+  position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center; justify-content: space-between;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 8px 12px;
+  box-shadow: 0 4px 18px rgba(27, 37, 89, 0.05);
+}
+.studio-tb-left { display: flex; gap: 8px; align-items: center; min-width: 0; flex-wrap: wrap; }
+.studio-tb-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.studio-name-input {
+  border: 0; border-bottom: 1px dashed transparent; background: transparent; outline: 0;
+  font: inherit; font-weight: 600; font-size: 14px; color: var(--navy); min-width: 150px; padding: 2px;
+}
+.studio-name-input:focus { border-bottom-color: var(--lav); }
+
+.studio-grid { display: grid; grid-template-columns: 236px minmax(0, 1fr) 252px; gap: 12px; align-items: start; }
+@media (max-width: 1180px) {
+  .studio-grid { grid-template-columns: 1fr; }
+  .studio-stage { order: -1; }
+  .studio-toolbar { position: static; }
+}
+.studio-panel { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px; min-width: 0; }
+.studio-panel-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.studio-palette { display: flex; flex-direction: column; gap: 6px; }
+.studio-el-btn {
+  display: flex; gap: 8px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer;
+  border: 1px dashed var(--border); background: #fbfbfe; border-radius: 10px; padding: 7px 9px; color: var(--brand);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.studio-el-btn:hover { border-color: var(--lav); background: var(--lav-soft); }
+.studio-el-btn > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.studio-layers { display: flex; flex-direction: column; gap: 2px; max-height: 42vh; overflow: auto; }
+.studio-layer {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+}
+.studio-layer:hover { background: #f6f7fc; }
+.studio-layer.active { background: var(--lav-soft); border-color: var(--lav); }
+.studio-layer-name { display: flex; gap: 7px; align-items: flex-start; min-width: 0; flex: 1; color: var(--muted); }
+.studio-layer-name > span { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.studio-layer-name .strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-layer-actions { display: none; gap: 2px; flex: none; }
+.studio-layer:hover .studio-layer-actions { display: inline-flex; }
+.studio-layer-actions .btn-xs { padding: 2px 5px; font-size: 10.5px; }
+
+.studio-stage { min-width: 0; }
+.studio-viewport {
+  overflow: auto; border: 1px solid var(--border); border-radius: 14px; padding: 26px 18px;
+  display: flex; justify-content: center;
+  background-image: radial-gradient(#d9dce8 1px, transparent 1px);
+  background-size: 16px 16px; background-color: #f3f4f9;
+}
+.studio-surface { flex: none; box-shadow: 0 10px 30px rgba(27, 37, 89, 0.14); border-radius: 2px; }
+.studio-edit-surface { position: relative; }
+.studio-static { pointer-events: none; width: 100%; height: 100%; }
+.studio-el { box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.studio-el > span { max-width: 100%; max-height: 100%; }
+.studio-el-button { cursor: pointer; }
+.studio-el-empty { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+.studio-star { display: inline-flex; }
+.studio-star svg { display: block; }
+
+.studio-el-hit { position: absolute; box-sizing: border-box; touch-action: none; }
+.studio-el-hit.selected { outline: 1.5px solid #2563eb; outline-offset: 0; }
+.studio-el-hit.hovered:not(.selected) { outline: 1.5px dashed #93c5fd; }
+.studio-el-tag {
+  position: absolute; top: -23px; left: -1px; z-index: 6; max-width: 200px;
+  background: #2563eb; color: #fff; font-size: 10.5px; line-height: 1; padding: 4px 7px;
+  border-radius: 7px 7px 7px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.studio-handle { position: absolute; z-index: 7; }
+.studio-guide { position: absolute; pointer-events: none; background: #3b82f6; z-index: 70; }
+.studio-guide-x { top: 0; bottom: 0; width: 1px; }
+.studio-guide-y { left: 0; right: 0; height: 1px; }
+.studio-hint { position: absolute; left: 12px; bottom: 10px; pointer-events: none; z-index: 4; }
+.studio-previewbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 60; display: flex; flex-wrap: wrap;
+  gap: 8px; align-items: center; justify-content: space-between; padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.94); border-top: 1px solid var(--border);
+  backdrop-filter: blur(4px);
+}
+.studio-preview-actions { display: inline-flex; gap: 6px; align-items: center; }
+
+.studio-props { display: flex; flex-direction: column; gap: 2px; }
+.studio-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.studio-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.studio-row .btn { flex: none; }
+.studio-area {
+  width: 100%; resize: vertical; font: inherit; font-size: 12.5px; line-height: 1.45;
+  padding: 8px 9px; border: 1px solid var(--border); border-radius: 9px; color: var(--navy);
+  background: #fff; outline: none;
+}
+.studio-area:focus { border-color: var(--lav); }
+.color-input { width: 100%; height: 34px; border: 1px solid var(--border); border-radius: 9px; padding: 2px; background: #fff; }

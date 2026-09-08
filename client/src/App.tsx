@@ -23,6 +23,7 @@ import CompanyOverviewPage from './pages/CompanyOverviewPage';
 import SettingsPage from './pages/SettingsPage';
 import ThemePage from './pages/ThemePage';
 import ThemeMarketplacePage from './pages/ThemeMarketplacePage';
+import DesignStudioPage from './pages/DesignStudioPage';
 import AccountPage from './pages/AccountPage';
 import OverviewPage from './pages/OverviewPage';
 import TestimonialsPage from './pages/TestimonialsPage';
@@ -85,6 +86,7 @@ function AppRoutes() {
           {/* One product = one website. Everything below is scoped to :appId. */}
           <Route path="a/:appId/overview" element={<OverviewPage />} />
           <Route path="a/:appId/connect" element={<ConnectPage />} />
+          <Route path="a/:appId/studio" element={<DesignStudioPage />} />
           <Route path="a/:appId/testimonials" element={<TestimonialsPage />} />
           <Route path="a/:appId/testimonials/moderation" element={<ModerationPage />} />
           <Route path="a/:appId/forms" element={<FormsPage />} />
