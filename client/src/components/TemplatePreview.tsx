@@ -1,7 +1,9 @@
 /**
- * TemplatePreview — a widget template's schema rendered live, scaled to fit
- * whatever box it sits in. One renderer shared by the template picker, the
- * marketplace and the builder, so a template always looks like itself.
+ * TemplatePreview — a widget template's schema rendered live, letterboxed
+ * into a FIXED 16:11 frame so every card in every grid is the same shape
+ * (and an empty or missing preview keeps the shell instead of collapsing).
+ * One renderer shared by the template picker, the marketplace, the builder,
+ * the designs gallery and the platform catalogue.
  */
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { SchemaSurface } from '../design-studio/runtime';
@@ -32,27 +34,26 @@ export function TemplatePreview({
     if (!box) return;
     const measure = (): void => {
       const w = box.clientWidth;
-      if (w > 0) setScale(Math.min(maxScale, w / schema.canvas.width));
+      const h = box.clientHeight;
+      if (w > 0 && h > 0) {
+        // Fit the widget inside the frame at its true proportions.
+        setScale(Math.min(maxScale, w / schema.canvas.width, h / schema.canvas.height));
+      }
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(box);
     return () => ro.disconnect();
-  }, [schema.canvas.width, maxScale]);
+  }, [schema.canvas.width, schema.canvas.height, maxScale]);
 
   return (
-    <div
-      ref={boxRef}
-      className="tpl-preview"
-      style={{ aspectRatio: `${schema.canvas.width} / ${schema.canvas.height}`, ...style }}
-    >
+    <div ref={boxRef} className="tpl-preview" style={style}>
       <div
         className="tpl-preview-inner"
         style={{
           width: schema.canvas.width,
           height: schema.canvas.height,
           transform: `scale(${scale})`,
-          transformOrigin: '0 0',
         }}
       >
         <SchemaSurface schema={schema} record={record} />

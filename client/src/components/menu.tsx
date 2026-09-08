@@ -15,7 +15,8 @@
  * and destructive work is always confirmed.
  */
 import { IconCheck, IconMore, IconTrash, IconX } from './icons';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import Modal from './Modal';
 import { Button } from './ui';
 
@@ -39,11 +40,18 @@ export function KebabMenu({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // Fixed viewport coordinates for the portal panel (body-level, so no
+  // card / table / modal can ever clip it or stack above it).
+  const [pos, setPos] = useState<{ top: number; left: number | null; right: number | null } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent): void {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') setOpen(false);
@@ -56,6 +64,35 @@ export function KebabMenu({
     };
   }, [open]);
 
+  // A fixed panel must follow its trigger: close on any scroll or resize.
+  useEffect(() => {
+    if (!open) return;
+    const close = (): void => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
+  // Position under the trigger (flipping up near the bottom of the viewport),
+  // then re-measure once the real panel height is known.
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const place = (panelH: number): void => {
+      const r = triggerRef.current!.getBoundingClientRect();
+      const below = r.bottom + 8 + panelH <= window.innerHeight;
+      setPos({
+        top: below ? r.bottom + 6 : Math.max(8, r.top - panelH - 6),
+        left: align === 'right' ? null : Math.max(8, r.left),
+        right: align === 'right' ? Math.max(8, window.innerWidth - r.right) : null,
+      });
+    };
+    place((actions.length + 0.5) * 34 + 12); // estimate until measured
+    if (panelRef.current) place(panelRef.current.offsetHeight);
+  }, [open, align, actions.length]);
+
   const safe = actions.filter((a) => !a.danger);
   const danger = actions.filter((a) => a.danger);
 
@@ -63,6 +100,7 @@ export function KebabMenu({
     <div className={`ctx ${align === 'right' ? 'ctx-right' : ''}`} ref={rootRef}>
       <button
         type="button"
+        ref={triggerRef}
         className="ctx-trigger"
         aria-label={label}
         aria-haspopup="menu"
@@ -72,8 +110,14 @@ export function KebabMenu({
       >
         <IconMore size={16} />
       </button>
-      {open && (
-        <div className="ctx-panel" role="menu" onClick={() => setOpen(false)}>
+      {open && pos && createPortal(
+        <div
+          ref={panelRef}
+          className="ctx-panel"
+          role="menu"
+          style={{ position: 'fixed', top: pos.top, ...(pos.left !== null ? { left: pos.left } : {}), ...(pos.right !== null ? { right: pos.right } : {}) }}
+          onClick={() => setOpen(false)}
+        >
           {safe.map((a) => (
             <button
               key={a.id}
@@ -101,7 +145,8 @@ export function KebabMenu({
               <span>{a.label}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
