@@ -1,111 +1,67 @@
-/** Company (tenant) workspace — Settings hub: theme & identity + management links. */
-import { useEffect, useState } from 'react';
+/** Company (tenant) workspace — Settings hub. Categories fan out to dedicated pages. */
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
 import { useAuth } from '../auth';
-import ThemeEditor from '../components/ThemeEditor';
-import type { ResolvedTheme, ThemeSaveResponse } from '../lib/types';
-import { Breadcrumbs, Card, ErrorBanner, PageHeader } from '../components/ui';
+import type { MeTenant } from '../lib/types';
+import { Breadcrumbs, PageHeader } from '../components/ui';
+
+interface Cat {
+  key: string;
+  icon: string;
+  title: string;
+  desc: string;
+  to: string;
+  note?: string;
+}
+
+function SwatchDots({ t }: { t: MeTenant }) {
+  const c = t.theme?.primary ?? t.brandColor ?? '#1b2559';
+  const a = t.theme?.accent ?? '#0ea5a0';
+  return (
+    <span className="cat-dots">
+      <i style={{ background: c }} />
+      <i style={{ background: a }} />
+    </span>
+  );
+}
 
 export default function SettingsPage() {
-  const { tenant, refresh } = useAuth();
-  const [theme, setTheme] = useState<ResolvedTheme | null>(null);
-  const [logo, setLogo] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
+  const { tenant } = useAuth();
 
-  useEffect(() => {
-    let alive = true;
-    setError(null);
-    api
-      .get<{ theme: ResolvedTheme; logoUrl: string | null }>('/v1/settings/theme')
-      .then((res) => {
-        if (!alive) return;
-        setTheme(res.theme);
-        setLogo(res.logoUrl);
-      })
-      .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : 'Could not load your theme.');
-      });
-    return () => {
-      alive = false;
-    };
-  }, [tick]);
-
-  function onSaved(res: ThemeSaveResponse): void {
-    setTheme(res.theme);
-    setLogo(res.logoUrl ?? null);
-    setNotice('Theme saved — your workspace chrome and every public form, wall and embed use it now.');
-    void refresh(); // keep sidebar identity (brand colour/logo) in sync
-  }
+  const cats: Cat[] = [
+    { key: 'theme', icon: '🎨', title: 'Appearance & theme', desc: 'Template + colours, corners, font and logo for your public surfaces.', to: '/app/settings/theme' },
+    { key: 'account', icon: '🔐', title: 'Account & security', desc: 'Your name, sign-in email and password.', to: '/app/settings/account' },
+    { key: 'team', icon: '👥', title: 'Users & roles', desc: 'Members, invites, role permissions.', to: '/app/team' },
+    { key: 'audit', icon: '🧾', title: 'Audit & activity', desc: 'Who did what across the workspace.', to: '/app/audit' },
+    { key: 'products', icon: '🧩', title: 'Products & embedding', desc: 'Create products, collect reviews, connect walls to your sites.', to: '/app/products' },
+  ];
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Company', to: '/app/overview' }, { label: 'Settings' }]} />
-      <PageHeader title="Settings" subtitle="Make the workspace yours — theme, identity and who has access." />
+      <Breadcrumbs items={[{ label: 'Settings', to: '/app/settings' }]} />
+      <PageHeader title="Settings" subtitle="Everything is split into focused pages so each one stays short and manageable." />
 
-      {error && <ErrorBanner message={error} onRetry={() => setTick((t) => t + 1)} />}
-      {notice && <div className="banner banner-ok">✓ {notice}</div>}
-
-      <div className="two-col" style={{ marginBottom: 14 }}>
-        <Card className="stack">
-          <div className="brand-id">
-            {logo ? (
-              <img src={logo} alt={`${tenant?.name ?? ''} logo`} className="brand-logo" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
-            ) : (
-              <span className="ws-avatar" style={{ background: theme?.primary ?? 'var(--navy)', width: 46, height: 46, fontSize: 20 }}>
-                {(tenant?.name?.[0] ?? '?').toUpperCase()}
-              </span>
-            )}
-            <div>
-              <h2 style={{ margin: 0 }}>Theme &amp; branding</h2>
-              <p className="muted small" style={{ margin: '2px 0 0' }}>
-                Tailwind-presets-style tokens, fully adjustable, saved server-side. Your customers see them on forms, walls and embeds.
-              </p>
+      <div className="cat-grid">
+        {cats.map((c) => (
+          <Link key={c.key} to={c.to} className="card cat-card">
+            <div className="cat-card-head">
+              <span className="cat-icon">{c.icon}</span>
+              {c.key === 'theme' && tenant && <SwatchDots t={tenant} />}
             </div>
-          </div>
-
-          {theme ? (
-            <ThemeEditor
-              endpoint="/v1/settings/theme"
-              initial={theme}
-              initialLogo={logo}
-              onSaved={onSaved}
-            />
-          ) : (
-            <div aria-busy="true">
-              <span className="sk" style={{ display: 'block', width: '60%', height: 14 }} />
-              <span className="sk" style={{ display: 'block', width: '100%', height: 30, marginTop: 10 }} />
-              <span className="sk" style={{ display: 'block', width: '100%', height: 30, marginTop: 8 }} />
-              <span className="sk" style={{ display: 'block', width: '70%', height: 14, marginTop: 12 }} />
-            </div>
-          )}
-        </Card>
-
-        <Card className="stack">
-          <h2 style={{ margin: 0 }}>Management</h2>
-          <Link to="/app/settings/account" className="card settings-link">
-            <div className="small strong">Account</div>
-            <div className="muted small">Your name, sign-in email and password.</div>
-            <span className="settings-go">Open →</span>
+            <div className="strong">{c.title}</div>
+            <div className="muted small">{c.desc}</div>
+            <span className="cat-go">Open →</span>
           </Link>
-          <Link to="/app/team" className="card settings-link">
-            <div className="small strong">Users & Roles</div>
-            <div className="muted small">Invite teammates, assign roles and view permissions.</div>
-            <span className="settings-go">Open →</span>
-          </Link>
-          <Link to="/app/audit" className="card settings-link">
-            <div className="small strong">Audit Logs</div>
-            <div className="muted small">Who did what, and what the System did automatically.</div>
-            <span className="settings-go">Open →</span>
-          </Link>
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            Product setup lives on the <Link to="/app/products">Products</Link> page — each product gets its own ID, review form, wall and
-            embed snippets.
-          </p>
-        </Card>
+        ))}
       </div>
+
+      <details className="card collapse-card" open={false}>
+        <summary>About this workspace (collapsed for tidiness)</summary>
+        <p className="muted small" style={{ margin: '6px 0 0' }}>
+          <strong>Tenant:</strong> {tenant?.name} · slug <code>{tenant?.slug}</code> · products live on the Products page and each product owns its
+          testimonials, forms, wall and embed snippets. Billing is not part of this demo. Zojatech (platform side) manages plans, status and can
+          impersonate your workspace.
+        </p>
+      </details>
     </div>
   );
 }

@@ -950,3 +950,16 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 }
 .connect-security code, .connect-step code { background: #f1f2f8; border-radius: 5px; padding: 0 4px; font-size: 12px; }
 .connect-security em { font-style: normal; color: var(--brand); font-weight: 600; }
+
+/* DOC 7 continued — Settings hub categories + collapsible cards */
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.cat-card { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 16px; transition: border-color 0.15s ease, transform 0.15s ease; }
+.cat-card:hover { border-color: var(--lav); transform: translateY(-1px); }
+.cat-card-head { display: flex; justify-content: space-between; align-items: center; }
+.cat-icon { font-size: 22px; }
+.cat-dots { display: inline-flex; gap: 3px; }
+.cat-dots i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.08); display: inline-block; }
+.cat-go { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--brand); }
+.collapse-card { padding: 10px 14px; }
+.collapse-card summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--navy); }
+.collapse-card[open] summary { margin-bottom: 6px; }
