@@ -92,13 +92,36 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'apps.manage');
   if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
-  const patch: { name?: string; websiteUrl?: string | null; status?: 'active' | 'paused'; accentColor?: string | null } = {};
+  const patch: {
+    name?: string;
+    websiteUrl?: string | null;
+    status?: 'active' | 'paused';
+    accentColor?: string | null;
+    themeAccent?: string | null;
+    themeRadius?: string | null;
+    themeFont?: string | null;
+  } = {};
   if (typeof req.body?.name === 'string') patch.name = req.body.name.trim().slice(0, 80);
   if (typeof req.body?.websiteUrl === 'string') patch.websiteUrl = req.body.websiteUrl.trim().slice(0, 300) || null;
   else if (req.body?.websiteUrl === null) patch.websiteUrl = null;
   if (req.body?.status === 'active' || req.body?.status === 'paused') patch.status = req.body.status;
   if (typeof req.body?.accentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body.accentColor.trim())) patch.accentColor = req.body.accentColor.trim();
   else if (req.body?.accentColor === null || req.body?.accentColor === '') patch.accentColor = null;
+  if (req.body?.themeAccent !== undefined) {
+    if (typeof req.body.themeAccent === 'string' && /^#[0-9a-fA-F]{6}$/.test(req.body.themeAccent.trim())) patch.themeAccent = req.body.themeAccent.trim();
+    else if (req.body.themeAccent === null || req.body.themeAccent === '') patch.themeAccent = null;
+    else throw badRequest('Per-product accent must be a hex colour or null.');
+  }
+  if (req.body?.themeRadius !== undefined) {
+    if (req.body.themeRadius === null || req.body.themeRadius === '') patch.themeRadius = null;
+    else if (['sm', 'md', 'lg'].includes(String(req.body.themeRadius))) patch.themeRadius = String(req.body.themeRadius);
+    else throw badRequest('Per-product radius must be sm, md or lg.');
+  }
+  if (req.body?.themeFont !== undefined) {
+    if (req.body.themeFont === null || req.body.themeFont === '') patch.themeFont = null;
+    else if (['system', 'serif', 'mono'].includes(String(req.body.themeFont))) patch.themeFont = String(req.body.themeFont);
+    else throw badRequest('Per-product font must be system, serif or mono.');
+  }
   const updated = DEMO.updateApp(req.params.appId, patch);
   if (!updated) throw notFound('App not found.');
   res.json({ app: DEMO.appSummary(updated) });

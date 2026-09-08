@@ -6,17 +6,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { AppSummary, FormRow } from '../lib/types';
-import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader } from '../components/ui';
+import type { AppSummary, FormRow, ThemeFontId, ThemeRadiusId } from '../lib/types';
+import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader, Select } from '../components/ui';
 import { SkeletonCards } from '../components/Skeleton';
-
-const ACCENTS = ['#0ea5a0', '#1b2559', '#7c3aed', '#2563eb', '#0d9488', '#c026d3', '#e11d48', '#f59e0b'];
 
 export default function ConnectPage() {
   const { appId = '' } = useParams();
   const [app, setApp] = useState<AppSummary | null>(null);
   const [form, setForm] = useState<FormRow | null>(null);
-  const [accent, setAccent] = useState('#0ea5a0');
+  interface Override { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null; }
+  const NONE: Override = { primary: null, accent: null, radius: null, font: null };
+  const [ov, setOv] = useState<Override>(NONE);
+  const [company, setCompany] = useState<{ primary: string; accent: string; radius: ThemeRadiusId; font: ThemeFontId } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,8 +36,15 @@ export default function ConnectPage() {
           return;
         }
         setApp(appRow);
-        setAccent(appRow.accentColor ?? '#0ea5a0');
         setForm(formsData.rows.find((f) => f.published) ?? formsData.rows[0] ?? null);
+        const o = appRow.themeOverride;
+        setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
+        api
+          .get<{ theme: { primary: string; accent: string; radius: ThemeRadiusId; font: ThemeFontId } }>(`/v1/public/theme/${appRow.slug}`)
+          .then((t) => {
+            if (t.theme) setCompany({ primary: t.theme.primary, accent: t.theme.accent, radius: t.theme.radius, font: t.theme.font });
+          })
+          .catch(() => undefined);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load this product.'));
   }, [appId]);
@@ -45,15 +53,22 @@ export default function ConnectPage() {
     load();
   }, [load]);
 
-  async function saveAccent(): Promise<void> {
+  async function saveDesign(): Promise<void> {
     if (!app) return;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, { accentColor: accent });
+      const res = await api.patch<{ app: AppSummary }>(`/v1/apps/${app.id}`, {
+        accentColor: ov.primary ?? null,
+        themeAccent: ov.accent,
+        themeRadius: ov.radius,
+        themeFont: ov.font,
+      });
       setApp(res.app);
-      setNotice('Design saved — your public form and wall now use the new accent colour.');
+      const o = res.app.themeOverride;
+      setOv({ primary: o?.primary ?? null, accent: o?.accent ?? null, radius: o?.radius ?? null, font: o?.font ?? null });
+      setNotice('Product design saved — this product now layers these tokens over the company theme.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the design.');
     } finally {
@@ -105,6 +120,14 @@ export default function ConnectPage() {
         </div>
       </div>
     );
+
+  const effPrimary = ov.primary ?? company?.primary ?? '#0ea5a0';
+  const accent = effPrimary; // legacy var name — everything primary-branded follows it
+  const dirtyDesign =
+    ov.primary !== (app.themeOverride?.primary ?? null) ||
+    ov.accent !== (app.themeOverride?.accent ?? null) ||
+    ov.radius !== (app.themeOverride?.radius ?? null) ||
+    ov.font !== (app.themeOverride?.font ?? null);
 
   const origin = window.location.origin;
   const formSlug = form?.slug ?? `${app.slug}-review`;
@@ -233,30 +256,90 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
                 {copied === 'embed' ? 'Copied ✓' : 'Copy embed snippet'}
               </Button>
             </div>
-            <div>
-              <Label>Design — accent colour</Label>
-              <div className="swatches" style={{ marginBottom: 10 }}>
-                {ACCENTS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    title={c}
-                    aria-label={`Accent ${c}`}
-                    className={`swatch ${accent.toLowerCase() === c.toLowerCase() ? 'active' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => setAccent(c)}
-                  />
-                ))}
-                <label className="swatch swatch-custom" title="Custom colour">
-                  <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} />
-                  +
-                </label>
+            <div className="stack" style={{ minWidth: 0 }}>
+              <div className="muted small" style={{ lineHeight: 1.6 }}>
+                This product can <strong>layer overrides</strong> on top of your company theme (set in{' '}
+                <Link to="/app/settings/theme">Settings → Appearance &amp; theme</Link>). Leave a field on “Company” to inherit.
               </div>
-              <Button variant="outline" className="btn-xs" disabled={busy || accent === (app.accentColor ?? '#0ea5a0')} onClick={() => void saveAccent()}>
-                {busy ? 'Saving…' : 'Save design'}
-              </Button>
-              <div className="muted small" style={{ marginTop: 8 }}>
-                Changes apply to the live form, wall and preview instantly.
+
+              {company && (
+                <div className="company-theme-line">
+                  <span className="color-dots">
+                    <i style={{ background: company.primary }} />
+                    <i style={{ background: company.accent }} />
+                  </span>
+                  <span className="muted small">
+                    Company theme now: {company.primary} · radius {company.radius} · font {company.font}
+                  </span>
+                </div>
+              )}
+
+              <div className="override-row">
+                <Label>Product colour (primary)</Label>
+                <div className="link-copy">
+                  <input
+                    type="color"
+                    aria-label="Product primary colour"
+                    value={ov.primary ?? company?.primary ?? '#0ea5a0'}
+                    onChange={(e) => setOv((d) => ({ ...d, primary: e.target.value }))}
+                  />
+                  {ov.primary ? (
+                    <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, primary: null }))}>
+                      Inherit company
+                    </Button>
+                  ) : (
+                    <span className="chip chip-approved">Company</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="override-row">
+                <Label>Accent colour</Label>
+                <div className="link-copy">
+                  <input
+                    type="color"
+                    aria-label="Product accent colour"
+                    value={ov.accent ?? company?.accent ?? '#0ea5a0'}
+                    onChange={(e) => setOv((d) => ({ ...d, accent: e.target.value }))}
+                  />
+                  {ov.accent ? (
+                    <Button variant="ghost" className="btn-xs" onClick={() => setOv((d) => ({ ...d, accent: null }))}>
+                      Inherit company
+                    </Button>
+                  ) : (
+                    <span className="chip chip-approved">Company</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="override-row">
+                <Label>Corner radius</Label>
+                <Select value={ov.radius ?? ''} onChange={(e) => setOv((d) => ({ ...d, radius: (e.target.value || null) as ThemeRadiusId | null }))}>
+                  <option value="">Company ({company?.radius ?? 'md'})</option>
+                  <option value="sm">Sharp · 8</option>
+                  <option value="md">Soft · 12</option>
+                  <option value="lg">Rounded · 18</option>
+                </Select>
+              </div>
+
+              <div className="override-row">
+                <Label>Font</Label>
+                <Select value={ov.font ?? ''} onChange={(e) => setOv((d) => ({ ...d, font: (e.target.value || null) as ThemeFontId | null }))}>
+                  <option value="">Company ({company?.font ?? 'system'})</option>
+                  <option value="system">System</option>
+                  <option value="serif">Serif</option>
+                  <option value="mono">Mono</option>
+                </Select>
+              </div>
+
+              <div className="modal-actions">
+                <Button variant="outline" className="btn-xs" disabled={busy || !dirtyDesign} onClick={() => void saveDesign()}>
+                  {busy ? 'Saving…' : 'Save product design'}
+                </Button>
+                {!company && <span className="muted small">Loading company theme…</span>}
+              </div>
+              <div className="muted small">
+                Changes apply instantly to this product&apos;s form, wall and embeds (theme version bumps server-side).
               </div>
             </div>
           </div>
@@ -312,9 +395,18 @@ const wall = await fetch("${origin}/v1/public/walls/${app.slug}").then((r) => r.
               <div>
                 <Label>Live widget demo (this page)</Label>
                 <div id="connect-widget-demo" className="widget-demo" />
-                <Button variant="ghost" className="btn-xs" style={{ marginTop: 6 }} onClick={() => setDemoKey((k) => k + 1)}>
-                  ↻ Re-mount demo
-                </Button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                  <Button variant="ghost" className="btn-xs" onClick={() => setDemoKey((k) => k + 1)}>
+                    ↻ Re-mount demo
+                  </Button>
+                  <a className="btn btn-secondary btn-xs" href={`${origin}/external/acme.html?app=${app.slug}&form=${formSlug}`} target="_blank" rel="noreferrer">
+                    Open example external site ↗
+                  </a>
+                </div>
+                <p className="muted small" style={{ margin: '2px 0 0' }}>
+                  That page is a <strong>standalone external website</strong> (static HTML, no app) — it embeds Acme’s wall exactly like a
+                  real third-party site would. Change the theme in Settings, then reload it.
+                </p>
               </div>
             </div>
 

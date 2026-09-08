@@ -963,3 +963,12 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .collapse-card { padding: 10px 14px; }
 .collapse-card summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--navy); }
 .collapse-card[open] summary { margin-bottom: 6px; }
+
+/* DOC 7 — platform template library + connect per-product overrides */
+.tpl-preview { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; }
+.tpl-preview .chip { margin-left: auto; }
+.company-theme-line { display: flex; align-items: center; gap: 8px; }
+.override-row { display: flex; flex-direction: column; gap: 4px; }
+.override-row .link-copy { justify-content: flex-start; }
+.override-row input[type='color'] { width: 42px; height: 28px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: #fff; cursor: pointer; }
+.override-row .chip { font-size: 11px; }

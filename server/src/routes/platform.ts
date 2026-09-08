@@ -5,7 +5,7 @@
 import { Router, type Request } from 'express';
 import { DEMO, MONTHLY_BY_PLAN, type DemoTenant } from '../demo-data';
 import { badRequest, createSessionToken, notFound, paginate, queryString, requirePlatform, sessionOf, type Paging } from '../lib';
-import { parseThemePatch } from '../theme';
+import { isValidHexColor, parseThemePatch, RADIUS_IDS, FONT_IDS, type ThemeFont, type ThemeRadius } from '../theme';
 
 export const platformRouter = Router();
 
@@ -111,6 +111,50 @@ platformRouter.post('/platform/tenants/:tenantId/impersonate', (req, res) => {
     user: { email: owner.email, name: owner.name },
     tenant: { id: t.id, name: t.name, slug: t.slug },
   });
+});
+
+// ---------------------------------------------------------------------------
+// Theme templates — Zojatech owns the template catalogue tenants adopt.
+// ---------------------------------------------------------------------------
+
+// GET /v1/platform/theme-templates
+platformRouter.get('/platform/theme-templates', (req, res) => {
+  requirePlatform(req);
+  res.json({ rows: DEMO.themeTemplates() });
+});
+
+function templateFromBody(body: Record<string, unknown>) {
+  const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 60) : '';
+  if (!name) throw badRequest('A template name is required.');
+  const primary = typeof body?.primary === 'string' ? body.primary.trim() : '';
+  const accent = typeof body?.accent === 'string' ? body.accent.trim() : '';
+  if (!isValidHexColor(primary) || !isValidHexColor(accent)) throw badRequest('Template colours must be hex values like #1B2559.');
+  const radius: ThemeRadius = RADIUS_IDS.includes(body?.radius as ThemeRadius) ? (body.radius as ThemeRadius) : 'md';
+  const font: ThemeFont = FONT_IDS.includes(body?.font as ThemeFont) ? (body.font as ThemeFont) : 'system';
+  const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 160) : '';
+  return { name, description, primary, accent, radius, font };
+}
+
+// POST /v1/platform/theme-templates
+platformRouter.post('/platform/theme-templates', (req, res) => {
+  requirePlatform(req);
+  res.status(201).json(DEMO.createThemeTemplate(templateFromBody(req.body ?? {})));
+});
+
+// PATCH /v1/platform/theme-templates/:templateId
+platformRouter.patch('/platform/theme-templates/:templateId', (req, res) => {
+  requirePlatform(req);
+  const body = templateFromBody(req.body ?? {});
+  const updated = DEMO.updateThemeTemplate(req.params.templateId, body);
+  if (!updated) throw notFound('Template not found.');
+  res.json(updated);
+});
+
+// DELETE /v1/platform/theme-templates/:templateId
+platformRouter.delete('/platform/theme-templates/:templateId', (req, res) => {
+  requirePlatform(req);
+  if (!DEMO.deleteThemeTemplate(req.params.templateId)) throw notFound('Template not found.');
+  res.json({ ok: true });
 });
 
 // GET /v1/platform/tenants/:tenantId

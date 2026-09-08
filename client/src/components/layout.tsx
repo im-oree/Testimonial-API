@@ -317,6 +317,7 @@ export function PlatformLayout() {
       items: [
         { label: 'Overview', to: '/platform/overview', end: true },
         { label: 'Tenants', to: '/platform/tenants' },
+        { label: 'Theme Templates', to: '/platform/templates' },
         { label: 'Audit Logs', to: '/platform/audit', end: true },
       ],
     },

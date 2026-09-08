@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { DEMO } from '../demo-data';
 import { badRequest, notFound } from '../lib';
-import { hexSoft, presetSummary, resolveTheme, THEME_PRESETS } from '../theme';
+import { hexSoft, RADIUS_PX, resolveTheme, type ThemeFont, type ThemeRadius } from '../theme';
 
 export const publicRouter = Router();
 
@@ -23,18 +23,23 @@ function themeForApp(appSlug: string) {
   const tenant = app ? DEMO.tenantOfApp(app.id) : undefined;
   if (!app || !tenant) return null;
   const base = resolveTheme(tenant);
+  // Layering: template -> company theme -> per-product overrides.
   const primary = app.accentColor ?? base.primary;
+  const accent = (app.themeAccent as string | null | undefined) ?? base.accent;
+  const radius: ThemeRadius = (app.themeRadius as ThemeRadius | null | undefined) ?? base.radius;
+  const font: ThemeFont = (app.themeFont as ThemeFont | null | undefined) ?? base.font;
   return {
     app: { id: app.id, name: app.name, slug: app.slug, websiteUrl: app.websiteUrl },
     tenantName: tenant.name,
     logoUrl: tenant.logoUrl ?? null,
-    theme: { ...base, primary, soft: hexSoft(primary) },
+    theme: { ...base, primary, soft: hexSoft(primary), accent, radius, radiusPx: RADIUS_PX[radius], font },
   };
 }
 
-// GET /v1/public/theme-presets — the Tailwind-ish preset catalogue (no auth).
+// GET /v1/public/theme-presets — the template catalogue Zojatech owns (no auth).
+// Tenants see exactly this list in their Appearance page.
 publicRouter.get('/public/theme-presets', (_req, res) => {
-  res.json({ presets: THEME_PRESETS.map((p) => presetSummary(p)) });
+  res.json({ presets: DEMO.themeTemplates() });
 });
 
 // GET /v1/public/theme/:appSlug — pre-resolved tokens for walls/forms/widgets.

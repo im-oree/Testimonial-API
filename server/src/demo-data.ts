@@ -11,14 +11,8 @@
  * REMOVE this module when the real Doc-3 routes + repositories are wired.
  */
 import { randomUUID } from 'node:crypto';
-import {
-  resolveTheme,
-  type ResolvedTheme,
-  type StoredTheme,
-  type ThemeFont,
-  type ThemePreset,
-  type ThemeRadius,
-} from './theme';
+import { RADIUS_IDS, FONT_IDS, resolveTheme, THEME_PRESETS, type ResolvedTheme, type StoredTheme, type ThemeFont, type ThemeRadius } from './theme';
+import type { ThemePreset } from './theme';
 
 // ---------------------------------------------------------------------------
 // Types (shape-compatible with the frontend contracts)
@@ -67,6 +61,10 @@ export interface DemoApp {
   description?: string | null;
   adminEmail?: string | null;
   accentColor?: string | null;
+  /** Per-product theme overrides (layered over the company theme). */
+  themeAccent?: string | null;
+  themeRadius?: string | null;
+  themeFont?: string | null;
   status: 'active' | 'paused';
   createdAt: string;
 }
@@ -547,6 +545,16 @@ const AI_TASKS: DemoAiTask[] = [
 // ---------------------------------------------------------------------------
 // Store helpers
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Theme templates — the catalogue Zojatech owns. Tenants adopt one on their
+// Appearance page and can fine-tune afterwards. Seeded from the built-ins.
+// ---------------------------------------------------------------------------
+export interface ThemeTemplateRow extends ThemePreset {
+  builtin: boolean;
+}
+
+let THEME_TEMPLATES: ThemeTemplateRow[] = THEME_PRESETS.map((t) => ({ ...t, builtin: true }));
+
 export const DEMO = {
   tenantById(id: string): DemoTenant | undefined {
     return TENANTS.find((t) => t.id === id);
@@ -611,13 +619,27 @@ export const DEMO = {
     APPS.push(app);
     return { ...app };
   },
-  updateApp(appId: string, patch: { name?: string; websiteUrl?: string | null; status?: 'active' | 'paused'; accentColor?: string | null }): DemoApp | undefined {
+  updateApp(
+    appId: string,
+    patch: {
+      name?: string;
+      websiteUrl?: string | null;
+      status?: 'active' | 'paused';
+      accentColor?: string | null;
+      themeAccent?: string | null;
+      themeRadius?: string | null;
+      themeFont?: string | null;
+    },
+  ): DemoApp | undefined {
     const app = APPS.find((a) => a.id === appId);
     if (!app) return undefined;
     if (patch.name?.trim()) app.name = patch.name.trim();
     if (patch.websiteUrl !== undefined) app.websiteUrl = patch.websiteUrl?.trim() || null;
     if (patch.status) app.status = patch.status;
     if (patch.accentColor !== undefined) app.accentColor = patch.accentColor?.trim() || null;
+    if (patch.themeAccent !== undefined) app.themeAccent = patch.themeAccent;
+    if (patch.themeRadius !== undefined) app.themeRadius = patch.themeRadius;
+    if (patch.themeFont !== undefined) app.themeFont = patch.themeFont;
     return { ...app };
   },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
@@ -636,6 +658,12 @@ export const DEMO = {
       description: app.description ?? app.websiteUrl ?? null,
       adminEmail: app.adminEmail ?? null,
       accentColor: app.accentColor ?? null,
+      themeOverride: {
+        primary: app.accentColor ?? null,
+        accent: app.themeAccent ?? null,
+        radius: app.themeRadius ?? null,
+        font: app.themeFont ?? null,
+      },
       status: app.status,
       createdAt: app.createdAt,
       totalTestimonials: rows.length,
@@ -880,6 +908,39 @@ export const DEMO = {
   /** Resolved theme for a tenant — the single read path used by every consumer. */
   themeOfTenant(tenant: DemoTenant): ResolvedTheme {
     return resolveTheme(tenant);
+  },
+  themeTemplates(): ThemeTemplateRow[] {
+    return THEME_TEMPLATES.map((t) => ({ ...t }));
+  },
+  createThemeTemplate(input: { name: string; description: string; primary: string; accent: string; radius: ThemeRadius; font: ThemeFont }): ThemeTemplateRow {
+    const row: ThemeTemplateRow = {
+      id: `tpl-${randomUUID().slice(0, 8)}`,
+      name: input.name.trim().slice(0, 60),
+      description: input.description.trim().slice(0, 160),
+      primary: input.primary,
+      accent: input.accent,
+      radius: input.radius,
+      font: input.font,
+      builtin: false,
+    };
+    THEME_TEMPLATES.unshift(row);
+    return { ...row };
+  },
+  updateThemeTemplate(templateId: string, patch: Partial<ThemeTemplateRow>): ThemeTemplateRow | undefined {
+    const row = THEME_TEMPLATES.find((t) => t.id === templateId);
+    if (!row) return undefined;
+    if (typeof patch.name === 'string') row.name = patch.name.trim().slice(0, 60) || row.name;
+    if (typeof patch.description === 'string') row.description = patch.description.trim().slice(0, 160);
+    if (typeof patch.primary === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.primary)) row.primary = patch.primary;
+    if (typeof patch.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.accent)) row.accent = patch.accent;
+    if (patch.radius && RADIUS_IDS.includes(patch.radius)) row.radius = patch.radius;
+    if (patch.font && FONT_IDS.includes(patch.font)) row.font = patch.font;
+    return { ...row };
+  },
+  deleteThemeTemplate(templateId: string): boolean {
+    const before = THEME_TEMPLATES.length;
+    THEME_TEMPLATES = THEME_TEMPLATES.filter((t) => t.id !== templateId);
+    return THEME_TEMPLATES.length < before;
   },
   webhooksOfApp(appId: string): DemoWebhook[] {
     return WEBHOOKS.filter((w) => w.appId === appId);

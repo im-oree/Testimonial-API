@@ -37,6 +37,7 @@ import PlatformOverviewPage from './pages/platform/PlatformOverviewPage';
 import TenantsPage from './pages/platform/TenantsPage';
 import TenantDetailPage from './pages/platform/TenantDetailPage';
 import PlatformAuditPage from './pages/platform/PlatformAuditPage';
+import TemplatesPage from './pages/platform/TemplatesPage';
 
 export default function App() {
   return (
@@ -101,6 +102,7 @@ function AppRoutes() {
           <Route path="tenants" element={<TenantsPage />} />
           <Route path="tenants/:tenantId" element={<TenantDetailPage />} />
           <Route path="audit" element={<PlatformAuditPage />} />
+          <Route path="templates" element={<TemplatesPage />} />
         </Route>
 
         {/* Role-aware 404 with CTAs back to the right home */}

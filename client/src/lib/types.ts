@@ -24,6 +24,7 @@ export interface ThemePresetSummary {
   accent: string;
   radius: ThemeRadiusId;
   font: ThemeFontId;
+  builtin?: boolean;
 }
 
 export interface ThemeSaveResponse {
@@ -210,6 +211,7 @@ export interface AppSummary {
   description: string | null;
   adminEmail: string | null;
   accentColor: string | null;
+  themeOverride?: { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null } | null;
   status: 'active' | 'paused';
   createdAt: string;
   totalTestimonials: number;

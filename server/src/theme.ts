@@ -210,7 +210,7 @@ export function parseThemePatch(
   const patch: ThemePatch = {};
   if (body.presetId !== undefined && body.presetId !== null) {
     const id = String(body.presetId);
-    if (!PRESET_IDS.has(id) && id !== 'custom') return { ok: false, error: `Unknown theme preset “${id}”.` };
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(id)) return { ok: false, error: 'Template id must be 1-40 letters/digits/_/-.' };
     patch.presetId = id;
   }
   const checkColor = (key: 'primary' | 'accent'): string | null => {

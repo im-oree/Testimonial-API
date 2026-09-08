@@ -39,20 +39,12 @@ export function textOn(hex: string): string {
   return lum > 150 ? '#161a2e' : '#ffffff';
 }
 
-let presetsPromise: Promise<ThemePresetSummary[]> | null = null;
-
-/** Public preset catalogue — fetched once and cached for the session. */
+/** Public template catalogue — fetched on demand so platform edits appear instantly. */
 export function fetchThemePresets(): Promise<ThemePresetSummary[]> {
-  if (!presetsPromise) {
-    presetsPromise = api
-      .get<{ presets: ThemePresetSummary[] }>('/v1/public/theme-presets')
-      .then((d) => d.presets)
-      .catch(() => {
-        presetsPromise = null; // allow retry next call
-        return [];
-      });
-  }
-  return presetsPromise;
+  return api
+    .get<{ presets: ThemePresetSummary[] }>('/v1/public/theme-presets')
+    .then((d) => d.presets)
+    .catch(() => []);
 }
 
 /** Active preset id given a draft token set ('' = custom). */
