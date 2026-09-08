@@ -44,7 +44,7 @@ export default function ConnectPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [codeTab, setCodeTab] = useState<'widget' | 'iframe' | 'button' | 'api'>('widget');
+  const [codeTab, setCodeTab] = useState<'widget' | 'modal' | 'iframe' | 'button' | 'api'>('widget');
   const [open, setOpen] = useState<{ collect: boolean; details: boolean }>({ collect: false, details: false });
 
   const load = useCallback(() => {
@@ -158,6 +158,10 @@ export default function ConnectPage() {
   const widgetSnippet = `<!-- Zojatech widget — ${app!.name}: approved reviews only -->
 <div id="zojatech-wall-${app!.slug}"></div>
 <script src="${origin}/widget/embed.js" data-app="${app!.slug}" async></script>`;
+  const modalSnippet = `<!-- "Leave a review" popup — visitors never leave your site -->
+<button type="button" data-zr-open data-zr-form="${formSlug}"
+        style="display:inline-block;background:${primary};color:#fff;padding:10px 18px;border:0;border-radius:10px;font:inherit;font-weight:600;cursor:pointer">Leave a review</button>
+<script src="${origin}/widget/modal.js" async></script>`;
   const iframeSnippet = `<!-- Zojatech wall (auto-height embed) — product ${app!.code} -->
 <iframe
   src="${wallEmbedUrl}"
@@ -193,6 +197,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r
 
   const codeBlocks: Record<string, { label: string; hint: string; code: string; copyKey: string }> = {
     widget: { label: 'Widget — one script tag', hint: 'Best for any site: WordPress, Webflow, Shopify, plain HTML. Auto-height, no crop.', code: widgetSnippet, copyKey: 'widget' },
+    modal: { label: 'Review modal', hint: 'Floating popup on your page — visitors submit without leaving. Works with any [data-zr-open] element.', code: modalSnippet, copyKey: 'modal' },
     iframe: { label: 'Iframe embed', hint: 'Drop-in iframe that resizes to the wall height automatically.', code: iframeSnippet, copyKey: 'embed' },
     button: { label: 'Review button', hint: 'Point your "Leave a review" button at the public form.', code: buttonSnippet, copyKey: 'btn' },
     api: { label: 'Developer API', hint: 'Little-code path: fetch approved reviews + resolved theme directly.', code: apiSnippet, copyKey: 'api' },
@@ -362,7 +367,7 @@ const wall = await fetch("${origin}/v1/public/walls/${app!.slug}").then((r) => r
           </div>
 
           <div className="segmented" role="tablist" aria-label="Embed options">
-            {(Object.keys(codeBlocks) as ('widget' | 'iframe' | 'button' | 'api')[]).map((k) => (
+            {(Object.keys(codeBlocks) as ('widget' | 'modal' | 'iframe' | 'button' | 'api')[]).map((k) => (
               <button key={k} type="button" role="tab" aria-selected={codeTab === k} className={`segment ${codeTab === k ? 'active' : ''}`} onClick={() => setCodeTab(k)}>
                 {codeBlocks[k].label.split('—')[0].trim()}
               </button>

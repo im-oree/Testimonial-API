@@ -43,7 +43,7 @@
   <div class="hero">
     <h1>Software that keeps teams moving</h1>
     <p>Acme Inc is used by 2,400+ teams. Don't take our word for it — here's what our customers say, streamed straight from our Zojatech wall.</p>
-    <a class="cta-review" href="/forms/website-review">Leave a review</a>
+    <a class="cta-review" href="/forms/website-review" data-zr-open data-zr-form="website-review">Leave a review</a>
   </div>
 
   <div class="note">
@@ -77,7 +77,10 @@
       var app = q.get('app') || 'acme-marketing-site';
       var form = q.get('form') || 'website-review';
       var review = document.querySelector('.cta-review');
-      if (review) review.href = base + '/forms/' + encodeURIComponent(form);
+      if (review) {
+        review.href = base + '/forms/' + encodeURIComponent(form);
+        review.setAttribute('data-zr-form', form); // modal.js opens this form in a popup
+      }
 
       var box = document.getElementById('acme-site-wall');
       var s = document.createElement('script');
@@ -87,6 +90,13 @@
       s.setAttribute('data-height', '460');
       s.async = true;
       box.appendChild(s);
+
+      // The "Leave a review" popup: visitors never leave this page. modal.js
+      // binds the CTA above (data-zr-open) and opens the review form in a modal.
+      var m = document.createElement('script');
+      m.src = base + '/widget/modal.js';
+      m.async = true;
+      document.body.appendChild(m);
     })();
   </script>
 </body>
