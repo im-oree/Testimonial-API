@@ -18,11 +18,12 @@ import { SchemaSurface } from '../design-studio/runtime';
 import { snapBox, type SnapGuide } from '../design-studio/snap-engine';
 import { MIN_SIZE } from '../design-studio/types';
 import { elementToCSS } from '../design-studio/css';
-import { displayText } from '../design-studio/data-binder';
+import { boundFieldId, boundValue, displayText, FIELD_DEFS, fieldDefOf } from '../design-studio/data-binder';
 import type { AppSummary } from '../lib/types';
 import type { ElementType, StudioElement, StudioRecord } from '../design-studio/types';
 import { Button, ErrorBanner } from '../components/ui';
-import { IconCheck, IconLayers, IconPlus, IconRefresh, IconTrash, IconX } from '../components/icons';
+import { Field, NumberInput, SelectField, TextAreaInput, TextInput } from '../components/fields';
+import { IconCheck, IconLayers, IconPlus, IconRefresh, IconSidebar, IconTrash, IconX } from '../components/icons';
 
 const ELEMENTS: Array<{ type: ElementType; label: string; hint: string }> = [
   { type: 'heading', label: 'Heading', hint: 'Section title' },
@@ -52,6 +53,10 @@ export default function DesignStudioPage() {
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const [productName, setProductName] = useState('');
   const [slug, setSlug] = useState<string | null>(null);
+  // Left (elements/layers) and right (properties) rails collapse so the canvas
+  // can claim the whole stage — the preview should never be squeezed.
+  const [showLeft, setShowLeft] = useState(true);
+  const [showRight, setShowRight] = useState(true);
 
   // Product display name + slug (for the real review records used in preview).
   useEffect(() => {
@@ -198,17 +203,26 @@ export default function DesignStudioPage() {
           )}
         </div>
         <div className="studio-tb-right">
-          <span className="chip">studio v{store.savedStudioVersion}</span>
-          <span className="chip">design v{store.designVersion}</span>
+          <span className="chip" title={`Schema v${store.savedStudioVersion} · design v${store.designVersion}`}>
+            v{store.savedStudioVersion}
+          </span>
+          <div className="segmented studio-panel-toggles" role="group" aria-label="Side panels">
+            <button type="button" className={`segment ${showLeft ? 'active' : ''}`} aria-pressed={showLeft} onClick={() => setShowLeft((v) => !v)}>
+              Elements
+            </button>
+            <button type="button" className={`segment ${showRight ? 'active' : ''}`} aria-pressed={showRight} onClick={() => setShowRight((v) => !v)}>
+              Properties
+            </button>
+          </div>
           <Button variant="ghost" className="btn-xs" disabled={store.past.length === 0} title="Undo (Ctrl/Cmd+Z)" onClick={() => store.undo()}>
             <IconRefresh size={12} style={{ transform: 'scaleX(-1)' }} /> Undo
           </Button>
           <Button variant="ghost" className="btn-xs" disabled={store.future.length === 0} title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => store.redo()}>
             <IconRefresh size={12} /> Redo
           </Button>
-          <div className="segmented">
+          <div className="segmented" role="group" aria-label="Editor mode">
             <button type="button" className={`segment ${!store.previewMode ? 'active' : ''}`} onClick={() => store.setPreviewMode(false)}>
-              Edit
+              Editor
             </button>
             <button type="button" className={`segment ${store.previewMode ? 'active' : ''}`} onClick={() => store.setPreviewMode(true)}>
               Preview
@@ -225,9 +239,28 @@ export default function DesignStudioPage() {
         </div>
       )}
 
-      <div className="studio-grid">
-        <aside className="studio-panel">
-          <div className="studio-panel-title">Elements</div>
+      <div
+        className="studio-grid"
+        style={
+          showLeft && showRight
+            ? undefined
+            : {
+                gridTemplateColumns: showLeft
+                  ? '236px minmax(0, 1fr)'
+                  : showRight
+                    ? 'minmax(0, 1fr) 252px'
+                    : 'minmax(0, 1fr)',
+              }
+        }
+      >
+        {showLeft ? (
+          <aside className="studio-panel">
+          <div className="studio-panel-head">
+            <div className="studio-panel-title" style={{ margin: 0 }}>Elements</div>
+            <button type="button" className="ctx-trigger" title="Hide elements & layers" aria-label="Hide elements and layers" onClick={() => setShowLeft(false)}>
+              <IconX size={14} />
+            </button>
+          </div>
           <div className="studio-palette">
             {ELEMENTS.map((e) => (
               <button key={e.type} type="button" className="studio-el-btn" onClick={() => store.addElement(e.type)}>
@@ -256,8 +289,17 @@ export default function DesignStudioPage() {
                   <span className="studio-layer-name">
                     <IconLayers size={12} />
                     <span className="small">
-                      <span className="strong">{el.name}</span>
-                      <span className="muted small">{el.binding ? `bound · ${el.binding.bindingKey}` : el.type}</span>
+                      {boundFieldId(el) ? (
+                        <>
+                          <span className="strong studio-layer-field">{boundFieldId(el)}</span>
+                          <span className="muted small">{fieldDefOf(boundFieldId(el)).label} · live field</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="strong">{el.name}</span>
+                          <span className="muted small">{el.type}</span>
+                        </>
+                      )}
                     </span>
                   </span>
                   <span className="studio-layer-actions">
@@ -272,7 +314,12 @@ export default function DesignStudioPage() {
               );
             })}
           </div>
-        </aside>
+          </aside>
+        ) : (
+          <div className="studio-rail-btn" onClick={() => setShowLeft(true)} title="Show elements & layers" role="button" tabIndex={0} onKeyDown={(e)=>{ if(e.key==='Enter') setShowLeft(true); }}>
+            <IconLayers size={16} />
+          </div>
+        )}
 
         <main className="studio-stage">
           <div className="studio-viewport">
@@ -288,17 +335,36 @@ export default function DesignStudioPage() {
               {store.previewMode ? (
                 <>
                   <SchemaSurface schema={schema} record={store.records[store.previewIndex] ?? null} animate />
+                  {(() => {
+                    const used = [...new Set(schema.elements.map((e) => boundFieldId(e)).filter((f): f is string => Boolean(f)))];
+                    const record = store.records[store.previewIndex] ?? null;
+                    return used.length > 0 ? (
+                      <div className="studio-fieldmap">
+                        <span className="muted small strong" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}>Template fields</span>
+                        {used.map((id) => {
+                          const def = fieldDefOf(id);
+                          const val = boundValue(id, record);
+                          return (
+                            <span key={id} className="chip chip-tenant" title={`${def.label} — filled from the live review record`}>
+                              <code>{id}</code>
+                              {val !== null ? ` → ${String(val).slice(0, 26)}${String(val).length > 26 ? '…' : ''}` : ' → awaiting record'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="studio-previewbar">
                     <span className="muted small">
-                      {store.records.length > 0 ? `Review ${store.previewIndex + 1} of ${store.records.length}` : 'Static placeholder'}
+                      {store.records.length > 0 ? `Live preview · review ${store.previewIndex + 1} of ${store.records.length}` : 'Static placeholder'}
                     </span>
                     {store.records.length > 0 && (
                       <span className="studio-preview-actions">
-                        <button type="button" className="btn btn-secondary btn-xs" onClick={() => store.cycleRecord(-1)}>Prev</button>
-                        <button type="button" className="btn btn-secondary btn-xs" onClick={() => store.cycleRecord(1)}>Next</button>
+                        <button type="button" className="btn btn-secondary btn-xs" onClick={() => store.cycleRecord(-1)}>Prev review</button>
+                        <button type="button" className="btn btn-secondary btn-xs" onClick={() => store.cycleRecord(1)}>Next review</button>
                       </span>
                     )}
-                    <button type="button" className="btn btn-ghost btn-xs" onClick={() => store.setPreviewMode(false)}>Back to edit</button>
+                    <button type="button" className="btn btn-ghost btn-xs" onClick={() => store.setPreviewMode(false)}>Back to editor</button>
                   </div>
                 </>
               ) : (
@@ -325,9 +391,21 @@ export default function DesignStudioPage() {
           </div>
         </main>
 
-        <aside className="studio-panel">
-          <PropertiesPanel />
-        </aside>
+        {showRight ? (
+          <aside className="studio-panel">
+            <div className="studio-panel-head">
+              <div className="studio-panel-title" style={{ margin: 0 }}>Properties</div>
+              <button type="button" className="ctx-trigger" title="Hide properties" aria-label="Hide properties" onClick={() => setShowRight(false)}>
+                <IconX size={14} />
+              </button>
+            </div>
+            <PropertiesPanel />
+          </aside>
+        ) : (
+          <div className="studio-rail-btn studio-rail-right" onClick={() => setShowRight(true)} title="Show properties" role="button" tabIndex={0} onKeyDown={(e)=>{ if(e.key==='Enter') setShowRight(true); }}>
+            <IconSidebar size={16} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -398,7 +476,7 @@ function EditOverlay({ el, onGestureStart }: { el: StudioElement; onGestureStart
     >
       {selected && (
         <>
-          <div className="studio-el-tag">{el.name}</div>
+          <div className="studio-el-tag">{boundFieldId(el) ? `${boundFieldId(el)} · ${fieldDefOf(boundFieldId(el)).label}` : el.name}</div>
           {HANDLES.map((h) => (
             <div key={h} className="studio-handle" style={handleStyle(h)} onPointerDown={beginResize(h)} />
           ))}
@@ -466,37 +544,37 @@ function PropertiesPanel() {
   const sel = schema.elements.filter((e) => selectedIds.includes(e.id));
 
   if (sel.length === 0) {
+    const st = useEditorStore.getState;
     return (
       <div className="studio-props">
-        <div className="studio-panel-title">Design</div>
         <div className="stack">
-          <label className="field-label">Name</label>
-          <input className="text-input" value={schema.name} onChange={(e) => useEditorStore.getState().updateSchemaName(e.target.value)} />
-          <div className="studio-grid2">
-            <div>
-              <label className="field-label">Canvas W</label>
-              <input
-                className="text-input"
-                type="number"
-                value={schema.canvas.width}
-                onChange={(e) => useEditorStore.getState().updateCanvas({ width: Number(e.target.value) || schema.canvas.width })}
-              />
-            </div>
-            <div>
-              <label className="field-label">Canvas H</label>
-              <input
-                className="text-input"
-                type="number"
-                value={schema.canvas.height}
-                onChange={(e) => useEditorStore.getState().updateCanvas({ height: Number(e.target.value) || schema.canvas.height })}
-              />
-            </div>
+          <Field label="Design name" hint="Shown in the product’s connect &amp; studio lists.">
+            <TextInput value={schema.name} onChange={(e) => st().updateSchemaName(e.target.value)} />
+          </Field>
+          <div className="f-group f-group-2">
+            <Field label="Canvas width">
+              <NumberInput min={320} max={1600} value={schema.canvas.width} onChange={(e) => st().updateCanvas({ width: Number(e.target.value) || schema.canvas.width })} />
+            </Field>
+            <Field label="Canvas height">
+              <NumberInput min={240} max={2000} value={schema.canvas.height} onChange={(e) => st().updateCanvas({ height: Number(e.target.value) || schema.canvas.height })} />
+            </Field>
           </div>
-          <label className="field-label">Canvas background</label>
-          <input type="color" value={schema.canvas.background} onChange={(e) => useEditorStore.getState().updateCanvas({ background: e.target.value })} className="color-input" />
+          <Field label="Canvas background" hint="Colours and logo tokens below; previews render on this surface.">
+            <div className="swatches" style={{ gap: 7 }}>
+              <span className="swatch" style={{ background: schema.canvas.background }} />
+              <label className="swatch swatch-custom">
+                <input type="color" value={schema.canvas.background} onChange={(e) => st().updateCanvas({ background: e.target.value })} />
+                <IconPlus size={12} />
+              </label>
+              <span className="muted small" style={{ fontFamily: 'monospace' }}>{schema.canvas.background.toUpperCase()}</span>
+            </div>
+          </Field>
         </div>
-        <p className="muted small" style={{ marginTop: 12 }}>
-          Pick an element from the canvas or Layers to edit its properties. Drag to move, corners resize, both snap to the grid.
+        <hr className="divider" style={{ margin: '14px 0 8px' }} />
+        <p className="muted small" style={{ margin: 0 }}>
+          Select an element on the canvas or in <strong>Layers</strong> to edit it. Drag to move, drag a corner to resize — both snap to the
+          grid. Elements bound to a review field carry their field id (<code>reviewer_name</code>, <code>review_text</code>…) and fill in
+          automatically on <strong>Preview</strong> and when the wall goes live.
         </p>
       </div>
     );
@@ -504,191 +582,217 @@ function PropertiesPanel() {
 
   const single = sel.length === 1 ? sel[0] : null;
   const upd = (id: string, patch: Partial<StudioElement>) => useEditorStore.getState().updateElement(id, patch);
+  const fieldId = single ? boundFieldId(single) : null;
+
+  if (sel.length > 1) {
+    return (
+      <div className="studio-props stack">
+        <p className="muted small" style={{ margin: 0 }}>{sel.length} elements selected</p>
+        <div className="studio-row">
+          <Button variant="secondary" className="btn-xs" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
+          <Button variant="ghost" className="btn-xs" onClick={() => useEditorStore.getState().deleteSelected()}>
+            <IconTrash size={12} /> Delete
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (!single) return null;
+
+  const isText = single.type === 'heading' || single.type === 'text' || single.type === 'button';
+  const def = fieldDefOf(fieldId);
 
   return (
     <div className="studio-props">
-      <div className="studio-panel-title">Properties</div>
-      {sel.length > 1 ? (
-        <>
-          <p className="muted small">{sel.length} elements selected</p>
-          <div className="studio-row">
-            <Button variant="secondary" className="btn-sm" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
-            <Button variant="danger" className="btn-sm" onClick={() => useEditorStore.getState().deleteSelected()}>
-              <IconTrash size={13} /> Delete
-            </Button>
+      <div className="studio-el-id">
+        <span className="studio-el-id-chip">{single.type}</span>
+        {fieldId ? (
+          <div className="studio-el-id-text">
+            <span className="strong small" style={{ fontFamily: 'var(--mono, SFMono-Regular, Consolas, monospace)', color: 'var(--navy)' }}>{fieldId}</span>
+            <span className="muted small">{def.label} · live field</span>
           </div>
-        </>
-      ) : single ? (
-        <div className="stack">
-          <label className="field-label">Name</label>
-          <input className="text-input" value={single.name} onChange={(e) => upd(single.id, { name: e.target.value })} />
-          <span className="chip">{single.type}</span>
-
-          <div className="studio-grid2">
-            {(['x', 'y', 'width', 'height'] as const).map((k) => (
-              <div key={k}>
-                <label className="field-label">{k}</label>
-                <input
-                  className="text-input"
-                  type="number"
-                  value={single.layout[k]}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (!Number.isFinite(v)) return;
-                    const layout = { ...single.layout };
-                    if (k === 'x' || k === 'y') layout[k] = v;
-                    else layout[k] = Math.max(MIN_SIZE, v);
-                    upd(single.id, { layout });
-                  }}
-                />
-              </div>
-            ))}
+        ) : (
+          <div className="studio-el-id-text">
+            <span className="strong small">{single.name}</span>
+            <span className="muted small">Static element</span>
           </div>
+        )}
+      </div>
 
-          {(single.type === 'heading' || single.type === 'text' || single.type === 'button') && (
-            <>
-              <label className="field-label">Text</label>
-              <textarea
-                className="studio-area"
-                rows={3}
-                value={displayText(single, null)}
-                onChange={(e) => upd(single.id, { text: e.target.value, binding: null })}
-              />
-              <label className="field-label">Bind to a review field</label>
-              <select
-                className="select"
-                value={single.binding?.bindingKey ?? 'none'}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  upd(single.id, v === 'none' ? { binding: null } : { binding: { bindingKey: v as 'content' | 'authorName', property: 'text' } });
-                }}
-              >
-                <option value="none">Static text</option>
-                <option value="content">Review content</option>
-                <option value="authorName">Author name</option>
-              </select>
-            </>
-          )}
+      <div className="f-group" style={{ gap: 10 }}>
+        <div className="f-group f-group-2" style={{ gap: 8 }}>
+          <Field label="X">
+            <NumberInput size="sm" value={single.layout.x} onChange={(e) => upd(single.id, { layout: { ...single.layout, x: Number(e.target.value) || 0 } })} />
+          </Field>
+          <Field label="Y">
+            <NumberInput size="sm" value={single.layout.y} onChange={(e) => upd(single.id, { layout: { ...single.layout, y: Number(e.target.value) || 0 } })} />
+          </Field>
+          <Field label="Width">
+            <NumberInput size="sm" min={MIN_SIZE} value={single.layout.width} onChange={(e) => upd(single.id, { layout: { ...single.layout, width: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) } })} />
+          </Field>
+          <Field label="Height">
+            <NumberInput size="sm" min={MIN_SIZE} value={single.layout.height} onChange={(e) => upd(single.id, { layout: { ...single.layout, height: Math.max(MIN_SIZE, Number(e.target.value) || MIN_SIZE) } })} />
+          </Field>
+        </div>
+      </div>
 
-          {single.typography && (
-            <div className="studio-grid2">
-              <div>
-                <label className="field-label">Size</label>
-                <input
-                  className="text-input"
-                  type="number"
-                  value={single.typography.fontSize}
-                  onChange={(e) => upd(single.id, { typography: { ...single.typography!, fontSize: Number(e.target.value) || 14 } })}
-                />
-              </div>
-              <div>
-                <label className="field-label">Weight</label>
-                <select
-                  className="select"
-                  value={single.typography.fontWeight}
-                  onChange={(e) => upd(single.id, { typography: { ...single.typography!, fontWeight: Number(e.target.value) } })}
-                >
-                  <option value={400}>Regular</option>
-                  <option value={500}>Medium</option>
-                  <option value={600}>Semibold</option>
-                  <option value={700}>Bold</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {(single.type === 'heading' || single.type === 'text') && single.typography && (
-            <div>
-              <label className="field-label">Text colour</label>
-              <div className="swatches">
-                {PALETTE_SWATCHES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Colour ${c}`}
-                    className={`swatch ${single.typography!.color.toLowerCase() === c ? 'active' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => upd(single.id, { typography: { ...single.typography!, color: c } })}
-                  />
-                ))}
-                <label className="swatch swatch-custom">
-                  <input type="color" value={single.typography.color} onChange={(e) => upd(single.id, { typography: { ...single.typography!, color: e.target.value } })} />
-                  <IconPlus size={12} />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {(single.type === 'heading' || single.type === 'text') && (
-            <div>
-              <label className="field-label">Align</label>
-              <div className="segmented">
-                {(['left', 'center', 'right'] as const).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    className={`segment ${single.typography?.align === a ? 'active' : ''}`}
-                    onClick={() => upd(single.id, { typography: { ...single.typography!, align: a } })}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {single.type === 'image' && (
-            <>
-              <label className="field-label">Image URL</label>
-              <input className="text-input" value={single.imageUrl ?? ''} placeholder="https://example.com/picture.jpg" onChange={(e) => upd(single.id, { imageUrl: e.target.value || null })} />
-            </>
-          )}
-
-          {single.type !== 'spacer' && (
-            <>
-              <label className="field-label">Background</label>
-              <div className="swatches">
-                {PALETTE_SWATCHES.slice(0, 7).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Background ${c}`}
-                    className={`swatch ${single.style.background?.toLowerCase() === c ? 'active' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => upd(single.id, { style: { ...single.style, background: c } })}
-                  />
-                ))}
-                <button type="button" className="swatch" title="No background" onClick={() => upd(single.id, { style: { ...single.style, background: null } })}>
-                  <IconX size={11} />
-                </button>
-              </div>
-              <div className="studio-grid2">
-                <div>
-                  <label className="field-label">Radius</label>
-                  <input className="text-input" type="number" value={single.style.radius} onChange={(e) => upd(single.id, { style: { ...single.style, radius: Number(e.target.value) || 0 } })} />
-                </div>
-                <div>
-                  <label className="field-label">Opacity</label>
-                  <input className="text-input" type="number" min={0.05} max={1} step={0.05} value={single.style.opacity} onChange={(e) => upd(single.id, { style: { ...single.style, opacity: Math.max(0.05, Math.min(1, Number(e.target.value) || 1)) } })} />
-                </div>
-                <div>
-                  <label className="field-label">Z order</label>
-                  <input className="text-input" type="number" value={single.layout.z} onChange={(e) => upd(single.id, { layout: { ...single.layout, z: Number(e.target.value) || 0 } })} />
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="studio-row">
-            <Button variant="secondary" className="btn-sm" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
-            <Button variant="ghost" className="btn-sm" onClick={() => useEditorStore.getState().bringToFront(single.id)}>Front</Button>
-            <Button variant="ghost" className="btn-sm" onClick={() => useEditorStore.getState().sendToBack(single.id)}>Back</Button>
-            <Button variant="danger" className="btn-sm" onClick={() => useEditorStore.getState().deleteSelected()}>
-              <IconTrash size={13} /> Delete
-            </Button>
-          </div>
+      {single.type === 'rating-stars' ? (
+        <div className="studio-note">
+          <span className="muted small">
+            Bound to <code style={{ color: 'var(--navy)', fontWeight: 700 }}>review_rating</code> — the record fills the stars live. Star size
+            follows the element’s <strong>height</strong>: drag the bottom edge to make them bigger or smaller.
+          </span>
         </div>
       ) : null}
+
+      {isText && (
+        <>
+          <hr className="divider" style={{ margin: '8px 0' }} />
+          <div className="studio-panel-label">Content</div>
+          <div className="f-group">
+            {fieldId ? (
+              <>
+                <div className="studio-note">
+                  <span className="muted small">
+                    Bound to <code style={{ color: 'var(--navy)', fontWeight: 700 }}>{fieldId}</code> · filled automatically from each review
+                    (see Preview). To use your own copy instead, switch back to static text.
+                  </span>
+                </div>
+                <div className="f-group f-group-2" style={{ gap: 8 }}>
+                  <Field label="Field id">
+                    <SelectField
+                      size="sm"
+                      value={fieldId}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        upd(single.id, { binding: { bindingKey: v as StudioElement['binding'] extends { bindingKey: infer K } ? K : never, property: 'text' } });
+                      }}
+                    >
+                      {FIELD_DEFS.filter((f) => f.id !== 'review_rating').map((f) => (
+                        <option key={f.id} value={f.id}>{f.label} ({f.id})</option>
+                      ))}
+                    </SelectField>
+                  </Field>
+                </div>
+              </>
+            ) : (
+              <>
+                <Field label="Static copy" hint="Keep it on your own copy, or bind this element to a review field below.">
+                  <TextAreaInput rows={3} value={displayText(single, null)} onChange={(e) => upd(single.id, { text: e.target.value, binding: null })} />
+                </Field>
+                <Field label="Bind to a review field" hint="The record fills the text at preview/live time; the element keeps its id.">
+                  <SelectField
+                    size="sm"
+                    value="static"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      upd(single.id, v === 'static' ? { binding: null } : { binding: { bindingKey: v as 'review_text' | 'reviewer_name', property: 'text' } });
+                    }}
+                  >
+                    <option value="static">Static text (no binding)</option>
+                    <option value="review_text">Review text (review_text)</option>
+                    <option value="reviewer_name">Reviewer name (reviewer_name)</option>
+                  </SelectField>
+                </Field>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {single.typography && (
+        <>
+          <hr className="divider" style={{ margin: '8px 0' }} />
+          <div className="studio-panel-label">Typography</div>
+          <div className="f-group f-group-2" style={{ gap: 8 }}>
+            <Field label="Size (px)">
+              <NumberInput size="sm" min={8} max={160} value={single.typography.fontSize} onChange={(e) => upd(single.id, { typography: { ...single.typography!, fontSize: Number(e.target.value) || 14 } })} />
+            </Field>
+            <Field label="Weight">
+              <SelectField size="sm" value={String(single.typography.fontWeight)} onChange={(e) => upd(single.id, { typography: { ...single.typography!, fontWeight: Number(e.target.value) } })}>
+                <option value="400">Regular</option>
+                <option value="500">Medium</option>
+                <option value="600">Semibold</option>
+                <option value="700">Bold</option>
+              </SelectField>
+            </Field>
+          </div>
+          {(single.type === 'heading' || single.type === 'text') && (
+            <>
+              <Field label="Text colour">
+                <div className="swatches" style={{ gap: 6 }}>
+                  {PALETTE_SWATCHES.map((c) => (
+                    <button key={c} type="button" aria-label={`Colour ${c}`} className={`swatch ${single.typography!.color.toLowerCase() === c ? 'active' : ''}`} style={{ background: c }} onClick={() => upd(single.id, { typography: { ...single.typography!, color: c } })} />
+                  ))}
+                  <label className="swatch swatch-custom">
+                    <input type="color" value={single.typography.color} onChange={(e) => upd(single.id, { typography: { ...single.typography!, color: e.target.value } })} />
+                    <IconPlus size={12} />
+                  </label>
+                </div>
+              </Field>
+              <Field label="Align">
+                <div className="segmented">
+                  {(['left', 'center', 'right'] as const).map((a) => (
+                    <button key={a} type="button" className={`segment ${single.typography?.align === a ? 'active' : ''}`} onClick={() => upd(single.id, { typography: { ...single.typography!, align: a } })}>
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </>
+          )}
+        </>
+      )}
+
+      {single.type === 'image' && (
+        <>
+          <hr className="divider" style={{ margin: '8px 0' }} />
+          <div className="studio-panel-label">Image</div>
+          <Field label="Image URL">
+            <TextInput value={single.imageUrl ?? ''} placeholder="https://example.com/picture.jpg" onChange={(e) => upd(single.id, { imageUrl: e.target.value || null })} />
+          </Field>
+        </>
+      )}
+
+      {single.type !== 'spacer' && (
+        <>
+          <hr className="divider" style={{ margin: '8px 0' }} />
+          <div className="studio-panel-label">Surface</div>
+          <Field label="Background">
+            <div className="swatches" style={{ gap: 6 }}>
+              {PALETTE_SWATCHES.slice(0, 7).map((c) => (
+                <button key={c} type="button" aria-label={`Background ${c}`} className={`swatch ${single.style.background?.toLowerCase() === c ? 'active' : ''}`} style={{ background: c }} onClick={() => upd(single.id, { style: { ...single.style, background: c } })} />
+              ))}
+              <button type="button" className="swatch" title="No background" onClick={() => upd(single.id, { style: { ...single.style, background: null } })}>
+                <IconX size={11} />
+              </button>
+            </div>
+          </Field>
+          <div className="f-group f-group-2" style={{ gap: 8 }}>
+            <Field label="Corner radius">
+              <NumberInput size="sm" min={0} max={120} value={single.style.radius} onChange={(e) => upd(single.id, { style: { ...single.style, radius: Number(e.target.value) || 0 } })} />
+            </Field>
+            <Field label="Z order">
+              <NumberInput size="sm" value={single.layout.z} onChange={(e) => upd(single.id, { layout: { ...single.layout, z: Number(e.target.value) || 0 } })} />
+            </Field>
+          </div>
+          <Field label={`Opacity ${single.style.opacity.toFixed(2)}`}>
+            <input className="f-range-slider" type="range" min={0.05} max={1} step={0.05} value={single.style.opacity} onChange={(e) => upd(single.id, { style: { ...single.style, opacity: Number(e.target.value) } })} />
+          </Field>
+        </>
+      )}
+
+      <hr className="divider" style={{ margin: '10px 0 8px' }} />
+      <div className="studio-row" style={{ justifyContent: 'space-between' }}>
+        <div className="studio-row" style={{ gap: 4 }}>
+          <Button variant="ghost" className="btn-xs" onClick={() => useEditorStore.getState().bringToFront(single.id)} title="Bring to front">Front</Button>
+          <Button variant="ghost" className="btn-xs" onClick={() => useEditorStore.getState().sendToBack(single.id)} title="Send to back">Back</Button>
+        </div>
+        <Button variant="secondary" className="btn-xs" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
+      </div>
+      <Button variant="danger" className="btn-block" style={{ marginTop: 6 }} onClick={() => useEditorStore.getState().deleteSelected()}>
+        <IconTrash size={13} /> Delete {single.type === 'container' ? 'card' : single.type.replace('-', ' ')}
+      </Button>
     </div>
   );
 }

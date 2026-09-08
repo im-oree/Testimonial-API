@@ -39,12 +39,16 @@ export interface Typography {
 }
 
 /**
- * Data binding (DOC 7B §7): `bindingKey` addresses a field on the review the
- * widget renders (content | authorName | rating), `property` says where the
- * value lands. The binder resolves it for preview and the public runtime.
+ * Data binding (DOC 7B §7): `bindingKey` is the id of the review field this
+ * element renders (`reviewer_name`, `review_text`, `review_rating` — legacy
+ * short names content/authorName/rating also resolve). The element never
+ * carries its own copy; the record fills it in at preview/live time.
+ * `property` says where the value lands.
  */
+export type ReviewFieldKey = 'review_text' | 'reviewer_name' | 'review_rating' | 'content' | 'authorName' | 'rating';
+
 export interface DataBinding {
-  bindingKey: 'content' | 'authorName' | 'rating';
+  bindingKey: ReviewFieldKey;
   property: string;
 }
 

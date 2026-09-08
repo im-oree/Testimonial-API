@@ -238,3 +238,52 @@ export function IconEyeOff(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconMore(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="5.4" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="18.6" r="1.5" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+export function IconSettings(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="3.1" />
+      <path d="M19 12.7a7.3 7.3 0 0 0 .06-1.4l2-1.55-2-3.46-2.36.95a7.4 7.4 0 0 0-1.21-.7L15.2 3.4h-4l-.29 2.54a7.4 7.4 0 0 0-1.2.7l-2.37-.95-2 3.46 2 1.55a7.3 7.3 0 0 0 0 1.4l-2 1.55 2 3.46 2.36-.95a7.4 7.4 0 0 0 1.21.7l.3 2.54h4l.29-2.54a7.4 7.4 0 0 0 1.2-.7l2.37.95 2-3.46-2-1.55z" />
+    </Svg>
+  );
+}
+
+export function IconSidebar(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.4" />
+      <path d="M9.2 4.5v15" />
+      <path d="M5.5 8h1.7M5.5 11h1.7M5.5 14h1.7" />
+    </Svg>
+  );
+}
+
+export function IconBuilding(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4.5 20V5.6A1.6 1.6 0 0 1 6.1 4h8.8a1.6 1.6 0 0 1 1.6 1.6V20" />
+      <path d="M16.5 9h2.1a1.4 1.4 0 0 1 1.4 1.4V20" />
+      <path d="M3.5 20h17" />
+      <path d="M8 8h1.6M8 11.4h1.6M8 14.8h1.6M12 8h1.6M12 11.4h1.6M12 14.8h1.6" />
+    </Svg>
+  );
+}
+
+export function IconLogout(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M14.5 8.5V6.6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10.8a2 2 0 0 0 2 2h6.5a2 2 0 0 0 2-2v-1.9" />
+      <path d="M10 12h10.5M17.5 9l3 3-3 3" />
+    </Svg>
+  );
+}

@@ -20,10 +20,10 @@ interface Props {
   animate?: boolean;
 }
 
-function Star({ on }: { on: boolean }) {
+function Star({ on, size }: { on: boolean; size: number }) {
   return (
-    <span className="studio-star" style={{ color: on ? '#f59e0b' : '#dbe1ec' }} aria-hidden>
-      <IconStar size={18} />
+    <span className="studio-star" style={{ color: on ? '#f59e0b' : '#dbe1ec', fontSize: size }} aria-hidden>
+      <IconStar />
     </span>
   );
 }
@@ -54,10 +54,13 @@ function ElementView({ el, record, animate }: { el: StudioElement; record?: Stud
       break;
     case 'rating-stars': {
       const value = record ? displayRating(el, record) : 0;
+      // Stars scale with the element: its height drives the glyph size so a
+      // taller rating block produces bigger stars instead of whitespace.
+      const starSize = Math.max(11, Math.min(46, Math.round((el.layout.height - 4) * 0.72)));
       inner = (
-        <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center', height: '100%' }}>
+        <span style={{ display: 'inline-flex', gap: Math.max(2, Math.round(starSize * 0.16)), alignItems: 'center', height: '100%' }}>
           {[1, 2, 3, 4, 5].map((n) => (
-            <Star key={n} on={n <= value} />
+            <Star key={n} on={n <= value} size={starSize} />
           ))}
         </span>
       );

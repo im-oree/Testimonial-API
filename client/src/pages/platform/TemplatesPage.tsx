@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { ThemeFontId, ThemePresetSummary, ThemeRadiusId } from '../../lib/types';
 import { Breadcrumbs, Button, ErrorBanner, Label, PageHeader, TextInput } from '../../components/ui';
+import { ConfirmDialog, KebabMenu } from '../../components/menu';
 
 const EMPTY = { id: '', name: '', description: '', primary: '#1b2559', accent: '#0ea5a0', radius: 'md' as ThemeRadiusId, font: 'system' as ThemeFontId };
 
@@ -163,25 +164,45 @@ export default function TemplatesPage() {
                 <span className="chip chip-approved">{t.builtin ? 'Built-in' : 'Custom'}</span>
               </div>
               <p className="muted small" style={{ margin: 0 }}>{t.description || 'No description.'}</p>
-              <div className="modal-actions">
-                {confirmDelete === t.id ? (
-                  <>
-                    <Button variant="danger" className="btn-xs" disabled={busy} onClick={() => void remove(t.id)}>Delete?</Button>
-                    <Button variant="ghost" className="btn-xs" onClick={() => setConfirmDelete(null)}>Cancel</Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="outline" className="btn-xs" onClick={() => { setDraft({ id: t.id, name: t.name, description: t.description, primary: t.primary, accent: t.accent, radius: t.radius, font: t.font }); setError(null); setNotice(null); }}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" className="btn-xs" onClick={() => setConfirmDelete(t.id)}>Delete</Button>
-                  </>
-                )}
+              <div className="row-actions" style={{ justifyContent: 'space-between' }}>
+                <Button variant="outline" className="btn-xs" onClick={() => { setDraft({ id: t.id, name: t.name, description: t.description, primary: t.primary, accent: t.accent, radius: t.radius, font: t.font }); setError(null); setNotice(null); }}>
+                  Edit
+                </Button>
+                <KebabMenu
+                  label={`Actions for ${t.name}`}
+                  actions={[
+                    {
+                      id: 'delete',
+                      label: t.builtin ? 'Delete template' : 'Delete template',
+                      danger: true,
+                      onSelect: () => setConfirmDelete(t.id),
+                    },
+                  ]}
+                />
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={confirmDelete ? 'Delete template?' : 'Delete template?'}
+        body={
+          confirmDelete ? (
+            <p style={{ margin: 0 }}>
+              <strong>{rows.find((r) => r.id === confirmDelete)?.name}</strong> will be removed from the catalogue. Products that adopted it
+              keep their current look — only the template entry disappears. This cannot be undone.
+            </p>
+          ) : null
+        }
+        confirmLabel="Delete template"
+        busy={busy}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete) void remove(confirmDelete);
+        }}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { useAuth } from '../auth';
 import type { RoleTemplateSummary, TeamMember } from '../lib/types';
 import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { Field, PasswordInput, SearchField, SelectField, TextInput } from '../components/fields';
+import { ConfirmDialog, KebabMenu } from '../components/menu';
 import { SkeletonTable } from '../components/Skeleton';
 import Modal from '../components/Modal';
 
@@ -397,6 +398,7 @@ function MemberManageModal({
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmSuspend, setConfirmSuspend] = useState(false);
 
   useEffect(() => {
     if (member) {
@@ -404,6 +406,7 @@ function MemberManageModal({
       setPassword('');
       setError(null);
       setBusy(null);
+      setConfirmSuspend(false);
     }
   }, [member]);
 
@@ -516,17 +519,46 @@ function MemberManageModal({
               <div className="modal-section-title" style={{ margin: 0 }}>
                 Account status <span className={`chip chip-${member.status}`} style={{ marginLeft: 8 }}>{member.status}</span>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Button variant="outline" className="btn-xs" disabled={busy !== null || member.status === 'active'} onClick={() => void act('status', { status: 'active' })}>
-                  {busy === 'status' ? 'Saving…' : 'Activate'}
+                  {busy === 'status' ? 'Saving…' : 'Activate access'}
                 </Button>
-                <Button variant="danger" className="btn-xs" disabled={busy !== null || member.status === 'suspended'} onClick={() => void act('status', { status: 'suspended' })}>
-                  {busy === 'status' ? 'Saving…' : 'Suspend'}
-                </Button>
+                <KebabMenu
+                  label={`More actions for ${member.name}`}
+                  actions={[
+                    {
+                      id: 'suspend',
+                      label: 'Suspend access',
+                      danger: true,
+                      disabled: busy !== null || member.status === 'suspended',
+                      onSelect: () => setConfirmSuspend(true),
+                    },
+                  ]}
+                />
               </div>
             </div>
           </>
         )}
+        <ConfirmDialog
+          open={confirmSuspend}
+          title={member ? `Suspend ${member.name}?` : 'Suspend?'}
+          body={
+            <p style={{ margin: 0 }}>
+              {member ? (
+                <>
+                  {member.name} keeps their account, but will be blocked from signing in to this workspace
+                  until an owner or manager activates them again.
+                </>
+              ) : (
+                'No member selected.'
+              )}
+            </p>
+          }
+          confirmLabel="Suspend access"
+          busy={busy !== null}
+          onCancel={() => setConfirmSuspend(false)}
+          onConfirm={() => void act('status', { status: 'suspended' })}
+        />
       </div>
     </Modal>
   );

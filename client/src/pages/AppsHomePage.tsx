@@ -6,18 +6,20 @@
  */
 import { IconPlus } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { formatDate } from '../lib/format';
 import type { AppSummary, AppsResponse } from '../lib/types';
 import CreateProductModal from '../components/CreateProductModal';
 import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager } from '../components/ui';
-import { SkeletonCards } from '../components/Skeleton';
+import { SkeletonTable } from '../components/Skeleton';
+import { KebabMenu } from '../components/menu';
 
 type Filter = 'all' | 'active' | 'paused';
 const PAGE_SIZE = 8;
 
 export default function AppsHomePage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<AppsResponse | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
@@ -86,7 +88,7 @@ export default function AppsHomePage() {
 
       {error && <ErrorBanner message={error} />}
 
-      {!data && loading && <SkeletonCards count={6} height={150} />}
+      {!data && loading && <SkeletonTable rows={4} cols={7} />}
 
       {data && (
         <>
@@ -112,7 +114,8 @@ export default function AppsHomePage() {
 
           {!loading && data.rows.length > 0 && (
             <div className="card table-card">
-              <table className="table">
+              <div className="table-scroll">
+              <table className="table" style={{ minWidth: 820 }}>
                 <thead>
                   <tr>
                     <th>Product</th>
@@ -145,16 +148,30 @@ export default function AppsHomePage() {
                       <td>{app.avgRating ?? '—'}</td>
                       <td className="muted small">{formatDate(app.createdAt)}</td>
                       <td>
-                        <div className="row-actions">
-                          <Link className="btn btn-ghost btn-xs" to={`/wall/${app.slug}`} title="Public wall for this product">
-                            Wall
-                          </Link>
-                          <Button variant="ghost" className="btn-xs" disabled={busyPause === app.id} onClick={() => void togglePause(app)}>
-                            {app.status === 'active' ? 'Pause' : 'Resume'}
-                          </Button>
+                        <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
                           <Link className="btn btn-secondary btn-xs" to={`/app/a/${app.id}/overview`}>
                             Open
                           </Link>
+                          <KebabMenu
+                            label={`Actions for ${app.name}`}
+                            actions={[
+                              { id: 'wall', label: 'Public wall', onSelect: () => navigate(`/wall/${app.slug}`) },
+                              { id: 'studio', label: 'Design studio', onSelect: () => navigate(`/app/a/${app.id}/studio`) },
+                              {
+                                id: 'pause',
+                                label: app.status === 'active' ? 'Pause product' : 'Resume product',
+                                disabled: busyPause === app.id,
+                                onSelect: () => void togglePause(app),
+                              },
+                              {
+                                id: 'copy',
+                                label: `Copy ID (${app.code})`,
+                                onSelect: () => {
+                                  void navigator.clipboard?.writeText(app.code).catch(() => undefined);
+                                },
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -162,6 +179,7 @@ export default function AppsHomePage() {
                 </tbody>
               </table>
             </div>
+              </div>
           )}
 
           {!loading && data.total > PAGE_SIZE && <Pager page={page} pageCount={Math.ceil(data.total / PAGE_SIZE)} total={data.total} onChange={gotoPage} />}

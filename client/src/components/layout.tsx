@@ -19,7 +19,10 @@ import { initials } from '../lib/format';
 import type { AppSummary, MeTenant } from '../lib/types';
 import { InlineSpinner } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
-import { IconChevronDown } from './icons';
+import {
+  IconBuilding, IconChevronDown, IconChevronLeft, IconClipboard, IconEdit, IconHome,
+  IconLayers, IconLock, IconLogout, IconPalette, IconSettings, IconStar, IconUsers,
+} from './icons';
 
 export interface NavItem {
   label: string;
@@ -27,6 +30,8 @@ export interface NavItem {
   end?: boolean;
   /** Required platform/company permission; hidden when the session lacks it. */
   perm?: string;
+  /** Optional leading glyph (shown alone when the sidebar is collapsed to a rail). */
+  icon?: ReactNode;
 }
 
 export interface NavGroup {
@@ -34,17 +39,32 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+function RowLink({ item, rail }: { item: NavItem; rail: boolean }) {
+  return (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      title={rail ? item.label : undefined}
+      className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+    >
+      {item.icon && <span className="nav-ic">{item.icon}</span>}
+      <span className="nav-label">{item.label}</span>
+    </NavLink>
+  );
+}
+
 /** A labelled nav section that can collapse to keep the sidebar from getting crowded. */
-function NavGroupBlock({ label, items }: { label?: string | null; items: NavItem[] }) {
+function NavGroupBlock({ label, items, rail }: { label?: string | null; items: NavItem[]; rail: boolean }) {
   const [open, setOpen] = useState(true);
   if (items.length === 0) return null;
-  if (!label) {
+  // Collapsed rail: sections are flattened into plain icon rows so every
+  // destination stays reachable (group toggles would trap content).
+  if (rail || !label) {
     return (
       <div className="nav-group">
         {items.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            {item.label}
-          </NavLink>
+          <RowLink key={item.to} item={item} rail={rail} />
         ))}
       </div>
     );
@@ -63,9 +83,7 @@ function NavGroupBlock({ label, items }: { label?: string | null; items: NavItem
       {open && (
         <div className="nav-group-items">
           {items.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              {item.label}
-            </NavLink>
+            <RowLink key={item.to} item={item} rail={rail} />
           ))}
         </div>
       )}
@@ -78,11 +96,15 @@ function Sidebar({
   groups,
   identity,
   extra,
+  rail,
+  onToggleRail,
 }: {
   brand: string;
   groups: NavGroup[];
   identity?: Pick<MeTenant, 'name' | 'brandColor' | 'logoUrl'> | null;
   extra?: ReactNode;
+  rail: boolean;
+  onToggleRail: (rail: boolean) => void;
 }) {
   const { user, permissions, signOut } = useAuth();
   const navigate = useNavigate();
@@ -92,11 +114,22 @@ function Sidebar({
     .filter((g) => g.items.length > 0);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${rail ? 'rail' : ''}`}>
       <div className="sidebar-brand">
         <span className="brand-dot" />
-        {brand}
+        <span className="nav-label">{brand}</span>
       </div>
+      <button
+        type="button"
+        className="rail-toggle"
+        title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={rail ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!rail}
+        onClick={() => onToggleRail(!rail)}
+      >
+        {rail ? <IconChevronLeft size={15} style={{ transform: 'rotate(180deg)' }} /> : <IconChevronLeft size={15} />}
+        {!rail && <span className="nav-label">Collapse</span>}
+      </button>
 
       {identity && (
         <div className="ws-identity">
@@ -123,7 +156,7 @@ function Sidebar({
 
       <nav className="sidebar-nav">
         {visible.map((group, gi) => (
-          <NavGroupBlock key={gi} label={group.label} items={group.items} />
+          <NavGroupBlock key={gi} label={group.label} items={group.items} rail={rail} />
         ))}
       </nav>
 
@@ -142,17 +175,21 @@ function Sidebar({
         <button
           type="button"
           className="btn btn-ghost btn-block"
+          title="Sign out"
           onClick={() => {
             signOut();
             navigate('/login', { replace: true });
           }}
         >
-          Sign out
+          {!rail && 'Sign out'}
+          {rail && <IconLogout size={16} />}
         </button>
       </div>
     </aside>
   );
 }
+
+const RAIL_KEY = 'zt.sidebar.rail';
 
 function Shell({
   brand,
@@ -171,10 +208,32 @@ function Shell({
 }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const [rail, setRail] = useState<boolean>(() => {
+    try {
+      const stored = window.localStorage.getItem(RAIL_KEY);
+      if (stored !== null) return stored === '1';
+    } catch {
+      /* ignore */
+    }
+    // Full-width pages (the design studio) start collapsed so the canvas gets
+    // the room it needs; the user can expand at any time.
+    return pathname.includes('/studio');
+  });
+
+  function toggleRail(next: boolean): void {
+    setRail(next);
+    try {
+      window.localStorage.setItem(RAIL_KEY, next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const fullBleed = pathname.includes('/studio');
 
   return (
     <div className="shell">
-      <Sidebar brand={brand} groups={groups} identity={identity} extra={sidebarExtra} />
+      <Sidebar brand={brand} groups={groups} identity={identity} extra={sidebarExtra} rail={rail} onToggleRail={toggleRail} />
       <div className="shell-main">
         {banner}
         <header className="topbar">
@@ -200,7 +259,7 @@ function Shell({
             <span className="muted small">{user?.email}</span>
           </div>
         </header>
-        <main className="content">
+        <main className={`content ${fullBleed ? 'content-full' : ''}`}>
           <ErrorBoundary resetKey={pathname}>
             <motion.div
               key={pathname}
@@ -311,23 +370,23 @@ export function AppLayout() {
   const appId = match?.[1] ?? null;
 
   const workspaceManage: NavItem[] = [
-    { label: 'Settings', to: '/app/settings', end: true },
-    { label: 'Account', to: '/app/settings/account', end: true },
-    { label: 'Team & roles', to: '/app/team', perm: 'team.manage' },
-    { label: 'Audit logs', to: '/app/audit', perm: 'audit.read' },
+    { label: 'Settings', to: '/app/settings', end: true, icon: <IconSettings size={16} /> },
+    { label: 'Account', to: '/app/settings/account', end: true, icon: <IconLock size={16} /> },
+    { label: 'Team & roles', to: '/app/team', perm: 'team.manage', icon: <IconUsers size={16} /> },
+    { label: 'Audit logs', to: '/app/audit', perm: 'audit.read', icon: <IconClipboard size={16} /> },
   ];
 
   const groups: NavGroup[] = appId
     ? [
-        { items: [{ label: 'All products', to: '/app/products' }] },
+        { items: [{ label: 'All products', to: '/app/products', icon: <IconLayers size={16} /> }] },
         {
           label: 'Product pages',
           items: [
-            { label: 'Overview', to: `/app/a/${appId}/overview`, end: true },
-            { label: 'Connect', to: `/app/a/${appId}/connect`, end: true },
-            { label: 'Testimonials', to: `/app/a/${appId}/testimonials`, end: true },
-            { label: 'Moderation', to: `/app/a/${appId}/testimonials/moderation` },
-            { label: 'Forms', to: `/app/a/${appId}/forms` },
+            { label: 'Overview', to: `/app/a/${appId}/overview`, end: true, icon: <IconHome size={16} /> },
+            { label: 'Connect', to: `/app/a/${appId}/connect`, end: true, icon: <IconEdit size={16} /> },
+            { label: 'Testimonials', to: `/app/a/${appId}/testimonials`, end: true, icon: <IconStar size={16} /> },
+            { label: 'Moderation', to: `/app/a/${appId}/testimonials/moderation`, icon: <IconClipboard size={16} /> },
+            { label: 'Forms', to: `/app/a/${appId}/forms`, icon: <IconEdit size={16} /> },
           ],
         },
         { label: 'Manage', items: workspaceManage },
@@ -335,8 +394,8 @@ export function AppLayout() {
     : [
         {
           items: [
-            { label: 'Overview', to: '/app/overview', end: true },
-            { label: 'Products', to: '/app/products', end: true },
+            { label: 'Overview', to: '/app/overview', end: true, icon: <IconHome size={16} /> },
+            { label: 'Products', to: '/app/products', end: true, icon: <IconLayers size={16} /> },
           ],
         },
         { label: 'Manage', items: workspaceManage },
@@ -360,19 +419,19 @@ export function PlatformLayout() {
     {
       label: 'Console',
       items: [
-        { label: 'Overview', to: '/platform/overview', end: true },
-        { label: 'Tenants', to: '/platform/tenants' },
+        { label: 'Overview', to: '/platform/overview', end: true, icon: <IconHome size={16} /> },
+        { label: 'Tenants', to: '/platform/tenants', icon: <IconBuilding size={16} /> },
       ],
     },
     {
       label: 'Catalogue',
-      items: [{ label: 'Theme Templates', to: '/platform/templates', end: true }],
+      items: [{ label: 'Theme Templates', to: '/platform/templates', end: true, icon: <IconPalette size={16} /> }],
     },
     {
       label: 'Team & access',
       items: [
-        { label: 'Team accounts', to: '/platform/accounts', perm: 'staff.read' },
-        { label: 'Audit Logs', to: '/platform/audit', perm: 'audit.read', end: true },
+        { label: 'Team accounts', to: '/platform/accounts', perm: 'staff.read', icon: <IconUsers size={16} /> },
+        { label: 'Audit Logs', to: '/platform/audit', perm: 'audit.read', end: true, icon: <IconClipboard size={16} /> },
       ],
     },
   ];
