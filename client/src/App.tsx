@@ -30,6 +30,7 @@ import TestimonialsPage from './pages/TestimonialsPage';
 import ModerationPage from './pages/ModerationPage';
 import FormsPage from './pages/FormsPage';
 import ConnectPage from './pages/ConnectPage';
+import EmbedPage from './pages/EmbedPage';
 import TeamPage from './pages/TeamPage';
 import AuditPage from './pages/AuditPage';
 import PublicFormPage from './pages/PublicFormPage';
@@ -87,6 +88,7 @@ function AppRoutes() {
           {/* One product = one website. Everything below is scoped to :appId. */}
           <Route path="a/:appId/overview" element={<OverviewPage />} />
           <Route path="a/:appId/connect" element={<ConnectPage />} />
+          <Route path="a/:appId/embed" element={<EmbedPage />} />
           <Route path="a/:appId/studio" element={<DesignStudioPage />} />
           <Route path="a/:appId/testimonials" element={<TestimonialsPage />} />
           <Route path="a/:appId/testimonials/moderation" element={<ModerationPage />} />

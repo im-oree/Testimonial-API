@@ -1,21 +1,17 @@
 /**
- * Product "Widget" — the heart of the product's output.
+ * Product "Widget" — pick the template your widget is built from.
  *
- * This page is where a widget gets made:
- *   1. PICK A TEMPLATE  — a visual grid of fixed-dimension, pre-designed
- *      widget templates rendered live with sample data. Every template
- *      already contains the required rating components (review text,
- *      reviewer name, rating stars) plus its own decorative extras; the
- *      dimensions are fixed so a developer knows exactly what space the
- *      embed occupies before it loads.
- *   2. EMBED EVERYWHERE  — the main output: the iframe / script snippets and
- *      the public wall URL, sized to the template. The embed renders the
- *      product's customized template with its live reviews.
+ * A paginated catalogue of fixed-dimension, pre-designed widget templates
+ * rendered live with sample data (6 per page). Every template already
+ * contains the required rating components (review text, reviewer name,
+ * rating stars) plus its own decorative extras; dimensions are fixed so a
+ * developer knows exactly what space the embed occupies before it loads.
  *
- * Customisation happens in the design studio (Widget → Customize): applying a
- * template here drops a fresh copy of it onto the product, ready to edit.
+ * From here: Apply now switches the live embed immediately, Preview &
+ * customize starts an unpublished draft in the design studio. The embed
+ * snippets and the live preview live on the Connect tab.
  */
-import { IconCheck, IconCopy, IconEdit, IconExternal } from '../components/icons';
+import { IconCheck, IconEdit } from '../components/icons';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -78,7 +74,7 @@ export default function ConnectPage() {
   const [note, setNote] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState<WidgetTemplateRow | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(() => {
     Promise.all([
@@ -153,25 +149,23 @@ export default function ConnectPage() {
     else void applyTemplate(t);
   }
 
-  async function copy(key: string, text: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(key);
-      window.setTimeout(() => setCopied((cur) => (cur === key ? null : cur)), 1600);
-    } catch {
-      window.prompt('Copy this snippet:', text);
-    }
-  }
-
   const activeTemplateId = app?.designTemplateId ?? null;
   const activeTemplate = templates?.find((t) => t.id === activeTemplateId) ?? null;
   const hasCustomDesign = (app?.studioVersion ?? 0) > 0;
-  const slug = app?.slug ?? '';
-  const origin = window.location.origin;
 
-  const iframeSnippet = `<iframe src="${origin}/wall/${slug}?embed=1" width="${activeTemplate?.width ?? 720}" height="${activeTemplate?.height ?? 560}" style="border:0;border-radius:14px;max-width:100%" title="Customer reviews" loading="lazy"></iframe>`;
-  const scriptSnippet = `<div id="zojatech-wall-${slug}"></div>\n<script src="${origin}/widget/embed.js" data-app="${slug}" async></script>`;
-  const wallUrl = `${origin}/wall/${slug}`;
+  // Pagination: 6 templates per page. Land on the page holding the active
+  // template so the current choice is what you see first.
+  const PAGE_SIZE = 6;
+  const pages = Math.max(1, Math.ceil((templates?.length ?? 0) / PAGE_SIZE));
+  const safePage = Math.min(page, pages);
+  const rows = templates?.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) ?? null;
+
+  // First render with templates loaded: open on the active template's page.
+  useEffect(() => {
+    if (!templates || !activeTemplate) return;
+    setPage(Math.floor(templates.indexOf(activeTemplate) / PAGE_SIZE) + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, activeTemplate?.id]);
 
   return (
     <div>
@@ -184,11 +178,16 @@ export default function ConnectPage() {
       />
       <PageHeader
         title="Widget"
-        subtitle="Pick a template, customise it in the studio, then embed it anywhere with one line of code."
+        subtitle="Pick the template your widget is built from — customise it in the studio, connect it on the Connect tab."
         actions={
-          <Link className="btn btn-outline" to={`/app/a/${appId}/studio`}>
-            <IconEdit size={13} /> Customize in studio
-          </Link>
+          <>
+            <Link className="btn btn-outline" to={`/app/a/${appId}/embed`}>
+              Connect it →
+            </Link>
+            <Link className="btn btn-outline" to={`/app/a/${appId}/studio`}>
+              <IconEdit size={13} /> Customize in studio
+            </Link>
+          </>
         }
       />
 
@@ -243,9 +242,9 @@ export default function ConnectPage() {
           </div>
         )}
 
-        {templates && (
+        {rows && (
           <div className="tpl-grid">
-            {templates.map((t) => {
+            {rows.map((t) => {
               const active = t.id === activeTemplateId && hasCustomDesign;
               return (
                 <div key={t.id} className={`card tpl-card ${active ? 'active' : ''}`}>
@@ -287,95 +286,31 @@ export default function ConnectPage() {
             })}
           </div>
         )}
-      </section>
 
-      {/* ---- 2 · Your embed code ------------------------------------------ */}
-      <section className="tpl-section">
-        <div className="section-head">
-          <div>
-            <h2 style={{ margin: 0 }}>Your embed code</h2>
-            <p className="muted small" style={{ margin: '2px 0 0' }}>
-              {activeTemplate || hasCustomDesign
-                ? `Sized to your design — ${activeTemplate ? `${activeTemplate.name} · ${activeTemplate.width} × ${activeTemplate.height}px` : 'your customized template'}. Paste it anywhere and your live reviews appear.`
-                : 'Pick a template above, then copy the snippet onto any website.'}
-            </p>
-          </div>
-          <Link className="btn btn-ghost btn-sm" to={`/wall/${slug}`}>
-            Preview the widget <IconExternal size={13} />
-          </Link>
-        </div>
-
-        <div className="embed-grid">
-          <div className="card embed-card">
-            <div className="embed-card-head">
-              <span className="strong small">Drop-in iframe</span>
-              <Button variant="ghost" className="btn-xs" onClick={() => void copy('iframe', iframeSnippet)}>
-                {copied === 'iframe' ? (
-                  <>
-                    <IconCheck size={12} /> Copied
-                  </>
-                ) : (
-                  <>
-                    <IconCopy size={12} /> Copy
-                  </>
-                )}
-              </Button>
-            </div>
-            <pre className="embed-code">
-              <code>{iframeSnippet}</code>
-            </pre>
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Fixed size — reserve {activeTemplate?.width ?? 720} × {activeTemplate?.height ?? 560}px and it fits first
-              time, every time.
-            </p>
-          </div>
-
-          <div className="card embed-card">
-            <div className="embed-card-head">
-              <span className="strong small">Auto-sizing script</span>
-              <Button variant="ghost" className="btn-xs" onClick={() => void copy('script', scriptSnippet)}>
-                {copied === 'script' ? (
-                  <>
-                    <IconCheck size={12} /> Copied
-                  </>
-                ) : (
-                  <>
-                    <IconCopy size={12} /> Copy
-                  </>
-                )}
-              </Button>
-            </div>
-            <pre className="embed-code">
-              <code>{scriptSnippet}</code>
-            </pre>
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Sizes itself to the template and stays in sync — design edits appear on every site embedding it.
-            </p>
-          </div>
-
-          <div className="card embed-card">
-            <div className="embed-card-head">
-              <span className="strong small">Direct link</span>
-              <Button variant="ghost" className="btn-xs" onClick={() => void copy('url', wallUrl)}>
-                {copied === 'url' ? (
-                  <>
-                    <IconCheck size={12} /> Copied
-                  </>
-                ) : (
-                  <>
-                    <IconCopy size={12} /> Copy
-                  </>
-                )}
-              </Button>
-            </div>
-            <pre className="embed-code">
-              <code>{wallUrl}</code>
-            </pre>
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              The public wall — every approved review, full page. Share it or link it from your site.
-            </p>
-          </div>
-        </div>
+        {pages > 1 && (
+          <nav className="tpl-pager" aria-label="Template pages">
+            <button type="button" className="btn btn-ghost btn-xs" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+              ‹ Prev
+            </button>
+            {Array.from({ length: pages }).map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-current={safePage === i + 1 ? 'page' : undefined}
+                className={`tpl-page-btn ${safePage === i + 1 ? 'active' : ''}`}
+                onClick={() => setPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button type="button" className="btn btn-ghost btn-xs" disabled={safePage >= pages} onClick={() => setPage(safePage + 1)}>
+              Next ›
+            </button>
+            <span className="muted small" style={{ marginLeft: 6 }}>
+              {templates?.length ?? 0} templates
+            </span>
+          </nav>
+        )}
       </section>
 
       <ConfirmDialog

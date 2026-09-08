@@ -89,10 +89,34 @@
       if (!w || !w.width || !w.height) return;
       var width = Math.round(w.width);
       var height = manualHeight ? manualHeight : Math.round(w.height);
-      frame.style.maxWidth = width + 'px';
-      frame.style.width = '100%';
-      frame.style.height = height + 'px';
+
+      // Responsive: the design keeps its aspect, but never overflows a narrow
+      // container — the whole iframe scales down proportionally instead.
+      function fit() {
+        var avail = Math.max(60, container.clientWidth || width);
+        if (avail >= width) {
+          frame.style.transform = '';
+          frame.style.width = '100%';
+          frame.style.maxWidth = width + 'px';
+          frame.style.height = height + 'px';
+          container.style.height = '';
+        } else {
+          var k = avail / width;
+          frame.style.maxWidth = 'none';
+          frame.style.width = width + 'px';
+          frame.style.height = height + 'px';
+          frame.style.transform = 'scale(' + k + ')';
+          frame.style.transformOrigin = 'top left';
+          container.style.height = Math.round(height * k) + 'px';
+        }
+      }
       frame.style.minHeight = '0px';
+      fit();
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(fit).observe(container);
+      } else {
+        window.addEventListener('resize', fit);
+      }
     })
     .catch(function () {
       /* keep the auto-height fallback */

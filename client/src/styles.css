@@ -1748,7 +1748,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 
 /* ---- Widget template picker (Connect → Widget) ---------------------------- */
 .tpl-section { margin-top: 22px; }
-.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.tpl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1240px) { .tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 780px) { .tpl-grid { grid-template-columns: 1fr; } }
 .tpl-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; transition: border-color .15s ease, box-shadow .15s ease; }
 .tpl-card:hover { border-color: var(--lav); box-shadow: var(--shadow); }
 .tpl-card.active { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(14, 165, 160, 0.14); }
@@ -1952,3 +1954,64 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 }
 .draft-banner > span:first-child { color: #3730a3; }
 .draft-banner-actions { display: inline-flex; gap: 6px; margin-left: auto; }
+
+/* ---- Template pagination --------------------------------------------------- */
+.tpl-pager { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin-top: 16px; }
+.tpl-page-btn {
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: #fff; color: #3d4470;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.tpl-page-btn:hover { border-color: #c7cdf3; background: #f6f7ff; }
+.tpl-page-btn.active { background: var(--brand, #1b2559); border-color: var(--brand, #1b2559); color: #fff; }
+
+/* ---- Connect page ----------------------------------------------------------- */
+.connect-preview {
+  position: relative; display: flex; justify-content: center; overflow: hidden;
+  border-radius: 14px; background:
+    radial-gradient(#d9dce8 1px, transparent 1px) 0 0 / 16px 16px, #eef0f6;
+}
+.connect-preview-inner { position: relative; flex: none; }
+.connect-empty { display: flex; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; }
+.connect-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 980px) { .connect-steps { grid-template-columns: 1fr; } }
+.connect-step { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; }
+.connect-step-no {
+  flex: none; width: 26px; height: 26px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #eef2ff; color: #4338ca; font-weight: 700; font-size: 13px;
+}
+
+/* ---- Wheel + stack widget behaviors ------------------------------------------ */
+.tpl-wheel { cursor: grab; touch-action: pan-y; }
+.tpl-wheel:active { cursor: grabbing; }
+.tpl-wheel-scene { position: absolute; inset: 0; perspective: 1400px; }
+.tpl-wheel-ring { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
+.tpl-wheel-card { position: absolute; top: 0; left: 0; transform-style: preserve-3d; }
+.tpl-stack { perspective: 1000px; }
+.tpl-stack-pile { position: absolute; inset: 0; transform-style: preserve-3d; }
+.tpl-stack-behind { position: absolute; top: 0; left: 0; pointer-events: none; }
+.tpl-stack-front { position: absolute; top: 0; left: 0; cursor: grab; touch-action: pan-y; border-radius: inherit; }
+.tpl-stack-front:active { cursor: grabbing; }
+
+/* ---- Login: demo accounts collapsed below the form ---------------------------- */
+.demo-access { border: 1px solid var(--border); border-radius: 12px; padding: 0 14px; background: #fbfbfe; }
+.demo-access summary {
+  list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 6px;
+  padding: 11px 0; user-select: none;
+}
+.demo-access summary::-webkit-details-marker { display: none; }
+.demo-access summary::after {
+  content: '⌄'; margin-left: auto; color: #8b91b5; font-size: 15px; line-height: 1;
+  transition: transform .18s ease;
+}
+.demo-access[open] summary::after { transform: rotate(180deg); }
+.demo-access .demo-list { padding: 2px 0 12px; }
+
+/* ---- Sidebar: icons optically aligned with their labels ------------------------ */
+.nav-link .nav-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 20px; height: 20px;
+}
+.nav-link .nav-ic svg { display: block; }

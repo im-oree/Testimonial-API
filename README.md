@@ -89,18 +89,25 @@ has its own isolated testimonials, moderation queue and public forms.
 
 The point of the app: **templated, editable widgets** you embed on any website.
 
-- **Templates** (`GET /v1/widget-templates`) — a catalogue of fixed-dimension
-  designs (Quote Card 720×560, Spotlight Hero 1200×420, Slim Strip 1200×200,
-  Rating Badge 360×320, Story Card 540×760, Bold Statement 800×600, Swipe Deck
-  640×480, Coverflow Deck 960×540, Tilt Card 560×460, Aurora Glass 720×560).
-  Every template carries the **required rating components** — `review_text`,
-  `reviewer_name`, `review_rating` — plus decorative extras (Aurora Glass
-  includes a live **GLSL shader** backdrop).
-- **Pick one** on the product's **Widget** page — *Apply now* switches the
-  embed immediately, or *Preview & customize* starts an **unpublished draft**
-  (`POST /v1/apps/:appId/widget-template/:id/draft`) and opens the studio.
-  In the studio, **Save writes the draft and Publish is the only step that
-  changes the live embed** — preview, customise and save without applying.
+- **Templates** (`GET /v1/widget-templates`) — a catalogue of 30
+  fixed-dimension designs: the classics (Quote Card, Spotlight Hero, Slim
+  Strip, Rating Badge, Story Card, Bold Statement), interaction templates
+  (Swipe Deck, Coverflow Deck, Tilt Card, Aurora Glass with a live **GLSL
+  shader** backdrop) and a **twenty-template 3D carousel family** — coverflow
+  depth fans, rotating 3D wheels and swipeable card stacks in palettes from
+  neon to editorial. Every template carries the **required rating
+  components** — `review_text`, `reviewer_name`, `review_rating`.
+- **Pick one** on the product's **Widget** page (paginated, 6 per page) —
+  *Apply now* switches the embed immediately, or *Preview & customize* starts
+  an **unpublished draft** (`POST /v1/apps/:appId/widget-template/:id/draft`)
+  and opens the studio. In the studio, **Save writes the draft and Publish is
+  the only step that changes the live embed** — preview, customise and save
+  without applying.
+- **Connect tab** — the embed hub: the live preview of whatever design the
+  product currently serves (the exact component visitors see, running real
+  reviews), step-by-step instructions and the copy-paste snippets. The
+  auto-sizing script also scales the widget down on narrow screens so a
+  fixed-dimension design never overflows its container.
 - **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
   to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
   an immersive full-bleed stage (app sidebar collapses to the icon rail, the
@@ -113,10 +120,13 @@ The point of the app: **templated, editable widgets** you embed on any website.
   executed by the live widget: **cycle** (cross-fade, one review at a time),
   **carousel** (swipeable/draggable slides with touch inertia, dots + arrows),
   **coverflow** (a 3D depth carousel that leans toward the cursor — drag it or
-  click a side card), **tilt** (a mouse-reactive 3D card with cursor glare),
-  or **marquee** (a continuous stream — direction left/right and speed
-  adjustable, pauses on hover). Auto-advance interval and a max-records cap
-  keep heavy review counts light.
+  click a side card; gap, depth and rotation adjustable on sliders),
+  **wheel** (a 3D ring of cards rotating around the vertical axis — drag to
+  spin, tilts with the cursor), **stack** (a deck — flick the top card aside
+  and the next review swings in), **tilt** (a mouse-reactive 3D card with
+  cursor glare), or **marquee** (a continuous stream — direction left/right
+  and speed adjustable, pauses on hover). Auto-advance interval and a
+  max-records cap keep heavy review counts light.
 - **Embed it** — the Widget page hands you the drop-in iframe and auto-sizing
   script. The embed (`/widget/embed.js`) sizes itself to the template's exact
   dimensions, and the wall inside renders the product's saved schema with its

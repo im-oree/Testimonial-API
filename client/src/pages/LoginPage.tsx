@@ -143,18 +143,21 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <hr className="divider" />
-        <p className="muted small demo-hint">
-          <strong>Demo access</strong> — local in-memory backend. Pick an account to sign in instantly:
-        </p>
-        <div className="demo-list">
-          {DEMO_ACCOUNTS.map((account) => (
-            <Button key={account.email} variant="secondary" type="button" disabled={busy} onClick={() => demoSignIn(account)}>
-              <span className="demo-btn-main">{account.label}</span>
-              <span className="demo-btn-sub">{account.email} · {account.password}</span>
-            </Button>
-          ))}
-        </div>
+        {/* Demo accounts stay out of the way: collapsed below the form. */}
+        <details className="demo-access">
+          <summary>
+            <span className="strong small">Demo accounts</span>
+            <span className="muted small"> — one-click sign-in for exploring</span>
+          </summary>
+          <div className="demo-list">
+            {DEMO_ACCOUNTS.map((account) => (
+              <Button key={account.email} variant="secondary" type="button" disabled={busy} onClick={() => demoSignIn(account)}>
+                <span className="demo-btn-main">{account.label}</span>
+                <span className="demo-btn-sub">{account.email} · {account.password}</span>
+              </Button>
+            ))}
+          </div>
+        </details>
       </div>
     </div>
   );

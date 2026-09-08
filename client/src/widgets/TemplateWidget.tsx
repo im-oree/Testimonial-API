@@ -11,7 +11,12 @@
  *              arrows and auto-advance
  *   · coverflow a 3D depth carousel — cards fan out in perspective, the
  *              whole scene leans toward the cursor, drag or click a side
- *              card to bring it front
+ *              card to bring it front (gap, depth and rotation adjustable
+ *              in the studio)
+ *   · wheel     a 3D ring of cards rotating around the vertical axis —
+ *              drag to spin, the scene tilts with the cursor
+ *   · stack     a deck of cards — drag the top card aside (or wait) and
+ *              the next review swings in
  *   · tilt      a mouse-reactive 3D card — leans and catches a glare under
  *              the cursor, springs back on leave, cycles reviews
  *   · marquee   a continuous stream in the template's own design — direction
@@ -130,7 +135,17 @@ export function TemplateWidget({
 
   // ---- Coverflow: 3D depth carousel with mouse-parallax.
   if (behavior.mode === 'coverflow' && limited.length > 1) {
-    return <CoverflowWidget schema={schema} slides={limited} index={safeIndex} onIndex={setIndex} paused={paused} hoverProps={hoverProps} ctaHref={ctaHref} />;
+    return <CoverflowWidget schema={schema} slides={limited} behavior={behavior} index={safeIndex} onIndex={setIndex} paused={paused} hoverProps={hoverProps} ctaHref={ctaHref} />;
+  }
+
+  // ---- Wheel: a 3D ring of cards rotating around the vertical axis.
+  if (behavior.mode === 'wheel' && limited.length > 1) {
+    return <WheelWidget schema={schema} slides={limited} index={safeIndex} onIndex={setIndex} paused={paused} hoverProps={hoverProps} ctaHref={ctaHref} />;
+  }
+
+  // ---- Stack: a deck — the top card swings away to reveal the next review.
+  if (behavior.mode === 'stack' && limited.length > 1) {
+    return <StackWidget schema={schema} slides={limited} index={safeIndex} onIndex={setIndex} paused={paused} hoverProps={hoverProps} ctaHref={ctaHref} />;
   }
 
   // ---- Tilt: a mouse-reactive 3D card that cycles reviews.
@@ -248,6 +263,7 @@ function CarouselWidget({
 function CoverflowWidget({
   schema,
   slides,
+  behavior,
   index,
   onIndex,
   paused,
@@ -256,6 +272,7 @@ function CoverflowWidget({
 }: {
   schema: StudioSchema;
   slides: Array<StudioRecord | null>;
+  behavior: WidgetBehavior;
   index: number;
   onIndex: (i: number) => void;
   paused: boolean;
@@ -305,14 +322,19 @@ function CoverflowWidget({
     dragX.set(0);
   }
 
+  // Tuning comes from the studio's behavior panel: card gap, z-depth and
+  // side rotation are all adjustable per design.
+  const gap = Math.min(w * Math.max(0.1, behavior.spacing ?? 0.42), 340);
+  const depth = Math.max(30, behavior.depth ?? 190);
+  const maxAngle = Math.min(70, Math.max(6, behavior.angle ?? 48));
+
   function slideTransform(offset: number): string {
     const abs = Math.abs(offset);
-    const spacing = Math.min(w * 0.42, 340);
     const sign = offset < 0 ? -1 : 1;
     return [
-      `translateX(${offset * spacing}px)`,
-      `translateZ(${-abs * 190}px)`,
-      `rotateY(${sign * Math.min(48, 16 + abs * 14)}deg)`,
+      `translateX(${offset * gap}px)`,
+      `translateZ(${-abs * depth}px)`,
+      `rotateY(${sign * Math.min(maxAngle, 16 + abs * 14)}deg)`,
       `scale(${Math.max(0.62, 1 - abs * 0.14)})`,
     ].join(' ');
   }
@@ -460,6 +482,208 @@ function TiltWidget({
           <Dots count={slides.length} index={safeIndex} onPick={onIndex} />
         </>
       )}
+      {paused && <span className="visually-hidden">Paused</span>}
+    </div>
+  );
+}
+
+/**
+ * Wheel — a 3D ring of cards rotating around the vertical axis. Cards sit on
+ * a cylinder (rotateY(i·step) translateZ(radius)); the ring rotates to bring
+ * the active card front. Drag to spin, hover to pause, cursor to tilt.
+ */
+function WheelWidget({
+  schema,
+  slides,
+  index,
+  onIndex,
+  paused,
+  hoverProps,
+  ctaHref,
+}: {
+  schema: StudioSchema;
+  slides: Array<StudioRecord | null>;
+  index: number;
+  onIndex: (i: number) => void;
+  paused: boolean;
+  hoverProps: HoverProps;
+  ctaHref: string | null;
+}) {
+  const w = schema.canvas.width;
+  const h = schema.canvas.height;
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const n = slides.length;
+  const step = 360 / n;
+  // Radius so neighbouring cards just touch: (w/2) / tan(π/n).
+  const radius = Math.round(w / 2 / Math.tan(Math.PI / n));
+
+  const rotY = useMotionValue(0);
+  const rotRef = useRef(0);
+  const spring = { type: 'spring', stiffness: 90, damping: 18 } as const;
+
+  // Arrows / dots / auto-advance rotate the ring to the active card.
+  useEffect(() => {
+    rotRef.current = -index * step;
+    animate(rotY, rotRef.current, spring);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, step]);
+
+  // Scene parallax: the ring leans toward the cursor.
+  const sceneRx = useSpring(0, { stiffness: 120, damping: 18 });
+  const sceneRy = useSpring(0, { stiffness: 120, damping: 18 });
+  const dragRef = useRef<{ x: number; base: number } | null>(null);
+
+  function onPointerDown(e: React.PointerEvent): void {
+    if (e.button !== 0) return;
+    dragRef.current = { x: e.clientX, base: rotRef.current };
+  }
+  function onPointerMove(e: React.PointerEvent): void {
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (rect) {
+      sceneRy.set(((e.clientX - rect.left) / rect.width - 0.5) * 10);
+      sceneRx.set(-((e.clientY - rect.top) / rect.height - 0.5) * 6);
+    }
+    const d = dragRef.current;
+    if (!d) return;
+    rotY.set(d.base + (e.clientX - d.x) * 0.25);
+  }
+  function onPointerUp(e: React.PointerEvent): void {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    const dist = e.clientX - d.x;
+    if (dist < -60) onIndex((index + 1) % n);
+    else if (dist > 60) onIndex((index - 1 + n) % n);
+    else {
+      rotRef.current = -index * step;
+      animate(rotY, rotRef.current, spring);
+    }
+  }
+  function onPointerLeave(): void {
+    sceneRx.set(0);
+    sceneRy.set(0);
+    dragRef.current = null;
+    rotRef.current = -index * step;
+    animate(rotY, rotRef.current, spring);
+  }
+
+  const go = (dir: 1 | -1): void => onIndex((index + dir + n) % n);
+
+  return (
+    <div
+      ref={stageRef}
+      className="tpl-widget tpl-wheel"
+      style={{ width: w, height: h }}
+      {...hoverProps}
+      role="region"
+      aria-label={`Customer reviews — ${n} reviews on a 3D wheel, drag to spin`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
+    >
+      <motion.div className="tpl-wheel-scene" style={{ rotateX: sceneRx, rotateY: sceneRy }}>
+        <motion.div className="tpl-wheel-ring" style={{ rotateY: rotY }}>
+          {slides.map((r, i) => (
+            <div
+              key={i}
+              className={`tpl-wheel-card ${i === index ? 'is-active' : ''}`}
+              style={{ width: w, height: h, transform: `rotateY(${i * step}deg) translateZ(${radius}px)`, backfaceVisibility: 'hidden' }}
+              onClick={() => {
+                if (Math.abs(dragRef.current?.x ?? 0) >= 0 && i !== index && !dragRef.current) onIndex(i);
+              }}
+            >
+              <SchemaSurface schema={schema} record={r} animate ctaHref={i === index ? ctaHref : null} />
+            </div>
+          ))}
+        </motion.div>
+      </motion.div>
+      <Arrow side="prev" onClick={() => go(-1)} />
+      <Arrow side="next" onClick={() => go(1)} />
+      <Dots count={n} index={index} onPick={onIndex} />
+      {paused && <span className="visually-hidden">Paused</span>}
+    </div>
+  );
+}
+
+/**
+ * Stack — a deck of cards. The top card can be dragged aside (either
+ * direction) and swings away; the next review is already waiting behind it,
+ * slightly smaller and deeper, and steps forward.
+ */
+function StackWidget({
+  schema,
+  slides,
+  index,
+  onIndex,
+  paused,
+  hoverProps,
+  ctaHref,
+}: {
+  schema: StudioSchema;
+  slides: Array<StudioRecord | null>;
+  index: number;
+  onIndex: (i: number) => void;
+  paused: boolean;
+  hoverProps: HoverProps;
+  ctaHref: string | null;
+}) {
+  const w = schema.canvas.width;
+  const h = schema.canvas.height;
+  const n = slides.length;
+  const go = (dir: 1 | -1): void => onIndex((index + dir + n) % n);
+
+  return (
+    <div
+      className="tpl-widget tpl-stack"
+      style={{ width: w, height: h }}
+      {...hoverProps}
+      role="region"
+      aria-label={`Customer reviews — ${n} reviews in a deck, swipe the top card`}
+    >
+      <div className="tpl-stack-pile">
+        {/* Cards waiting behind: deeper and smaller for every step back. */}
+        {[3, 2, 1].map((k) => {
+          const i = (index + k) % n;
+          return (
+            <div
+              key={k}
+              className="tpl-stack-behind"
+              style={{
+                width: w,
+                height: h,
+                zIndex: 20 - k,
+                transform: `translateY(${k * 14}px) scale(${1 - k * 0.05}) translateZ(${-k * 80}px)`,
+                filter: `brightness(${1 - k * 0.12})`,
+              }}
+              aria-hidden={k > 2}
+            >
+              <SchemaSurface schema={schema} record={slides[i]} />
+            </div>
+          );
+        })}
+        {/* The top card: draggable, swings away when dismissed. */}
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={index}
+            className="tpl-stack-front"
+            style={{ width: w, height: h, zIndex: 30 }}
+            drag
+            dragConstraints={{ left: -70, right: 70, top: -24, bottom: 24 }}
+            dragElastic={0.55}
+            onDragEnd={(_e, info) => {
+              if (Math.abs(info.offset.x) > 80 || Math.abs(info.velocity.x) > 420) onIndex((index + 1) % n);
+            }}
+            exit={{ x: 340, rotate: 14, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 26 }}
+          >
+            <SchemaSurface schema={schema} record={slides[index]} animate ctaHref={ctaHref} />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      <Arrow side="prev" onClick={() => go(-1)} />
+      <Arrow side="next" onClick={() => go(1)} />
+      <Dots count={n} index={index} onPick={onIndex} />
       {paused && <span className="visually-hidden">Paused</span>}
     </div>
   );

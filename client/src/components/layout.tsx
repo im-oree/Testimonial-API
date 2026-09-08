@@ -21,7 +21,7 @@ import { useEditorStore } from '../design-studio/editor-store';
 import { InlineSpinner } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import {
-  IconBuilding, IconChevronDown, IconChevronLeft, IconClipboard, IconEdit, IconHome,
+  IconBuilding, IconChevronDown, IconChevronLeft, IconClipboard, IconEdit, IconExternal, IconHome,
   IconLayers, IconLock, IconLogout, IconPalette, IconSettings, IconStar, IconUsers,
 } from './icons';
 
@@ -409,6 +409,7 @@ export function AppLayout() {
           items: [
             { label: 'Overview', to: `/app/a/${appId}/overview`, end: true, icon: <IconHome size={16} /> },
             { label: 'Widget', to: `/app/a/${appId}/connect`, end: true, icon: <IconEdit size={16} /> },
+            { label: 'Connect', to: `/app/a/${appId}/embed`, end: true, icon: <IconExternal size={16} /> },
             { label: 'Testimonials', to: `/app/a/${appId}/testimonials`, end: true, icon: <IconStar size={16} /> },
             { label: 'Moderation', to: `/app/a/${appId}/testimonials/moderation`, icon: <IconClipboard size={16} /> },
             { label: 'Forms', to: `/app/a/${appId}/forms`, icon: <IconEdit size={16} /> },

@@ -24,7 +24,7 @@ import { useEditorStore } from '../design-studio/editor-store';
 import { SchemaSurface } from '../design-studio/runtime';
 import { TemplateWidget } from '../widgets/TemplateWidget';
 import { snapBox, type SnapGuide } from '../design-studio/snap-engine';
-import { MIN_SIZE, SHADER_PRESETS, type ShaderPreset, type WidgetBehavior } from '../design-studio/types';
+import { DEFAULT_BEHAVIOR, MIN_SIZE, SHADER_PRESETS, type ShaderPreset, type WidgetBehavior } from '../design-studio/types';
 import { elementToCSS } from '../design-studio/css';
 import { ANIMATION_PRESETS } from '../design-studio/animation-presets';
 import { boundFieldId, boundValue, displayText, FIELD_DEFS, fieldDefOf } from '../design-studio/data-binder';
@@ -386,7 +386,7 @@ export default function DesignStudioPage() {
   }
   if (!schema) return null;
 
-  const behavior: WidgetBehavior = { mode: 'cycle', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0, ...(schema.behavior ?? {}) };
+  const behavior: WidgetBehavior = { ...DEFAULT_BEHAVIOR, ...(schema.behavior ?? {}) };
 
   return (
     <div className="studio-page">
@@ -807,7 +807,7 @@ function PropertiesPanel({ onDeleteSelected }: { onDeleteSelected: () => void })
   // ---- Nothing selected: the widget itself (design + live behavior).
   if (sel.length === 0) {
     const st = useEditorStore.getState;
-    const b = { mode: 'cycle', autoPlay: true, intervalSec: 6, pauseOnHover: true, direction: 'left', speedPx: 60, maxRecords: 0, ...(schema.behavior ?? {}) } as WidgetBehavior;
+    const b: WidgetBehavior = { ...DEFAULT_BEHAVIOR, ...(schema.behavior ?? {}) };
     const setB = (patch: Partial<WidgetBehavior>): void => st().updateBehavior(patch);
     return (
       <div className="studio-props">
@@ -843,10 +843,25 @@ function PropertiesPanel({ onDeleteSelected }: { onDeleteSelected: () => void })
             <option value="cycle">Cycle — one review at a time (cross-fade)</option>
             <option value="carousel">Carousel — swipeable / draggable slides</option>
             <option value="coverflow">Coverflow — 3D depth carousel, leans with the cursor</option>
+            <option value="wheel">Wheel — 3D rotating ring of cards</option>
+            <option value="stack">Stack — swipe the top card away</option>
             <option value="tilt">Tilt — mouse-reactive 3D card</option>
             <option value="marquee">Marquee — continuous stream</option>
           </SelectField>
         </Field>
+        {b.mode === 'coverflow' && (
+          <div className="stack" style={{ gap: 6 }}>
+            <Field label={`Card gap · ${b.spacing.toFixed(2)}×`}>
+              <input className="f-range-slider" type="range" min={0.15} max={0.8} step={0.05} value={b.spacing} onChange={(e) => setB({ spacing: Number(e.target.value) })} />
+            </Field>
+            <Field label={`Depth · ${b.depth}px`}>
+              <input className="f-range-slider" type="range" min={40} max={400} step={10} value={b.depth} onChange={(e) => setB({ depth: Number(e.target.value) })} />
+            </Field>
+            <Field label={`Rotation · ${b.angle}°`}>
+              <input className="f-range-slider" type="range" min={10} max={60} step={2} value={b.angle} onChange={(e) => setB({ angle: Number(e.target.value) })} />
+            </Field>
+          </div>
+        )}
         {b.mode !== 'marquee' && (
           <>
             <Field label="Auto-advance">

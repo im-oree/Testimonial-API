@@ -104,10 +104,11 @@ export interface WidgetBehavior {
   /**
    * cycle = one at a time cross-fade · carousel = swipeable slides ·
    * marquee = continuous stream · coverflow = 3D depth carousel with
-   * mouse-parallax · tilt = single mouse-reactive 3D card.
+   * mouse-parallax · tilt = single mouse-reactive 3D card ·
+   * wheel = 3D rotating ring of cards · stack = swipe the top card away.
    */
-  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt';
-  /** Auto-advance (cycle/carousel). */
+  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt' | 'wheel' | 'stack';
+  /** Auto-advance (every mode except marquee). */
   autoPlay: boolean;
   /** Seconds each review stays on screen. */
   intervalSec: number;
@@ -118,6 +119,12 @@ export interface WidgetBehavior {
   speedPx: number;
   /** How many reviews the widget includes (0 = all). */
   maxRecords: number;
+  /** Coverflow: card gap as a share of the card width (0.15–0.8). */
+  spacing: number;
+  /** Coverflow: z-depth each step is pushed back, px. */
+  depth: number;
+  /** Coverflow: maximum side rotation, degrees. */
+  angle: number;
 }
 
 /** Sensible defaults for designs saved before behaviors existed. */
@@ -129,6 +136,9 @@ export const DEFAULT_BEHAVIOR: WidgetBehavior = {
   direction: 'left',
   speedPx: 60,
   maxRecords: 0,
+  spacing: 0.42,
+  depth: 190,
+  angle: 48,
 };
 
 /** One versioned, editable design — the root object the store edits. */

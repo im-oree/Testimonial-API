@@ -51,13 +51,17 @@ export interface TemplateSchema {
  * carousel, or stream a marquee.
  */
 export interface TemplateBehavior {
-  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt';
+  mode: 'cycle' | 'carousel' | 'marquee' | 'coverflow' | 'tilt' | 'wheel' | 'stack';
   autoPlay: boolean;
   intervalSec: number;
   pauseOnHover: boolean;
   direction: 'left' | 'right';
   speedPx: number;
   maxRecords: number;
+  /** Coverflow tuning (optional — the studio slider values): card gap × card width, z-depth per step, max side rotation. */
+  spacing?: number;
+  depth?: number;
+  angle?: number;
 }
 
 export interface WidgetTemplate {
@@ -99,6 +103,260 @@ function el(p: Partial<TemplateElement> & Pick<TemplateElement, 'id' | 'type' | 
 
 const SAMPLE_QUOTE = 'The embed was live on our site before lunch and reviews started arriving the same day.';
 const SAMPLE_AUTHOR = 'Ada Okafor';
+
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * The 3D carousel family — twenty motion-first templates generated from
+ * compact specs. Every one keeps the required rating components; the visual
+ * variety comes from the layout variant, the palette and the behavior
+ * (coverflow depth fans, rotating 3D wheels, swipeable stacks).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+type CarouselMode = 'coverflow' | 'wheel' | 'stack' | 'carousel';
+type LayoutVariant = 'focus' | 'editorial' | 'split' | 'wide';
+
+interface CarouselSpec {
+  id: string;
+  name: string;
+  blurb: string;
+  mode: CarouselMode;
+  variant: LayoutVariant;
+  w: number;
+  h: number;
+  canvas: string;
+  card: string;
+  cardOpacity?: number;
+  ink: string;
+  sub: string;
+  accent: string;
+  intervalSec?: number;
+  maxRecords?: number;
+  spacing?: number;
+  depth?: number;
+  angle?: number;
+}
+
+const CAROUSEL_SPECS: CarouselSpec[] = [
+  { id: 'prism-flow', name: 'Prism Flow', blurb: 'Violet glass cards fan out in 3D and lean toward the cursor. Drag the row or click a side card.', mode: 'coverflow', variant: 'focus', w: 900, h: 520, canvas: '#120b26', card: '#1d1440', cardOpacity: 0.94, ink: '#ede9fe', sub: '#8b7fc7', accent: '#a78bfa', spacing: 0.36, depth: 220, angle: 44 },
+  { id: 'sunset-deck', name: 'Sunset Deck', blurb: 'Warm amber side panel, coral cards fanned in depth — a friendly coverflow for consumer brands.', mode: 'coverflow', variant: 'split', w: 860, h: 500, canvas: '#fff7ed', card: '#ffffff', ink: '#431407', sub: '#b45309', accent: '#ea580c', spacing: 0.44, depth: 180, angle: 50 },
+  { id: 'mint-editorial', name: 'Mint Editorial', blurb: 'A quiet editorial layout — big left-aligned quote, thin rule, cards gliding in 3D depth.', mode: 'coverflow', variant: 'editorial', w: 820, h: 500, canvas: '#f0fdf9', card: '#ffffff', ink: '#134e4a', sub: '#14b8a6', accent: '#0d9488' },
+  { id: 'mono-focus', name: 'Mono Focus', blurb: 'Monochrome slate with one accent — the 3D fan does the talking. Tunes cleanly to any brand.', mode: 'coverflow', variant: 'focus', w: 780, h: 520, canvas: '#f1f2f6', card: '#ffffff', ink: '#0f172a', sub: '#64748b', accent: '#0f172a', spacing: 0.4, depth: 200, angle: 46 },
+  { id: 'ocean-depth', name: 'Ocean Depth', blurb: 'Deep-sea glass: translucent cards over navy, fanning far back in z-depth as they recede.', mode: 'coverflow', variant: 'focus', w: 880, h: 540, canvas: '#04121f', card: '#0c2a3f', cardOpacity: 0.9, ink: '#e0f2fe', sub: '#7da7c4', accent: '#38bdf8', spacing: 0.46, depth: 260, angle: 52 },
+  { id: 'candy-fan', name: 'Candy Fan', blurb: 'A compact pink fan — small footprint, big personality, all the 3D controls in the studio.', mode: 'coverflow', variant: 'focus', w: 640, h: 460, canvas: '#fdf2f8', card: '#ffffff', ink: '#500724', sub: '#be185d', accent: '#ec4899', spacing: 0.34, depth: 150, angle: 42 },
+  { id: 'forest-lean', name: 'Forest Lean', blurb: 'A wide evergreen banner whose review cards lean and drift apart in perspective.', mode: 'coverflow', variant: 'wide', w: 960, h: 460, canvas: '#f7faf7', card: '#ffffff', ink: '#14281d', sub: '#4d7c0f', accent: '#16a34a', spacing: 0.4, depth: 190, angle: 46 },
+  { id: 'royal-arc', name: 'Royal Arc', blurb: 'Royal purple and gold — cards arc around a centered quote like exhibits in a gallery.', mode: 'coverflow', variant: 'focus', w: 820, h: 540, canvas: '#1a1033', card: '#251a47', cardOpacity: 0.95, ink: '#f5f3ff', sub: '#9d8bd6', accent: '#fbbf24', spacing: 0.42, depth: 210, angle: 48 },
+  { id: 'neon-orbit', name: 'Neon Orbit', blurb: 'Cards ride a glowing 3D ring that spins toward whoever is reading. Drag it — it has momentum.', mode: 'wheel', variant: 'focus', w: 900, h: 560, canvas: '#0a0a12', card: '#141428', cardOpacity: 0.96, ink: '#e4e4ff', sub: '#6ee7ff', accent: '#22d3ee' },
+  { id: 'cobalt-ring', name: 'Cobalt Ring', blurb: 'A cobalt carousel wheel — steady rotation, cursor parallax, dots to jump anywhere.', mode: 'wheel', variant: 'focus', w: 880, h: 540, canvas: '#f4f7ff', card: '#ffffff', ink: '#17255c', sub: '#3b82f6', accent: '#2563eb' },
+  { id: 'sand-rotate', name: 'Sand Rotate', blurb: 'Warm sand tones on a light ring — an approachable 3D carousel for portfolio sites.', mode: 'wheel', variant: 'editorial', w: 840, h: 520, canvas: '#fefce8', card: '#ffffff', ink: '#422006', sub: '#a16207', accent: '#d97706' },
+  { id: 'midnight-ring', name: 'Midnight Ring', blurb: 'The night version — dark ring, silver text, cards catching light as they rotate to the front.', mode: 'wheel', variant: 'focus', w: 900, h: 560, canvas: '#090d1a', card: '#131a2e', cardOpacity: 0.95, ink: '#e8ecf8', sub: '#8593b8', accent: '#818cf8' },
+  { id: 'teal-orbit', name: 'Teal Orbit', blurb: 'A compact teal wheel — tidy on sidebars and footers, still fully 3D and draggable.', mode: 'wheel', variant: 'focus', w: 660, h: 480, canvas: '#f0fdfa', card: '#ffffff', ink: '#134e4a', sub: '#0d9488', accent: '#14b8a6' },
+  { id: 'violet-ring', name: 'Violet Ring', blurb: 'Violet cards orbit on a wide stage — the ring tilts with the cursor like a gyroscope.', mode: 'wheel', variant: 'wide', w: 940, h: 520, canvas: '#1c1240', card: '#2a1d5c', cardOpacity: 0.94, ink: '#f3efff', sub: '#a996e8', accent: '#c084fc' },
+  { id: 'paper-stack', name: 'Paper Stack', blurb: 'A neat paper deck — drag the top card off and the next review steps forward.', mode: 'stack', variant: 'editorial', w: 720, h: 520, canvas: '#faf9f6', card: '#ffffff', ink: '#292524', sub: '#a8a29e', accent: '#f59e0b' },
+  { id: 'slate-deck', name: 'Slate Deck', blurb: 'A dark card deck with spring physics — swipe the front card either way to deal the next.', mode: 'stack', variant: 'focus', w: 700, h: 500, canvas: '#111827', card: '#1f2937', cardOpacity: 0.97, ink: '#f9fafb', sub: '#9ca3af', accent: '#34d399' },
+  { id: 'coral-stack', name: 'Coral Stack', blurb: 'Coral-toned stack with soft shadows — playful, compact, and touch-friendly.', mode: 'stack', variant: 'focus', w: 600, h: 440, canvas: '#fff5f2', card: '#ffffff', ink: '#4c0519', sub: '#fb7185', accent: '#f43f5e' },
+  { id: 'gold-stack', name: 'Gold Stack', blurb: 'Charcoal and gold — premium cards stacked with depth, dismissed with a flick.', mode: 'stack', variant: 'focus', w: 720, h: 540, canvas: '#171410', card: '#241f18', cardOpacity: 0.96, ink: '#faf6ea', sub: '#b9a97e', accent: '#eab308' },
+  { id: 'drift-strip', name: 'Drift Strip', blurb: 'A low, wide strip that swipes horizontally — made for page footers and feature rows.', mode: 'carousel', variant: 'wide', w: 1000, h: 380, canvas: '#f8fafc', card: '#ffffff', ink: '#0f172a', sub: '#64748b', accent: '#0ea5e9' },
+  { id: 'pulse-deck', name: 'Pulse Deck', blurb: 'Indigo swipe deck with fling inertia — flick through reviews one card at a time.', mode: 'carousel', variant: 'focus', w: 660, h: 480, canvas: '#eef2ff', card: '#ffffff', ink: '#312e81', sub: '#818cf8', accent: '#4f46e5' },
+];
+
+/** Layout variants — each builds the element list for one spec. */
+function carouselElements(s: CarouselSpec): TemplateElement[] {
+  const { w, h } = s;
+  const shortQuote = 'Support that actually answers. This deck of reviews runs itself.';
+
+  if (s.variant === 'editorial') {
+    const mx = Math.round(w * 0.09);
+    return [
+      el({
+        id: `el_${s.id}_stars`, type: 'rating-stars', name: 'Rating', layout: { x: mx, y: Math.round(h * 0.14), width: 120, height: 28, z: 10 },
+        binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+      }),
+      el({
+        id: `el_${s.id}_quote`, type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+        layout: { x: mx, y: Math.round(h * 0.26), width: Math.round(w * 0.82), height: Math.round(h * 0.38), z: 10 },
+        typography: { fontSize: Math.round(Math.min(30, w / 28)), fontWeight: 400, color: s.ink, align: 'left' },
+        binding: { bindingKey: 'review_text', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+      }),
+      el({
+        id: `el_${s.id}_rule`, type: 'container', name: 'Accent rule', layout: { x: mx, y: Math.round(h * 0.68), width: 46, height: 3, z: 10 },
+        style: { background: s.accent, radius: 2, opacity: 1 },
+      }),
+      el({
+        id: `el_${s.id}_author`, type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+        layout: { x: mx, y: Math.round(h * 0.72), width: Math.round(w * 0.5), height: 26, z: 10 },
+        typography: { fontSize: 16, fontWeight: 700, color: s.ink, align: 'left' },
+        binding: { bindingKey: 'reviewer_name', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 500, delayMs: 140 },
+      }),
+      el({
+        id: `el_${s.id}_hint`, type: 'text', name: 'Hint', text: 'Verified customer review',
+        layout: { x: mx, y: Math.round(h * 0.72) + 30, width: Math.round(w * 0.5), height: 18, z: 10 },
+        typography: { fontSize: 11, fontWeight: 400, color: s.sub, align: 'left' },
+      }),
+    ];
+  }
+
+  if (s.variant === 'split') {
+    const panelW = Math.round(w * 0.34);
+    return [
+      el({
+        id: `el_${s.id}_panel`, type: 'container', name: 'Side panel', layout: { x: 0, y: 0, width: panelW, height: h, z: 1 },
+        style: { background: s.accent, radius: 0, opacity: 1 },
+      }),
+      el({
+        id: `el_${s.id}_eyebrow`, type: 'text', name: 'Eyebrow', text: 'CUSTOMER STORIES',
+        layout: { x: Math.round(panelW * 0.14), y: Math.round(h * 0.2), width: Math.round(panelW * 0.75), height: 18, z: 10 },
+        typography: { fontSize: 11, fontWeight: 700, color: '#ffffff', align: 'left' },
+      }),
+      el({
+        id: `el_${s.id}_stars`, type: 'rating-stars', name: 'Rating', layout: { x: Math.round(panelW * 0.14), y: Math.round(h * 0.28), width: 120, height: 28, z: 10 },
+        binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+      }),
+      el({
+        id: `el_${s.id}_author`, type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+        layout: { x: Math.round(panelW * 0.14), y: Math.round(h * 0.4), width: Math.round(panelW * 0.75), height: 26, z: 10 },
+        typography: { fontSize: 17, fontWeight: 700, color: '#ffffff', align: 'left' },
+        binding: { bindingKey: 'reviewer_name', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 500, delayMs: 120 },
+      }),
+      el({
+        id: `el_${s.id}_card`, type: 'container', name: 'Card', layout: { x: panelW + Math.round(w * 0.05), y: Math.round(h * 0.12), width: Math.round(w * 0.94) - panelW - Math.round(w * 0.1), height: Math.round(h * 0.76), z: 5 },
+        style: { background: s.card, radius: 22, opacity: s.cardOpacity ?? 1 },
+      }),
+      el({
+        id: `el_${s.id}_quote`, type: 'text', name: 'Review', text: shortQuote,
+        layout: { x: panelW + Math.round(w * 0.09), y: Math.round(h * 0.26), width: Math.round(w * 0.94) - panelW - Math.round(w * 0.18), height: Math.round(h * 0.44), z: 10 },
+        typography: { fontSize: 20, fontWeight: 400, color: s.ink, align: 'left' },
+        binding: { bindingKey: 'review_text', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+      }),
+      el({
+        id: `el_${s.id}_hint`, type: 'text', name: 'Hint', text: 'Drag the deck to browse',
+        layout: { x: panelW + Math.round(w * 0.09), y: Math.round(h * 0.74), width: 260, height: 18, z: 10 },
+        typography: { fontSize: 11, fontWeight: 400, color: s.sub, align: 'left' },
+      }),
+    ];
+  }
+
+  if (s.variant === 'wide') {
+    const mx = Math.round(w * 0.05);
+    const cardW = Math.round(w * 0.9);
+    return [
+      el({
+        id: `el_${s.id}_card`, type: 'container', name: 'Card', layout: { x: mx, y: Math.round(h * 0.08), width: cardW, height: Math.round(h * 0.8), z: 1 },
+        style: { background: s.card, radius: 22, opacity: s.cardOpacity ?? 1 },
+      }),
+      el({
+        id: `el_${s.id}_stars`, type: 'rating-stars', name: 'Rating', layout: { x: mx + Math.round(cardW * 0.06), y: Math.round(h * 0.22), width: 120, height: 28, z: 10 },
+        binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+      }),
+      el({
+        id: `el_${s.id}_quote`, type: 'text', name: 'Review', text: shortQuote,
+        layout: { x: mx + Math.round(cardW * 0.06), y: Math.round(h * 0.34), width: Math.round(cardW * 0.6), height: Math.round(h * 0.36), z: 10 },
+        typography: { fontSize: 21, fontWeight: 400, color: s.ink, align: 'left' },
+        binding: { bindingKey: 'review_text', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+      }),
+      el({
+        id: `el_${s.id}_author`, type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+        layout: { x: mx + Math.round(cardW * 0.68), y: Math.round(h * 0.62), width: Math.round(cardW * 0.28), height: 24, z: 10 },
+        typography: { fontSize: 15, fontWeight: 700, color: s.ink, align: 'right' },
+        binding: { bindingKey: 'reviewer_name', property: 'text' },
+        animation: { type: 'fade-in-up', durationMs: 500, delayMs: 140 },
+      }),
+      el({
+        id: `el_${s.id}_hint`, type: 'text', name: 'Hint', text: 'Verified review',
+        layout: { x: mx + Math.round(cardW * 0.68), y: Math.round(h * 0.62) + 28, width: Math.round(cardW * 0.28), height: 18, z: 10 },
+        typography: { fontSize: 11, fontWeight: 400, color: s.sub, align: 'right' },
+      }),
+    ];
+  }
+
+  // focus (default): a centered card with the full quote.
+  const cardW = Math.round(w * 0.74);
+  const cardH = Math.round(h * 0.74);
+  const cardX = Math.round((w - cardW) / 2);
+  const cardY = Math.round((h - cardH) / 2);
+  return [
+    el({
+      id: `el_${s.id}_card`, type: 'container', name: 'Card', layout: { x: cardX, y: cardY, width: cardW, height: cardH, z: 1 },
+      style: { background: s.card, radius: 24, opacity: s.cardOpacity ?? 1 },
+    }),
+    el({
+      id: `el_${s.id}_eyebrow`, type: 'text', name: 'Eyebrow', text: 'WHAT CUSTOMERS SAY',
+      layout: { x: cardX, y: cardY + Math.round(cardH * 0.1), width: cardW, height: 18, z: 10 },
+      typography: { fontSize: 11, fontWeight: 700, color: s.accent, align: 'center' },
+    }),
+    el({
+      id: `el_${s.id}_stars`, type: 'rating-stars', name: 'Rating', layout: { x: Math.round((w - 120) / 2), y: cardY + Math.round(cardH * 0.2), width: 120, height: 28, z: 10 },
+      binding: { bindingKey: 'review_rating', property: 'rating' }, animation: { type: 'fade-in', durationMs: 450, delayMs: 0 },
+    }),
+    el({
+      id: `el_${s.id}_quote`, type: 'text', name: 'Review', text: SAMPLE_QUOTE,
+      layout: { x: cardX + Math.round(cardW * 0.09), y: cardY + Math.round(cardH * 0.3), width: Math.round(cardW * 0.82), height: Math.round(cardH * 0.34), z: 10 },
+      typography: { fontSize: 20, fontWeight: 400, color: s.ink, align: 'center' },
+      binding: { bindingKey: 'review_text', property: 'text' },
+      animation: { type: 'fade-in-up', durationMs: 550, delayMs: 80 },
+    }),
+    el({
+      id: `el_${s.id}_author`, type: 'heading', name: 'Reviewer', text: SAMPLE_AUTHOR,
+      layout: { x: cardX + Math.round(cardW * 0.09), y: cardY + Math.round(cardH * 0.7), width: Math.round(cardW * 0.82), height: 24, z: 10 },
+      typography: { fontSize: 15, fontWeight: 700, color: s.ink, align: 'center' },
+      binding: { bindingKey: 'reviewer_name', property: 'text' },
+      animation: { type: 'fade-in-up', durationMs: 500, delayMs: 140 },
+    }),
+    el({
+      id: `el_${s.id}_hint`, type: 'text', name: 'Hint', text: 'Verified customer review',
+      layout: { x: cardX + Math.round(cardW * 0.09), y: cardY + Math.round(cardH * 0.7) + 28, width: Math.round(cardW * 0.82), height: 18, z: 10 },
+      typography: { fontSize: 11, fontWeight: 400, color: s.sub, align: 'center' },
+    }),
+  ];
+}
+
+/** Behavior defaults per carousel mode (the studio sliders can retune all of it). */
+function carouselBehavior(s: CarouselSpec): TemplateBehavior {
+  const base = { autoPlay: true, pauseOnHover: true, direction: 'left' as const, speedPx: 60 };
+  if (s.mode === 'wheel') return { mode: 'wheel', ...base, intervalSec: s.intervalSec ?? 4, maxRecords: s.maxRecords ?? 6 };
+  if (s.mode === 'stack') return { mode: 'stack', ...base, intervalSec: s.intervalSec ?? 6, maxRecords: s.maxRecords ?? 5 };
+  if (s.mode === 'carousel') return { mode: 'carousel', ...base, intervalSec: s.intervalSec ?? 5, maxRecords: s.maxRecords ?? 0 };
+  return {
+    mode: 'coverflow',
+    ...base,
+    intervalSec: s.intervalSec ?? 5,
+    maxRecords: s.maxRecords ?? 8,
+    spacing: s.spacing ?? 0.42,
+    depth: s.depth ?? 190,
+    angle: s.angle ?? 48,
+  };
+}
+
+/** The generated 3D carousel family — twenty templates from the spec table. */
+export function carouselFamilyTemplates(): WidgetTemplate[] {
+  return CAROUSEL_SPECS.map((s) => ({
+    id: s.id,
+    name: s.name,
+    description: s.blurb,
+    category: 'Carousel',
+    width: s.w,
+    height: s.h,
+    features:
+      s.mode === 'wheel'
+        ? ['3D rotating ring', 'Drag to spin', 'Cursor parallax']
+        : s.mode === 'stack'
+          ? ['Card deck', 'Swipe the top card', 'Spring physics']
+          : s.mode === 'coverflow'
+            ? ['3D depth fan', 'Leans with the cursor', 'Adjustable in studio']
+            : ['Swipe / drag', 'Fling inertia', 'Dots + arrows'],
+    schema: {
+      name: s.name,
+      canvas: { width: s.w, height: s.h, background: s.canvas },
+      version: 1,
+      behavior: carouselBehavior(s),
+      elements: carouselElements(s),
+    },
+  }));
+}
 
 export const WIDGET_TEMPLATES: WidgetTemplate[] = [
   {
@@ -601,8 +859,8 @@ export const WIDGET_TEMPLATES: WidgetTemplate[] = [
       ],
     },
   },
+  ...carouselFamilyTemplates(),
 ];
-
 
 /** The template a product gets before it picks one itself. */
 export function defaultWidgetTemplate(): WidgetTemplate {
