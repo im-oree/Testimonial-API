@@ -110,7 +110,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <IconZojatechMark size={26} />
+          <IconZojatechMark size={30} />
           <span>Zojatech</span>
         </div>
         <h1>{cfg.title}</h1>

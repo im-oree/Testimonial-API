@@ -23,14 +23,14 @@ export function ZojatechLoader({
 }) {
   return (
     <span className="zj-loader" role="status" aria-label={label ?? 'Loading'}>
-      <svg width={size} height={size} viewBox="0 0 200 200" fill="none" aria-hidden>
+      <svg width={size} height={size} viewBox="56 49 88 98" fill="none" aria-hidden>
         {/* Faint full outline so the mark reads at a glance while it draws. */}
         <path
           d={ZOJATECH_MARK_PATH}
           fill="none"
           stroke={color}
           strokeOpacity={0.14}
-          strokeWidth={7}
+          strokeWidth={6}
           strokeLinejoin="round"
           strokeLinecap="round"
           fillRule="evenodd"
@@ -39,7 +39,7 @@ export function ZojatechLoader({
           d={ZOJATECH_MARK_PATH}
           fill="none"
           stroke={color}
-          strokeWidth={7}
+          strokeWidth={6}
           strokeLinejoin="round"
           strokeLinecap="round"
           fillRule="evenodd"

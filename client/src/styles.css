@@ -2029,13 +2029,18 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   transition: transform .58s cubic-bezier(.22, .61, .36, 1), opacity .5s ease;
 }
 
-.app-intro { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; }
-.app-intro-disc {
-  width: 165vmax; height: 165vmax; border-radius: 50%;
-  background: #002986;
+.app-intro { position: fixed; inset: 0; z-index: 999; }
+/* Full-screen navy backdrop carrying the logo. A circular clip-path matte
+   covers everything at first (no visible edge, no aspect-ratio math) and
+   then closes to nothing — always a perfect circle on any viewport shape. */
+.app-intro-matte {
+  position: absolute; inset: 0; background: #002986;
   display: flex; align-items: center; justify-content: center;
-  will-change: transform;
+  clip-path: circle(100% at 50% 50%);
+  transition: clip-path .72s cubic-bezier(.55, 0, .85, .36);
+  will-change: clip-path;
 }
+.app-intro.is-wipe .app-intro-matte { clip-path: circle(0% at 50% 50%); }
 
 /* ---- Template gallery (marketplace) ---------------------------------------- */
 .tpl-cat-pill {

@@ -1,5 +1,5 @@
 /**
- * Zojatech brand mark — the official logo path (viewBox 0 0 200 200).
+ * Zojatech brand mark — the official logo path (viewBox tight-cropped to the mark: 56 49 88 98).
  *
  * One shared path constant so every surface (the animated loader, the
  * sidebar, the intro) draws the exact same geometry. The mark is a filled
@@ -27,7 +27,7 @@ export function IconZojatechMark({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 200 200"
+      viewBox="56 49 88 98"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       style={{ flex: 'none', ...style }}

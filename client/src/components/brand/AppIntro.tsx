@@ -4,8 +4,9 @@
  * Sequence (all smooth, eased):
  *   1. TRIM PATH   the Zojatech mark draws on as a stroke
  *   2. FILL        the solid mark fades in over the stroke
- *   3. WIPE        the navy backdrop collapses into a circle around the mark
- *                  (a track matte) while the app itself scales up beneath it
+ *   3. WIPE        a circular clip-path matte closes over the full-screen
+ *                  navy backdrop, track-matting the logo out while the app
+ *                  scales up beneath it at the same time
  *
  * Client-side navigation never remounts the app, so the intro only appears
  * when the tab is opened or the page is hard-refreshed — exactly once per
@@ -32,7 +33,7 @@ export function AppIntro({ onReveal, onDone }: { onReveal: () => void; onDone: (
     const t1 = window.setTimeout(() => setPhase('fill'), 1100);
     const t2 = window.setTimeout(() => {
       setPhase('wipe');
-      onReveal(); // the app scales in WHILE the disc collapses
+      onReveal(); // the app scales in WHILE the matte closes
     }, 1800);
     const t3 = window.setTimeout(() => onDone(), 2600);
     return () => {
@@ -42,16 +43,12 @@ export function AppIntro({ onReveal, onDone }: { onReveal: () => void; onDone: (
   }, []);
 
   return (
-    <div className="app-intro" aria-hidden>
-      {/* The backdrop is a giant circle — shrinking it matte-punches the
-          whole screen down to the mark. */}
-      <motion.div
-        className="app-intro-disc"
-        initial={{ scale: 1 }}
-        animate={{ scale: phase === 'wipe' ? 0 : 1 }}
-        transition={{ duration: 0.72, ease: [0.55, 0, 0.85, 0.36] }}
-      >
-        <svg width="112" height="112" viewBox="0 0 200 200" fill="none">
+    <div className={`app-intro ${phase === 'wipe' ? 'is-wipe' : ''}`} aria-hidden>
+      {/* A full-screen navy layer carrying the logo. A circular clip covers
+          everything at first — no visible edge, no aspect-ratio tricks — then
+          closes to nothing, wiping the logo out with it. */}
+      <div className="app-intro-matte">
+        <svg width="124" height="124" viewBox="56 49 88 98" fill="none">
           {/* 1 — the stroke draws on (trim path). */}
           <motion.path
             d={ZOJATECH_MARK_PATH}
@@ -75,7 +72,7 @@ export function AppIntro({ onReveal, onDone }: { onReveal: () => void; onDone: (
             transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </svg>
-      </motion.div>
+      </div>
     </div>
   );
 }
