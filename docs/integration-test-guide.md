@@ -26,12 +26,12 @@ secured so no secret ever lives on the external page.
 ## 2 · Who sets the styling (layering)
 
 ```
-1. THEME TEMPLATE   — made by Zojatech (Platform → Theme Templates)
+1. THEME TEMPLATE   — made by Zojatech (Platform -> Theme Templates)
 2. COMPANY THEME    — Acme picks/adopts a template, can fine-tune any token
-                      (tenant: Settings → Appearance & theme,
-                       platform: Tenants → Acme → Theme & branding)
+                      (tenant: Settings -> Appearance & theme,
+                       platform: Tenants -> Acme -> Theme & branding)
 3. PRODUCT OVERRIDE — optional per-product tweaks on top
-                      (tenant: Products → product → Connect & design → step 3)
+                      (tenant: Products -> product -> Connect & design -> step 3)
 ```
 
 Public read path is one pre-resolved payload:
@@ -41,46 +41,46 @@ bumps on every save (that's your "it updated" proof).
 ## 3 · How to test, step by step
 
 ### A. Widget (no-code) on the external site
-1. Sign in as `owner@acme.test / demo1234` → **Products → Acme Marketing Site →
-   Connect & design → step 4**.
+1. Sign in as `owner@acme.test / demo1234` -> **Products -> Acme Marketing Site ->
+   Connect & design -> step 4**.
 2. Click **"Open example external site ↗"** (or open the URL above). You are on
    Acme's fake external website; its wall renders in a box.
 3. Proof it is separate: the page chrome is Acme's own plain HTML — there is no
    app sidebar, no login, nothing Zojatech-branded except the wall itself.
 
 ### B. Theme flows everywhere instantly
-1. Tenant side: **Settings → Appearance & theme** → pick a template (or change
-   the brand colour) → **Save theme**.
-2. Reload the external page → colours, corners, font and logo follow. Nothing
+1. Tenant side: **Settings -> Appearance & theme** -> pick a template (or change
+   the brand colour) -> **Save theme**.
+2. Reload the external page -> colours, corners, font and logo follow. Nothing
    was redeployed — the wall reads the resolved theme on every load.
-3. Platform side: sign in as `admin@zojatech.test / demo1234` →
-   **Tenants → Acme Inc → Theme & branding** → change it → reload the external
+3. Platform side: sign in as `admin@zojatech.test / demo1234` ->
+   **Tenants -> Acme Inc -> Theme & branding** -> change it -> reload the external
    page again. Zojatech can restyle a tenant; the tenant keeps the final say
    from its own Appearance page (last writer wins, same version counter).
 
 ### C. Templates — owners create, tenants adopt
-1. Platform → **Theme Templates** → **＋ New template** (name, colours, radius,
-   font) → Save.
-2. Tenant (`owner@acme.test`) → **Settings → Appearance & theme** → the new
-   template is in the picker → click it → Save. It is now Acme's company theme.
-3. Edit the template in the platform panel → tenants see the change in their
+1. Platform -> **Theme Templates** -> **＋ New template** (name, colours, radius,
+   font) -> Save.
+2. Tenant (`owner@acme.test`) -> **Settings -> Appearance & theme** -> the new
+   template is in the picker -> click it -> Save. It is now Acme's company theme.
+3. Edit the template in the platform panel -> tenants see the change in their
    picker on next open (they keep whatever tokens they adopted until they
    re-save).
 
 ### D. Per-product override
-1. Acme → **Connect & design → step 3** → set e.g. Product colour + font
-   "mono" → **Save product design**.
+1. Acme -> **Connect & design -> step 3** -> set e.g. Product colour + font
+   "mono" -> **Save product design**.
 2. Check `GET /v1/public/theme/acme-marketing-site` — only *this* product
    changed. Acme Blog (`/external/acme.html?app=acme-blog&form=blog-review`)
    still shows the company theme.
-3. Click **Inherit company** and save → product follows the company theme again.
+3. Click **Inherit company** and save -> product follows the company theme again.
 
 ### E. Content flows (moderation is the guard)
-1. On the external page click **Leave a review** → submit the public form.
+1. On the external page click **Leave a review** -> submit the public form.
 2. In Acme's workspace the submission arrives as **pending** (Moderation page).
 3. It does **not** appear on the external wall while pending.
-4. Approve it in Moderation → reload the external page → it appears.
-5. Reject one → it disappears from the wall for good.
+4. Approve it in Moderation -> reload the external page -> it appears.
+5. Reject one -> it disappears from the wall for good.
 
 ### F. Developer path (little code, still no secret)
 Public GET endpoints are CORS-open and contain **approved reviews + theme
@@ -99,22 +99,22 @@ are enforced server-side before anything is published.
 ## 4 · Expected results checklist
 
 - [ ] External page renders Acme's wall with **approved** reviews only.
-- [ ] Template → company theme → product override layering is visible and each
+- [ ] Template -> company theme -> product override layering is visible and each
       layer can win independently.
 - [ ] Theme version bumps on every save (`GET /v1/public/theme/:slug`).
 - [ ] A pending submission never shows on the wall until approved.
 - [ ] No 401/secret leakage from any public endpoint used by the widget.
-- [ ] Security suite still green: `npm run test:security` → 27 pass / 0 fail.
+- [ ] Security suite still green: `npm run test:security` -> 27 pass / 0 fail.
 
 ## 5 · Where things live
 
 | Concern | Where |
 |---|---|
 | Company theme (tokens, versioning) | `server/src/theme.ts`, tenant `theme` row |
-| Template catalogue CRUD | Platform → Theme Templates (`/v1/platform/theme-templates`) |
-| Tenant theme editor | Settings → Appearance & theme (`/v1/settings/theme`) |
-| Platform per-tenant editor | Tenants → :id → Theme & branding (`/v1/platform/tenants/:id/theme`) |
-| Per-product overrides | Connect & design → step 3 (`PATCH /v1/apps/:appId`) |
+| Template catalogue CRUD | Platform -> Theme Templates (`/v1/platform/theme-templates`) |
+| Tenant theme editor | Settings -> Appearance & theme (`/v1/settings/theme`) |
+| Platform per-tenant editor | Tenants -> :id -> Theme & branding (`/v1/platform/tenants/:id/theme`) |
+| Per-product overrides | Connect & design -> step 3 (`PATCH /v1/apps/:appId`) |
 | Public theme/tokens | `/v1/public/theme-presets`, `/v1/public/theme/:appSlug` |
 | No-code embed script | `/widget/embed.js` (static), wall at `/wall/:appSlug` |
 
@@ -139,7 +139,7 @@ auto-rotation, orbit) but never drop a required field.
 
 ### Test: choose, preview, embed
 
-1. Log in as Acme → Products → a product → **Connect & design**.
+1. Log in as Acme -> Products -> a product -> **Connect & design**.
 2. **1 · Pick the look**: choose each design and watch the live preview switch.
    With zero approved reviews the preview shows clearly-labelled sample
    content; with reviews it renders the real, approved ones.
@@ -186,7 +186,7 @@ auto-rotation, orbit) but never drop a required field.
 | Concern | Where |
 |---|---|
 | Widget design registry | `client/src/widgets/index.tsx` (+ `designs/*`, `primitives.tsx`, `types.ts`) |
-| Per-product design picker & preview | Connect & design → 1 · Pick the look |
-| Design persistence | `PATCH /v1/apps/:appId` → `widgetDesign` (server whitelist) |
-| Public design id | `/v1/public/theme/:slug` and `/v1/public/walls/:slug` → `design` |
+| Per-product design picker & preview | Connect & design -> 1 · Pick the look |
+| Design persistence | `PATCH /v1/apps/:appId` -> `widgetDesign` (server whitelist) |
+| Public design id | `/v1/public/theme/:slug` and `/v1/public/walls/:slug` -> `design` |
 | Auto-height embed | `/wall/:slug?embed=1` + `client/public/widget/embed.js` |

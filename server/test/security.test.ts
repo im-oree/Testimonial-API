@@ -8,8 +8,8 @@
  *   - Vertical RBAC: viewers/editors cannot moderate or create apps.
  *   - Cross-kind sessions: a company token cannot hit /v1/platform/* and a
  *     platform token cannot hit company /v1/apps.
- *   - Token tampering ("alg:none", bit-flips, garbage) → 401.
- *   - Impersonation lifecycle: issue → correct /me → still tenant-scoped →
+ *   - Token tampering ("alg:none", bit-flips, garbage) -> 401.
+ *   - Impersonation lifecycle: issue -> correct /me -> still tenant-scoped ->
  *     exit returns a platform session.
  *   - Write-time hygiene: ratings clamp to 1–5, free text is length-capped.
  *   - Security response headers present; x-powered-by removed.

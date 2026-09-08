@@ -331,8 +331,8 @@ function slugify(name: string): string {
 
 /**
  * Product-style identifier, e.g. "PRD-ATLS" (spec naming). Single-word names
- * use the first four letters ("Beacon" → BEAC); multi-word names use word
- * initials ("Acme Marketing Site" → AMS). Prefix is PRD-.
+ * use the first four letters ("Beacon" -> BEAC); multi-word names use word
+ * initials ("Acme Marketing Site" -> AMS). Prefix is PRD-.
  */
 export function productCode(name: string): string {
   const words = name
@@ -1085,7 +1085,7 @@ export const DEMO = {
   },
 };
 
-/** In-memory session id → account email. Restart clears sessions (dev only). */
+/** In-memory session id -> account email. Restart clears sessions (dev only). */
 export class DemoSessions {
   private readonly sessions = new Map<string, { kind: 'company' | 'platform'; email: string }>();
 
