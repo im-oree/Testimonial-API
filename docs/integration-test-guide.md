@@ -117,3 +117,76 @@ are enforced server-side before anything is published.
 | Per-product overrides | Connect & design → step 3 (`PATCH /v1/apps/:appId`) |
 | Public theme/tokens | `/v1/public/theme-presets`, `/v1/public/theme/:appSlug` |
 | No-code embed script | `/widget/embed.js` (static), wall at `/wall/:appSlug` |
+
+## 6 · Widget design library (plug-and-play)
+
+Every widget on the platform is one entry in a single registry, one file per
+design (`client/src/widgets/`):
+
+- `index.tsx` — lists **all** designs (`WIDGET_DESIGNS`) plus helpers
+  (`getWidgetDesign`, `DEFAULT_WIDGET_DESIGN`) and sample preview content.
+- `designs/<id>.tsx` — exactly one design each (classic grid, spotlight,
+  carousel, wall of love, marquee, orbit).
+- `primitives.tsx` — the things **every** design is required to show: author
+  picture (initials fallback), name, rating, message and date, plus optional
+  CTA and a shared empty state.
+- `types.ts` — the `WidgetDesignProps` contract: `{ items, tokens, cta }`.
+
+To add a design, drop `<id>.tsx` in `designs/`, implement the props contract,
+then register it in `index.tsx` — the picker, preview and public walls adopt it
+automatically. A design may add caveats (hover reveal, cursor tilt,
+auto-rotation, orbit) but never drop a required field.
+
+### Test: choose, preview, embed
+
+1. Log in as Acme → Products → a product → **Connect & design**.
+2. **1 · Pick the look**: choose each design and watch the live preview switch.
+   With zero approved reviews the preview shows clearly-labelled sample
+   content; with reviews it renders the real, approved ones.
+3. **Fine-tune**: override colour / accent / corners / font for this product
+   (or keep "Company" to inherit), save. The preview uses the current tokens
+   without a page reload.
+4. The saved design + overrides are per product:
+   ```bash
+   curl http://localhost:3000/v1/public/theme/acme-marketing-site | grep design
+   curl http://localhost:3000/v1/public/walls/acme-marketing-site | grep design
+   ```
+   Both return the design id (default `classic`). App summaries expose it too
+   (`PATCH /v1/apps/:appId` with `widgetDesign`).
+5. Open the public wall (`Preview wall`) — the full page header + the chosen
+   design render below it. Add `?design=wall` (or any id) to preview a
+   different design without saving.
+6. **2 · Get the code**: switch tabs (Widget / iframe / Button / API), copy,
+   and open **"See it on an example external site"** — the static Acme page
+   loads `/widget/embed.js` exactly like a third-party site.
+
+### Auto-height embeds (no more cropping)
+
+- The wall accepts `?embed=1` — a chrome-free, transparent widget surface.
+- The wall posts its rendered height to the parent
+  (`postMessage { zojatech: { height } }`) on load/resize; `embed.js` resizes
+  the iframe accordingly. `data-height` on the script tag is only the
+  fallback while the wall loads.
+- Long designs (carousel, orbit, wall of love) therefore never get clipped.
+
+### Expected results checklist (design library)
+
+- [ ] Registry lists every design; each has its own file implementing
+      `WidgetDesignProps` (picture/initials, name, rating, message, date).
+- [ ] Choosing a design + saving persists it (`PATCH /v1/apps/:id`) and the
+      public theme/wall payloads return it immediately.
+- [ ] Public wall and the external demo page render the chosen design; a
+      rejected/unknown id falls back to `classic`.
+- [ ] `?design=<id>` overrides the saved design for previews.
+- [ ] Embed iframes auto-size to the design (no crop, no internal scrollbar).
+- [ ] App shell: sidebar and top header stay fixed; only the page content
+      scrolls; page headers pin to the top of the scroll area.
+- [ ] No emoji anywhere — all glyphs come from `client/src/components/icons/`.
+
+| Concern | Where |
+|---|---|
+| Widget design registry | `client/src/widgets/index.tsx` (+ `designs/*`, `primitives.tsx`, `types.ts`) |
+| Per-product design picker & preview | Connect & design → 1 · Pick the look |
+| Design persistence | `PATCH /v1/apps/:appId` → `widgetDesign` (server whitelist) |
+| Public design id | `/v1/public/theme/:slug` and `/v1/public/walls/:slug` → `design` |
+| Auto-height embed | `/wall/:slug?embed=1` + `client/public/widget/embed.js` |
