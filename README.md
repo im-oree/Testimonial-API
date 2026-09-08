@@ -10,13 +10,18 @@ Data is **in-memory and seeded** on start (demo accounts, forms, testimonials), 
 ## Run it
 
 ```bash
-npm install
-npm run install:all   # installs deps inside server/ and client/
+npm install          # installs EVERYTHING: root + server/ + client/
+                     # (a postinstall hook cascades into both packages)
 
-npm run dev           # starts BOTH: API on :3000, web app on :3001
+npm run dev          # starts BOTH: API on :3000, web app on :3001
 ```
 
 Then open **http://localhost:3001**.
+
+> Installed with `--ignore-scripts`, or the cascade didn't run for some reason?
+> `npm run install:all` does the same thing manually: it installs the
+> dependencies inside `server/` and `client/` (each is its own package — the
+> root install alone only covers the dev orchestrator).
 
 | What | Where |
 | --- | --- |

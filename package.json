@@ -8,10 +8,13 @@
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "start:server": "npm --prefix server start",
+    "build": "npm --prefix server run typecheck && npm --prefix client run build",
     "build:client": "npm --prefix client run build",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
     "install:all": "npm --prefix server install && npm --prefix client install",
-    "test:security": "npm --prefix server run test:security"
+    "test": "npm run test:security",
+    "test:security": "npm --prefix server run test:security",
+    "postinstall": "npm run install:all"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
