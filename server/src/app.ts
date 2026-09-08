@@ -4,6 +4,7 @@
  * frontend only ever talks to /v1/... paths.
  */
 import express, { type NextFunction, type Request, type Response } from 'express';
+import './env';
 import { authRouter } from './routes/auth';
 import { platformRouter } from './routes/platform';
 import { publicRouter } from './routes/public';
@@ -13,6 +14,36 @@ import { errorResponse, HttpError, requestToken, tokenPrefix } from './lib';
 export function createApp(): express.Express {
   const app = express();
   app.disable('x-powered-by');
+
+  // Optional CORS (CORS_ORIGINS in server/.env). Off by default: the browser
+  // app is served same-origin (the Vite dev proxy forwards /v1 to the API),
+  // so no cross-origin headers are needed. Enable it only when a frontend
+  // deployed on ANOTHER domain points at this API (VITE_API_BASE over there).
+  //   CORS_ORIGINS=https://app.example.com       (one origin)
+  //   CORS_ORIGINS=https://a.example,https://b   (comma-separated)
+  //   CORS_ORIGINS=*                              (allow any origin — dev only)
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (corsOrigins.length > 0) {
+    const allowAll = corsOrigins.includes('*');
+    console.log(`[api] CORS enabled for ${allowAll ? 'any origin' : corsOrigins.join(', ')}`);
+    app.use((req, res, next) => {
+      const origin = req.headers.origin ?? '';
+      if (allowAll || corsOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', allowAll && !origin ? '*' : origin);
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-token');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+      }
+      if (req.method === 'OPTIONS') {
+        res.status(204).end();
+        return;
+      }
+      next();
+    });
+  }
 
   // Security headers on every response (DOC 6 §2.9 / §4.2). No frame-ancestors
   // or CSP here on purpose: the API serves JSON, and the SPA must stay

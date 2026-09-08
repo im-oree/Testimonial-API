@@ -23,6 +23,38 @@ Then open **http://localhost:3001**.
 > dependencies inside `server/` and `client/` (each is its own package — the
 > root install alone only covers the dev orchestrator).
 
+## Configuration (.env)
+
+Everything has working defaults — **no configuration needed to run the demo**.
+When you do want to change something, copy the example files:
+
+```bash
+cp server/.env.example server/.env     # API settings
+cp client/.env.example client/.env     # web app settings
+```
+
+**`server/.env`** (loaded by a tiny built-in reader — no extra dependency;
+real environment variables always win over file values):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `PORT` | `3000` | API port. If you change it, point the web app's `VITE_API_PROXY_TARGET` at it. |
+| `HOST` | `0.0.0.0` | Bind address (`127.0.0.1` = local only). |
+| `SESSION_SECRET` | *(auto)* | Inline token-signing secret. Unset = a secret is generated and persisted to `server/.session-secret`. Set this on read-only/deployed filesystems. |
+| `SESSION_SECRET_FILE` | `server/.session-secret` | Where the auto-generated signing secret lives. |
+| `CORS_ORIGINS` | *(off)* | Comma-separated origins allowed to call the API cross-origin (`*` = any, dev only). Only needed when a frontend on another domain points at this API. |
+
+**`client/.env`** (Vite loads it automatically; only `VITE_`-prefixed vars
+reach the browser):
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | `http://127.0.0.1:3000` | Where the dev server forwards `/v1` requests — keep it in sync with the API's `PORT`. |
+| `VITE_API_BASE` | *(same origin)* | Where the browser sends API calls. Leave unset for dev (the proxy handles it); set an absolute URL (e.g. `https://api.example.com`) for a deployed frontend — and allow its origin on the API via `CORS_ORIGINS`. |
+| `VITE_PORT` | `3001` | Port of the Vite dev server. |
+
+`.env` files are git-ignored (`.env.example` is committed as documentation).
+
 | What | Where |
 | --- | --- |
 | Web app | http://localhost:3001 |
