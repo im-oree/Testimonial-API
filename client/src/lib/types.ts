@@ -326,6 +326,8 @@ export interface AuditRow {
   ip?: string;
   createdAt: string;
   appId?: string;
+  /** Workspace whose own log produced this row (merged super-admin view). */
+  tenantId?: string;
 }
 
 export interface WallTestimonial {
