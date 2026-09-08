@@ -186,8 +186,12 @@ export default function AppsHomePage() {
         </>
       )}
 
-      <div className="card" style={{ marginTop: 18 }}>
-        <h2>How it works</h2>
+      <details className="how-it-works" style={{ marginTop: 18 }}>
+        <summary>
+          <h2>How it works</h2>
+          <span className="muted small">New here? The 3-step tour.</span>
+        </summary>
+        <div className="card how-card">
         <ol className="how-list">
           <li>
             <strong>Create a product</strong> for a website — e.g. “Acme Blog”. Each product is isolated with its own ID, reviews, form
@@ -203,7 +207,8 @@ export default function AppsHomePage() {
             Approve the good ones — they appear in the product&apos;s <strong>Testimonials</strong> and on its public Wall.
           </li>
         </ol>
-      </div>
+        </div>
+      </details>
 
       <CreateProductModal
         open={creating}

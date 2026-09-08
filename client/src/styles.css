@@ -2305,3 +2305,44 @@ a:focus-visible {
   .auth-shell { grid-template-columns: 1fr; max-width: 430px; }
   .auth-side { display: none; }
 }
+
+/* ---- Moderation: a real decision queue --------------------------------------- */
+.queue-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+@media (max-width: 520px) { .queue-list { grid-template-columns: 1fr; } }
+.queue-list .queue-card { margin-bottom: 0; padding: 16px 18px; }
+.queue-content { font-size: 14.5px; line-height: 1.55; }
+.queue-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---- Testimonials table: fixed wrapping, calmer scan ------------------------- */
+.t-table .t-content { max-width: 460px; min-width: 260px; }
+.t-table td:first-child .strong,
+.t-table .t-live { white-space: nowrap; }
+.t-table thead th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.table tbody tr { transition: background 100ms ease; }
+
+/* ---- Products: collapsible onboarding tour ----------------------------------- */
+.how-it-works { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+.how-it-works > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 13px 18px;
+}
+.how-it-works > summary::-webkit-details-marker { display: none; }
+.how-it-works > summary::after {
+  content: '⌄'; margin-left: auto; color: #8b91b5; font-size: 15px; line-height: 1;
+  transition: transform .18s ease;
+}
+.how-it-works[open] > summary::after { transform: rotate(180deg); }
+.how-it-works .how-card { border: 0; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); }

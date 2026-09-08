@@ -180,9 +180,10 @@ export default function ModerationPage() {
         <EmptyState title="All caught up" hint="New form submissions for this product land here as pending testimonials." />
       )}
 
-      {!loading &&
-        items.map((item) => (
-          <div className="card queue-card" key={item.id}>
+      {!loading && (
+        <div className="queue-list">
+          {items.map((item) => (
+            <div className="card card-hover queue-card" key={item.id}>
             <div className="queue-head">
               <div className="queue-head-main">
                 {canModerate && (
@@ -237,8 +238,10 @@ export default function ModerationPage() {
                 </Button>
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {!loading && total > 0 && (
         <Pager
