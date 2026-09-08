@@ -37,6 +37,9 @@ export interface DemoTenant {
   logoUrl?: string | null;
   /** DOC-7 theme — written by updateTenantTheme; resolved lazily for reads. */
   theme?: StoredTheme | null;
+  /** Company-wide widget design default (marketplace template tier 2). */
+  widgetDesign?: string | null;
+  designTemplateId?: string | null;
   plan: 'starter' | 'growth' | 'scale';
   status: 'active' | 'suspended' | 'trialing';
   createdAt: string;
@@ -80,6 +83,8 @@ export interface DemoApp {
   themeFont?: string | null;
   /** Per-product widget design from the plug-and-play library. */
   widgetDesign?: string | null;
+  /** Marketplace template this product design was cloned from (if any). */
+  designTemplateId?: string | null;
   /** Content + layout options saved with the design (each save = new version). */
   designOptions?: DesignOptions | null;
   designVersion?: number;
@@ -576,6 +581,36 @@ export interface ThemeTemplateRow extends ThemePreset {
 
 let THEME_TEMPLATES: ThemeTemplateRow[] = THEME_PRESETS.map((t) => ({ ...t, builtin: true }));
 
+// ---------------------------------------------------------------------------
+// Design templates — the marketplace (DOC 7 section 5). Tier 1 rows are owned
+// by Zojatech and list a widget design + a visual preset; tenants adopt them
+// as their company default (tier 2) or clone them onto one product (tier 3).
+// ---------------------------------------------------------------------------
+export interface DesignTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  designId: string;
+  primary: string;
+  accent: string;
+  radius: ThemeRadius;
+  font: ThemeFont;
+  builtin: boolean;
+  useCount: number;
+}
+
+const DESIGN_TEMPLATE_SEED: Array<Omit<DesignTemplateRow, 'builtin' | 'useCount'>> = [
+  { id: 'dt-grid-classic', name: 'Classic Teal', description: 'The dependable grid — every review card clean and scannable.', category: 'Grid', designId: 'classic', primary: '#0d9488', accent: '#0f766e', radius: 'md', font: 'system' },
+  { id: 'dt-wall-ocean', name: 'Wall of Love Ocean', description: 'Masonry wall of customer quotes with a deep blue accent.', category: 'Wall', designId: 'wall', primary: '#1e40af', accent: '#0ea5e9', radius: 'lg', font: 'system' },
+  { id: 'dt-spotlight-royal', name: 'Spotlight Royal', description: 'One featured review in the spotlight, the rest in a quiet grid.', category: 'Spotlight', designId: 'spotlight', primary: '#4338ca', accent: '#7c3aed', radius: 'md', font: 'system' },
+  { id: 'dt-carousel-sunset', name: 'Carousel Sunset', description: 'Rotating reviews with warm orange branding.', category: 'Carousel', designId: 'carousel', primary: '#c2410c', accent: '#ea580c', radius: 'lg', font: 'serif' },
+  { id: 'dt-orbit-violet', name: 'Orbit Violet', description: 'Author photos in a circle — hover to read their review.', category: 'Orbit', designId: 'orbit', primary: '#6d28d9', accent: '#a21caf', radius: 'lg', font: 'system' },
+  { id: 'dt-marquee-forest', name: 'Marquee Forest', description: 'Scrolling strips of praise with a green brand tone.', category: 'Marquee', designId: 'marquee', primary: '#166534', accent: '#16a34a', radius: 'sm', font: 'mono' },
+];
+
+let DESIGN_TEMPLATES: DesignTemplateRow[] = DESIGN_TEMPLATE_SEED.map((t) => ({ ...t, builtin: true, useCount: 0 }));
+
 export const DEMO = {
   tenantById(id: string): DemoTenant | undefined {
     return TENANTS.find((t) => t.id === id);
@@ -651,6 +686,7 @@ export const DEMO = {
       themeRadius?: string | null;
       themeFont?: string | null;
       widgetDesign?: string | null;
+      designTemplateId?: string | null;
       designOptions?: DesignOptions | null;
     },
   ): DemoApp | undefined {
@@ -678,6 +714,7 @@ export const DEMO = {
     if (patch.themeFont !== undefined) app.themeFont = patch.themeFont;
     if (patch.widgetDesign !== undefined) app.widgetDesign = patch.widgetDesign?.trim() || null;
     if (patch.designOptions !== undefined) app.designOptions = patch.designOptions;
+    if (patch.designTemplateId !== undefined) app.designTemplateId = patch.designTemplateId?.trim() || null;
     return { ...app };
   },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
@@ -703,6 +740,7 @@ export const DEMO = {
         font: app.themeFont ?? null,
       },
       widgetDesign: app.widgetDesign ?? null,
+      designTemplateId: app.designTemplateId ?? null,
       designVersion: app.designVersion ?? 0,
       designOptions: app.designOptions ?? null,
       status: app.status,
@@ -952,6 +990,59 @@ export const DEMO = {
   },
   themeTemplates(): ThemeTemplateRow[] {
     return THEME_TEMPLATES.map((t) => ({ ...t }));
+  },
+  designTemplates(): DesignTemplateRow[] {
+    return DESIGN_TEMPLATES.map((t) => ({ ...t }));
+  },
+  designTemplateById(templateId: string): DesignTemplateRow | undefined {
+    return DESIGN_TEMPLATES.find((t) => t.id === templateId);
+  },
+  createDesignTemplate(input: { name: string; description: string; category: string; designId: string; primary: string; accent: string; radius: ThemeRadius; font: ThemeFont }): DesignTemplateRow {
+    const row: DesignTemplateRow = {
+      id: `dt-${randomUUID().slice(0, 8)}`,
+      name: input.name.trim().slice(0, 60),
+      description: input.description.trim().slice(0, 180),
+      category: input.category.trim().slice(0, 30) || 'Grid',
+      designId: input.designId,
+      primary: input.primary,
+      accent: input.accent,
+      radius: input.radius,
+      font: input.font,
+      builtin: false,
+      useCount: 0,
+    };
+    DESIGN_TEMPLATES.unshift(row);
+    return { ...row };
+  },
+  updateDesignTemplate(templateId: string, patch: Partial<DesignTemplateRow>): DesignTemplateRow | undefined {
+    const row = DESIGN_TEMPLATES.find((t) => t.id === templateId);
+    if (!row) return undefined;
+    if (typeof patch.name === 'string') row.name = patch.name.trim().slice(0, 60) || row.name;
+    if (typeof patch.description === 'string') row.description = patch.description.trim().slice(0, 180);
+    if (typeof patch.category === 'string') row.category = patch.category.trim().slice(0, 30) || row.category;
+    if (typeof patch.designId === 'string') row.designId = patch.designId;
+    if (typeof patch.primary === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.primary)) row.primary = patch.primary;
+    if (typeof patch.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.accent)) row.accent = patch.accent;
+    if (patch.radius && RADIUS_IDS.includes(patch.radius)) row.radius = patch.radius;
+    if (patch.font && FONT_IDS.includes(patch.font)) row.font = patch.font;
+    return { ...row };
+  },
+  deleteDesignTemplate(templateId: string): boolean {
+    const before = DESIGN_TEMPLATES.length;
+    DESIGN_TEMPLATES = DESIGN_TEMPLATES.filter((t) => t.id !== templateId);
+    return DESIGN_TEMPLATES.length < before;
+  },
+  bumpDesignTemplateUse(templateId: string): void {
+    const row = DESIGN_TEMPLATES.find((t) => t.id === templateId);
+    if (row) row.useCount += 1;
+  },
+  /** Company-wide default design (marketplace tier 2). */
+  updateTenantDefaultDesign(tenantId: string, patch: { designId?: string | null; templateId?: string | null }): DemoTenant | undefined {
+    const tenant = TENANTS.find((t) => t.id === tenantId);
+    if (!tenant) return undefined;
+    if (patch.designId !== undefined) tenant.widgetDesign = patch.designId?.trim() || null;
+    if (patch.templateId !== undefined) tenant.designTemplateId = patch.templateId?.trim() || null;
+    return tenant;
   },
   createThemeTemplate(input: { name: string; description: string; primary: string; accent: string; radius: ThemeRadius; font: ThemeFont }): ThemeTemplateRow {
     const row: ThemeTemplateRow = {

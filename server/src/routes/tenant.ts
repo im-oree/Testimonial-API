@@ -101,6 +101,7 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     themeRadius?: string | null;
     themeFont?: string | null;
     widgetDesign?: string | null;
+    designTemplateId?: string | null;
     designOptions?: DesignOptions | null;
   } = {};
   if (typeof req.body?.name === 'string') patch.name = req.body.name.trim().slice(0, 80);
@@ -129,6 +130,10 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
     if (id === '' || req.body.widgetDesign === null) patch.widgetDesign = null;
     else if ((WIDGET_DESIGN_IDS as readonly string[]).includes(id)) patch.widgetDesign = id;
     else throw badRequest('Unknown widget design id.');
+  }
+  if (req.body?.designTemplateId !== undefined) {
+    const tpl = typeof req.body.designTemplateId === 'string' ? req.body.designTemplateId.trim() : '';
+    patch.designTemplateId = tpl === '' ? null : tpl.slice(0, 60);
   }
   if (req.body?.designOptions !== undefined) {
     const raw = req.body.designOptions;
@@ -579,14 +584,97 @@ tenantRouter.patch('/team/:memberId', (req, res) => {
 // Audit + billing (tenant)
 // ---------------------------------------------------------------------------
 
-// GET /v1/settings/theme — the tenant's DOC-7 theme (presets + resolved tokens).
+// GET /v1/settings/theme — the tenant's DOC-7 theme (presets + resolved tokens)
+// plus the company-wide widget default (marketplace tier 2) and the template it
+// came from. Products without their own override inherit this design.
 tenantRouter.get('/settings/theme', (req, res) => {
   const tenant = tenantOfSession(req);
+  const template = tenant.designTemplateId ? DEMO.designTemplateById(tenant.designTemplateId) : undefined;
   res.json({
     theme: DEMO.themeOfTenant(tenant),
     presets: THEME_PRESETS.map((p) => presetSummary(p)),
     logoUrl: tenant.logoUrl ?? null,
     brandColor: tenant.brandColor,
+    design: {
+      widgetDesign: tenant.widgetDesign ?? null,
+      template: template ? { id: template.id, name: template.name } : null,
+    },
+  });
+});
+
+// GET /v1/settings/theme/marketplace — Zojatech's design template catalogue the
+// tenant browses on its Appearance page and adopts as its company default.
+tenantRouter.get('/settings/theme/marketplace', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({
+    rows: DEMO.designTemplates().map((t) => ({
+      ...t,
+      active: tenant.designTemplateId === t.id,
+    })),
+    current: { widgetDesign: tenant.widgetDesign ?? null, templateId: tenant.designTemplateId ?? null },
+  });
+});
+
+// POST /v1/settings/theme/templates/:templateId/apply — company-level adoption:
+// copies the marketplace template's visual preset and widget design onto the
+// tenant (tier 2). Products keep their own per-product designs (tier 3).
+tenantRouter.post('/settings/theme/templates/:templateId/apply', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'settings.manage');
+  const template = DEMO.designTemplateById(req.params.templateId);
+  if (!template) throw notFound('Template not found.');
+  const themed = DEMO.updateTenantTheme(tenant.id, {
+    presetId: null,
+    primary: template.primary,
+    accent: template.accent,
+    radius: template.radius,
+    font: template.font,
+  });
+  if (!themed) throw notFound('Tenant not found.');
+  const updated = DEMO.updateTenantDefaultDesign(themed.id, { designId: template.designId, templateId: template.id });
+  DEMO.bumpDesignTemplateUse(template.id);
+  if (!updated) throw notFound('Tenant not found.');
+  res.json({
+    theme: DEMO.themeOfTenant(updated),
+    design: { widgetDesign: template.designId, template: { id: template.id, name: template.name } },
+  });
+});
+
+// PATCH /v1/settings/theme — tenant self-service theme editor. Saves presets /
+// tokens + logo, bumps the version so public surfaces and embeds reflect
+// immediately on next read (single pre-resolved payload server-side). Also
+// accepts `widgetDesign` to set the company-wide widget default directly.
+tenantRouter.patch('/settings/theme', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'settings.manage');
+  const parsed = parseThemePatch(req.body ?? {});
+  if (!parsed.ok) throw badRequest(parsed.error);
+  const withLogo = DEMO.updateTenantIdentity(tenant.id, { logoUrl: req.body?.logoUrl });
+  const updated = withLogo ? DEMO.updateTenantTheme(withLogo.id, parsed.patch) : undefined;
+  if (!updated) throw notFound('Tenant not found.');
+  let finalTenant = updated;
+  const rawDesign = (req.body as Record<string, unknown> | undefined)?.widgetDesign;
+  if (rawDesign !== undefined) {
+    const id = typeof rawDesign === 'string' ? rawDesign.trim() : '';
+    if (id !== '' && !(WIDGET_DESIGN_IDS as readonly string[]).includes(id as (typeof WIDGET_DESIGN_IDS)[number])) {
+      throw badRequest('Unknown widget design id.');
+    }
+    const patched = DEMO.updateTenantDefaultDesign(updated.id, {
+      designId: id === '' ? null : id,
+      templateId: id === '' ? null : undefined,
+    });
+    if (patched) finalTenant = patched;
+  }
+  const template = finalTenant.designTemplateId ? DEMO.designTemplateById(finalTenant.designTemplateId) : undefined;
+  res.json({
+    theme: DEMO.themeOfTenant(finalTenant),
+    presets: THEME_PRESETS.map((p) => presetSummary(p)),
+    logoUrl: finalTenant.logoUrl ?? null,
+    brandColor: finalTenant.brandColor,
+    design: {
+      widgetDesign: finalTenant.widgetDesign ?? null,
+      template: template ? { id: template.id, name: template.name } : null,
+    },
   });
 });
 

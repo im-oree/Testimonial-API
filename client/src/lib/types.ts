@@ -43,6 +43,32 @@ export interface ThemeSaveResponse {
   brandColor?: string | null;
 }
 
+/** Widget design ids that exist in the shared registry (client/src/widgets). */
+export type WidgetDesignId = 'classic' | 'spotlight' | 'carousel' | 'wall' | 'marquee' | 'orbit';
+
+/** Tier-1 marketplace row — a curated design + visual preset (Zojatech owns). */
+export interface DesignTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  category: 'Grid' | 'Spotlight' | 'Carousel' | 'Wall' | 'Marquee' | 'Orbit' | string;
+  designId: string;
+  primary: string;
+  accent: string;
+  radius: ThemeRadiusId;
+  font: ThemeFontId;
+  builtin: boolean;
+  useCount: number;
+  /** Only on tenant marketplace responses: is this the company default? */
+  active?: boolean;
+}
+
+/** Company-level default (marketplace tier 2) returned with /settings/theme. */
+export interface CompanyDesignDefault {
+  widgetDesign: string | null;
+  template: { id: string; name: string } | null;
+}
+
 export interface MeUser {
   id: string;
   email: string;
@@ -224,6 +250,7 @@ export interface AppSummary {
   accentColor: string | null;
   themeOverride?: { primary: string | null; accent: string | null; radius: ThemeRadiusId | null; font: ThemeFontId | null } | null;
   widgetDesign?: string | null;
+  designTemplateId?: string | null;
   designVersion?: number;
   designOptions?: DesignOptions | null;
   status: 'active' | 'paused';

@@ -211,3 +211,12 @@ export function IconBrand(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconSearch(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.6-4.6" />
+    </Svg>
+  );
+}

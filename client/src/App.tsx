@@ -22,6 +22,7 @@ import AppsHomePage from './pages/AppsHomePage';
 import CompanyOverviewPage from './pages/CompanyOverviewPage';
 import SettingsPage from './pages/SettingsPage';
 import ThemePage from './pages/ThemePage';
+import ThemeMarketplacePage from './pages/ThemeMarketplacePage';
 import AccountPage from './pages/AccountPage';
 import OverviewPage from './pages/OverviewPage';
 import TestimonialsPage from './pages/TestimonialsPage';
@@ -73,6 +74,7 @@ function AppRoutes() {
           <Route path="products" element={<AppsHomePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/theme" element={<ThemePage />} />
+          <Route path="settings/theme/marketplace" element={<ThemeMarketplacePage />} />
           <Route path="settings/account" element={<AccountPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="audit" element={<AuditPage />} />

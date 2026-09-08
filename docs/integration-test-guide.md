@@ -242,3 +242,46 @@ Test the round trip:
 5. Render follows: the wall (and `?embed=1`, and the external demo page) draw
    the design id returned by the payload — version changes never need a
    redeploy on the embedding site.
+
+## 9 · Design template marketplace (three tiers)
+
+Zojatech curates tier-1 design templates (a widget design + a visual preset).
+Companies browse that gallery, adopt one company-wide (tier 2), or copy one
+onto a single product (tier 3). Same machinery as §8: tier-3 copies bump the
+product's design version and public payloads carry the template marker.
+
+1. Zojatech curation (platform console -> Templates, or API):
+   ```bash
+   curl http://localhost:3000/v1/platform/design-templates \
+        -H "authorization: Bearer $PLATFORM_TOKEN"          # curated rows
+   curl -X POST http://localhost:3000/v1/platform/design-templates \
+        -H "authorization: Bearer $PLATFORM_TOKEN" -H 'content-type: application/json' \
+        -d '{"name":"Classic Cobalt","designId":"classic","primary":"#1e3a8a",
+             "accent":"#3b82f6","radius":"md","font":"system",
+             "category":"Grid","description":"grid in cobalt"}'
+   ```
+   New rows appear in every company's Appearance -> Design templates gallery
+   with no client release (tier-1 -> tenant direction).
+2. Company browse + tier-2 adoption:
+   ```bash
+   curl http://localhost:3000/v1/settings/theme/marketplace \
+        -H "authorization: Bearer $TOKEN"    # rows incl. `active` + `current`
+   curl -X POST http://localhost:3000/v1/settings/theme/templates/dt-wall-ocean/apply \
+        -H "authorization: Bearer $TOKEN"    # sets palette + design company-wide
+   ```
+   `GET /v1/settings/theme` then returns `design.widgetDesign` + the template.
+   Products without a per-product override now render the adopted design on
+   their public theme/wall payloads (`designTemplateId` included).
+3. Tier-3 copy onto one product (Connect & design page or API):
+   ```bash
+   curl -X PATCH http://localhost:3000/v1/apps/app-acme-2 \
+        -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+        -d '{"widgetDesign":"orbit","accentColor":"#6d28d9","themeAccent":"#a21caf",
+             "themeRadius":"lg","themeFont":"system","designTemplateId":"dt-orbit-violet"}'
+   ```
+   Verifies: `designVersion` bumps (v1, v2...), `GET /v1/dashboard/apps/:id/design`
+   gains a history entry, and `GET /v1/public/walls/acme-blog` returns
+   `"design":"orbit"` + `"designTemplateId"`. Company-wide changes no longer
+   affect that product until a new template is copied onto it.
+4. Each marketplace card renders the real widget design with the template's
+   tokens (no mock screenshots); adopting does not remove per-product designs.

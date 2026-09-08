@@ -14,6 +14,7 @@
  */
 import { IconCheck, IconPlus } from './icons';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fetchThemePresets, matchingPreset, softOf, RADIUS_OPTIONS, FONT_OPTIONS } from '../lib/theme';
 import type { ResolvedTheme, ThemeFontId, ThemePresetSummary, ThemeRadiusId, ThemeSaveResponse } from '../lib/types';
@@ -31,6 +32,8 @@ interface Draft {
 interface Props {
   /** API route that persists the theme (tenant or platform flavour). */
   endpoint: string;
+  /** Company editor only: href to the design template marketplace (tier-1 gallery). */
+  catalogueHref?: string;
   /** Current theme tokens (or null while loading). */
   initial: Partial<ResolvedTheme> | null;
   initialLogo?: string | null;
@@ -41,7 +44,7 @@ interface Props {
 const FALLBACK: Draft = { presetId: 'midnight', primary: '#1b2559', accent: '#0ea5a0', radius: 'md', font: 'system' };
 const PREVIEW_DESIGNS = ['classic', 'wall', 'carousel'] as const;
 
-export default function ThemeEditor({ endpoint, initial, initialLogo = null, onSaved }: Props) {
+export default function ThemeEditor({ endpoint, initial, initialLogo = null, onSaved, catalogueHref }: Props) {
   const [presets, setPresets] = useState<ThemePresetSummary[]>([]);
   const [presetsReady, setPresetsReady] = useState(false);
   const [draft, setDraft] = useState<Draft>(FALLBACK);
@@ -145,9 +148,14 @@ export default function ThemeEditor({ endpoint, initial, initialLogo = null, onS
               <div>
                 <h3 style={{ margin: 0 }}>1 · Start from a template</h3>
                 <p className="muted small" style={{ margin: '2px 0 0' }}>
-                  A live catalogue maintained by Zojatech — new templates appear here instantly. Custom keeps what you have now.
+                  Colour presets from Zojatech&apos;s live catalogue — new ones appear here instantly. Custom keeps what you have now.
                 </p>
               </div>
+              {catalogueHref && (
+                <Link to={catalogueHref} className="btn btn-secondary btn-xs">
+                  Browse design templates
+                </Link>
+              )}
             </div>
             <div className="theme-presets" role="radiogroup" aria-label="Theme templates">
               {presets.map((p) => {
