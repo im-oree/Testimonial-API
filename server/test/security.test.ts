@@ -266,3 +266,91 @@ describe('DOC 6 — response hardening', () => {
     assert.doesNotMatch(body, /at |\.ts:|stack|demo-data|node_modules/i);
   });
 });
+
+describe('DOC 6 — platform console RBAC (role templates & staff accounts)', () => {
+  let superT = '';
+  let adminT = '';
+  let editorT = '';
+
+  before(async () => {
+    superT = await login('admin@zojatech.test', 'demo1234', true);
+    adminT = await login('tolu@zojatech.test', 'demo1234', true);
+    editorT = await login('kemi@zojatech.test', 'demo1234', true);
+  });
+
+  it('a suspended platform account cannot sign in', async () => {
+    const res = await req('POST', '/v1/platform/auth/login', { body: { email: 'bode@zojatech.test', password: 'demo1234' } });
+    assert.equal(res.status, 403);
+  });
+
+  it('super admin session carries the role-template permission superset', async () => {
+    const me = await req('GET', '/v1/auth/me', { token: superT });
+    assert.equal(me.status, 200);
+    const body = me.json as { user: { role: string }; permissions: string[]; roleTemplates?: unknown[] };
+    assert.equal(body.user.role, 'platform_owner');
+    for (const p of ['tenants.read', 'tenants.write', 'staff.read', 'staff.write', 'impersonate', 'audit.all', 'platform.manage']) {
+      assert.ok(body.permissions.includes(p), `super admin holds ${p}`);
+    }
+    assert.equal(body.roleTemplates?.length, 4);
+  });
+
+  it('editor template: view tenants/staff, but no tenant writes, impersonation or staff mgmt', async () => {
+    assert.equal((await req('GET', '/v1/platform/tenants', { token: editorT })).status, 200);
+    assert.equal((await req('GET', '/v1/platform/staff', { token: editorT })).status, 200);
+    assert.equal(
+      (await req('POST', '/v1/platform/tenants', { token: editorT, body: { name: 'x', ownerEmail: 'x@x.test' } })).status,
+      403,
+    );
+    assert.equal((await req('POST', '/v1/platform/tenants/tenant-acme/impersonate', { token: editorT })).status, 403);
+    assert.equal(
+      (await req('POST', '/v1/platform/staff', { token: editorT, body: { name: 'n', email: 'n@n.test', role: 'platform_support' } })).status,
+      403,
+    );
+  });
+
+  it('admin template: tenants.write allowed, staff management still 403 (write independence)', async () => {
+    assert.equal((await req('PATCH', '/v1/platform/tenants/tenant-acme', { token: adminT, body: { status: 'trialing' } })).status, 200);
+    assert.equal((await req('PATCH', '/v1/platform/tenants/tenant-acme', { token: adminT, body: { status: 'active' } })).status, 200);
+    assert.equal(
+      (await req('POST', '/v1/platform/staff', { token: adminT, body: { name: 'n', email: 'n@n.test', role: 'platform_support' } })).status,
+      403,
+    );
+  });
+
+  it('super admin runs the full staff lifecycle (create, role, suspend, revoke-session, delete)', async () => {
+    const created = await req('POST', '/v1/platform/staff', {
+      token: superT,
+      body: { name: 'Rbac Test', email: 'rbac@zojatech.test', role: 'platform_editor', password: 'hunter22' },
+    });
+    assert.equal(created.status, 201);
+    const id = (created.json as { id: string }).id;
+
+    // signed in while active…
+    const activeToken = await login('rbac@zojatech.test', 'hunter22', true);
+    assert.equal((await req('PATCH', `/v1/platform/staff/${id}`, { token: superT, body: { status: 'suspended' } })).status, 200);
+    // …suspension kills both fresh logins and the already-issued token
+    assert.equal((await req('POST', '/v1/platform/auth/login', { body: { email: 'rbac@zojatech.test', password: 'hunter22' } })).status, 403);
+    assert.equal((await req('GET', '/v1/platform/tenants', { token: activeToken })).status, 403);
+
+    assert.equal((await req('DELETE', `/v1/platform/staff/${id}`, { token: superT })).status, 200);
+    assert.equal((await req('PATCH', `/v1/platform/staff/${id}`, { token: superT, body: { name: 'Ghost' } })).status, 404);
+  });
+
+  it('self-service: own password resets without staff.write; own role/status and self-removal are locked', async () => {
+    assert.equal((await req('PATCH', '/v1/platform/staff/ps-2', { token: adminT, body: { password: 'demo4321' } })).status, 200);
+    assert.equal((await req('PATCH', '/v1/platform/staff/ps-2', { token: adminT, body: { role: 'platform_owner' } })).status, 400);
+    assert.equal((await req('PATCH', '/v1/platform/staff/ps-1', { token: superT, body: { status: 'suspended' } })).status, 400);
+    assert.equal((await req('DELETE', '/v1/platform/staff/ps-1', { token: superT })).status, 400);
+  });
+
+  it('audit log records staff lifecycle with the acting account', async () => {
+    const res = await req('GET', '/v1/platform/audit-logs?perPage=20', { token: superT });
+    assert.equal(res.status, 200);
+    const rows = (res.json as { rows: Array<{ action: string; actor: string; resource: string }> }).rows;
+    assert.ok(rows.some((r) => r.action === 'staff.created'), 'staff.created present');
+    assert.ok(rows.some((r) => r.action === 'staff.password_changed' && r.actor === 'tolu@zojatech.test'));
+    assert.ok(rows.some((r) => r.action === 'staff.suspended' || r.action === 'staff.updated'));
+    const auditUrl = res.json as { rows?: unknown[] };
+    assert.equal((auditUrl.rows ?? []).length > 0, true);
+  });
+});

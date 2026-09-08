@@ -10,12 +10,12 @@
  *   GET  /v1/auth/me                 current session info
  */
 import { Router, type Request } from 'express';
-import { DEMO } from '../demo-data';
+import { DEMO, platformPermissionsFor, PLATFORM_ROLE_TEMPLATES } from '../demo-data';
 import {
   badRequest,
   createSessionToken,
+  forbidden,
   requireCompany,
-  requirePlatform,
   sessionOf,
   unauthorized,
 } from '../lib';
@@ -37,14 +37,19 @@ authRouter.post('/auth/login', (req, res) => {
   res.status(200).json({ requiresMfa: false, user: { email: user.email }, token });
 });
 
-// POST /v1/platform/auth/login
+// POST /v1/platform/auth/login — platform console sign-in. Accounts are the
+// PLATFORM_STAFF rows (they own credentials, role templates and status); the
+// USERS row is a legacy alias still accepted when credentials agree.
 authRouter.post('/platform/auth/login', (req, res) => {
   const email = String(req.body?.email ?? '').toLowerCase().trim();
   const password = String(req.body?.password ?? '');
-  const user = DEMO.platformUsers().find((u) => u.email === email && u.password === password);
-  if (!user) throw badRequest('Invalid email or password.');
-  const token = createSessionToken('platform', user.email);
-  res.status(200).json({ requiresMfa: false, user: { email: user.email }, token });
+  const staff = DEMO.platformStaffByEmail(email);
+  const legacy = DEMO.platformUsers().find((u) => u.email === email && u.password === password);
+  const account = staff ? { email: staff.email, password: staff.password } : legacy ? { email: legacy.email, password: legacy.password } : undefined;
+  if (!account || account.password !== password) throw badRequest('Invalid email or password.');
+  if (staff && staff.status !== 'active') throw forbidden('This account has been suspended. Contact a super admin to restore access.');
+  const token = createSessionToken('platform', account.email);
+  res.status(200).json({ requiresMfa: false, user: { email: account.email }, token });
 });
 
 // POST /v1/auth/mfa/verify
@@ -88,14 +93,18 @@ authRouter.get('/auth/me', (req, res) => {
   if (!session) throw unauthorized('No active session.');
 
   if (session.kind === 'platform') {
-    const user = DEMO.platformUsers().find((u) => u.email === session.email);
-    if (!user) throw unauthorized('No active session.');
+    const staff = DEMO.platformStaffByEmail(session.email) ?? DEMO.platformUsers().find((u) => u.email === session.email);
+    if (!staff) throw unauthorized('No active session.');
+    if ('status' in staff && staff.status === 'suspended') throw forbidden('This account has been suspended.');
+    const permissions = platformPermissionsFor(staff.role);
+    if (staff.role === 'platform_owner') permissions.push('platform.manage');
     res.json({
-      user: { id: user.id, email: user.email, name: user.name, avatarUrl: null, role: user.role },
+      user: { id: staff.id, email: staff.email, name: staff.name, avatarUrl: null, role: staff.role },
       tenant: null,
-      permissions: [],
+      permissions: [...new Set(permissions)],
       permissionsVersion: 1,
       impersonating: null,
+      roleTemplates: PLATFORM_ROLE_TEMPLATES,
     });
     return;
   }
@@ -104,7 +113,7 @@ authRouter.get('/auth/me', (req, res) => {
   if (!raw) throw unauthorized('No active session.');
   const tenant = DEMO.tenantForUser(raw);
   const impersonating =
-    session.impersonatedBy && DEMO.platformUsers().some((p) => p.email === session.impersonatedBy)
+    session.impersonatedBy && DEMO.platformStaffByEmail(session.impersonatedBy)
       ? { by: session.impersonatedBy, tenantId: tenant.id, tenantName: tenant.name }
       : null;
   res.json({
@@ -130,8 +139,8 @@ authRouter.post('/auth/impersonation/exit', (req, res) => {
   if (!session || session.kind !== 'company' || !session.impersonatedBy) {
     throw unauthorized('No active impersonation session.');
   }
-  const platformUser = DEMO.platformUsers().find((p) => p.email === session.impersonatedBy);
-  if (!platformUser) throw unauthorized('No active impersonation session.');
-  const token = createSessionToken('platform', platformUser.email);
-  res.status(200).json({ token, user: { email: platformUser.email } });
+  const platformStaff = DEMO.platformStaffByEmail(session.impersonatedBy);
+  if (!platformStaff) throw unauthorized('No active impersonation session.');
+  const token = createSessionToken('platform', platformStaff.email);
+  res.status(200).json({ token, user: { email: platformStaff.email } });
 });

@@ -3,8 +3,8 @@
  * audit log and AI provider management. All require a platform session.
  */
 import { Router, type Request } from 'express';
-import { DEMO, MONTHLY_BY_PLAN, WIDGET_DESIGN_IDS, type DemoTenant } from '../demo-data';
-import { badRequest, createSessionToken, notFound, paginate, queryString, requirePlatform, sessionOf, type Paging } from '../lib';
+import { DEMO, MONTHLY_BY_PLAN, PLATFORM_ROLE_TEMPLATES, WIDGET_DESIGN_IDS, type DemoTenant, type PlatformRole } from '../demo-data';
+import { badRequest, createSessionToken, forbidden, notFound, paginate, platformStaffOfSession, queryString, requirePlatform, requirePlatformPermission, sessionOf, type Paging } from '../lib';
 import { isValidHexColor, parseThemePatch, RADIUS_IDS, FONT_IDS, type ThemeFont, type ThemeRadius } from '../theme';
 
 export const platformRouter = Router();
@@ -44,7 +44,7 @@ platformRouter.get('/platform/overview', (req, res) => {
 // POST /v1/platform/tenants — create a tenant end-to-end: tenant row +
 // owner login (default demo password, shown once) + platform audit entry.
 platformRouter.post('/platform/tenants', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.write');
   const name = String(req.body?.name ?? '').trim();
   if (!name) throw badRequest('Company name is required.');
   const ownerEmail = String(req.body?.ownerEmail ?? '').toLowerCase().trim();
@@ -99,7 +99,7 @@ platformRouter.get('/platform/tenants', (req, res) => {
 // POST /v1/platform/tenants/:tenantId/impersonate — super-company access:
 // return a company token that opens that tenant's workspace as its owner.
 platformRouter.post('/platform/tenants/:tenantId/impersonate', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'impersonate');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   const owner = DEMO.companyUsers().find((u) => u.email === t.ownerEmail);
@@ -144,13 +144,13 @@ function designTemplateFromBody(body: Record<string, unknown>) {
 
 // POST /v1/platform/design-templates
 platformRouter.post('/platform/design-templates', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   res.status(201).json(DEMO.createDesignTemplate(designTemplateFromBody(req.body ?? {})));
 });
 
 // PATCH /v1/platform/design-templates/:templateId
 platformRouter.patch('/platform/design-templates/:templateId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   const updated = DEMO.updateDesignTemplate(req.params.templateId, designTemplateFromBody(req.body ?? {}));
   if (!updated) throw notFound('Template not found.');
   res.json(updated);
@@ -158,7 +158,7 @@ platformRouter.patch('/platform/design-templates/:templateId', (req, res) => {
 
 // DELETE /v1/platform/design-templates/:templateId
 platformRouter.delete('/platform/design-templates/:templateId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   if (!DEMO.deleteDesignTemplate(req.params.templateId)) throw notFound('Template not found.');
   res.json({ ok: true });
 });
@@ -187,13 +187,13 @@ function templateFromBody(body: Record<string, unknown>) {
 
 // POST /v1/platform/theme-templates
 platformRouter.post('/platform/theme-templates', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   res.status(201).json(DEMO.createThemeTemplate(templateFromBody(req.body ?? {})));
 });
 
 // PATCH /v1/platform/theme-templates/:templateId
 platformRouter.patch('/platform/theme-templates/:templateId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   const body = templateFromBody(req.body ?? {});
   const updated = DEMO.updateThemeTemplate(req.params.templateId, body);
   if (!updated) throw notFound('Template not found.');
@@ -202,14 +202,14 @@ platformRouter.patch('/platform/theme-templates/:templateId', (req, res) => {
 
 // DELETE /v1/platform/theme-templates/:templateId
 platformRouter.delete('/platform/theme-templates/:templateId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'templates.write');
   if (!DEMO.deleteThemeTemplate(req.params.templateId)) throw notFound('Template not found.');
   res.json({ ok: true });
 });
 
 // GET /v1/platform/tenants/:tenantId
 platformRouter.get('/platform/tenants/:tenantId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.read');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   res.json(DEMO.tenantStatusForDetail(t));
@@ -217,7 +217,7 @@ platformRouter.get('/platform/tenants/:tenantId', (req, res) => {
 
 // GET /v1/platform/tenants/:tenantId/staff
 platformRouter.get('/platform/tenants/:tenantId/staff', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.read');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   res.json({ rows: DEMO.teamOfTenant(t.id) });
@@ -225,7 +225,7 @@ platformRouter.get('/platform/tenants/:tenantId/staff', (req, res) => {
 
 // PATCH /v1/platform/tenants/:tenantId
 platformRouter.patch('/platform/tenants/:tenantId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.write');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   if (req.body.plan && ['starter', 'growth', 'scale'].includes(req.body.plan)) t.plan = req.body.plan;
@@ -253,7 +253,7 @@ platformRouter.patch('/platform/tenants/:tenantId', (req, res) => {
 // DOC-7 theme (presets + tokens). Tenants can also manage their own theme via
 // /v1/settings/theme; writes here bump the same version counter.
 platformRouter.patch('/platform/tenants/:tenantId/theme', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.write');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   const parsed = parseThemePatch(req.body ?? {});
@@ -266,7 +266,7 @@ platformRouter.patch('/platform/tenants/:tenantId/theme', (req, res) => {
 
 // DELETE /v1/platform/tenants/:tenantId
 platformRouter.delete('/platform/tenants/:tenantId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'tenants.write');
   const t = DEMO.tenantById(req.params.tenantId);
   if (!t) throw notFound('Tenant not found.');
   const confirm = queryString(req, 'confirm');
@@ -275,15 +275,102 @@ platformRouter.delete('/platform/tenants/:tenantId', (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /v1/platform/staff
+const PLATFORM_ROLE_IDS = PLATFORM_ROLE_TEMPLATES.map((r) => r.id);
+const sanitizeStaff = (m: { id: string; name: string; email: string; role: PlatformRole; status: string; lastActiveAt?: string; createdAt?: string }) => ({
+  id: m.id,
+  name: m.name,
+  email: m.email,
+  role: m.role,
+  status: m.status,
+  lastActiveAt: m.lastActiveAt ?? null,
+  createdAt: m.createdAt ?? null,
+});
+const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+function staffRole(value: unknown): PlatformRole {
+  if (typeof value === 'string' && (PLATFORM_ROLE_IDS as string[]).includes(value)) return value as PlatformRole;
+  throw badRequest('Unknown platform role.');
+}
+
+// GET /v1/platform/staff — directory of platform console accounts.
 platformRouter.get('/platform/staff', (req, res) => {
-  requirePlatform(req);
-  res.json({ rows: DEMO.platformStaff() });
+  requirePlatformPermission(req, 'staff.read');
+  res.json({ rows: DEMO.platformStaff().map(sanitizeStaff), templates: PLATFORM_ROLE_TEMPLATES });
+});
+
+// POST /v1/platform/staff — create a staff account (name/email/role/password).
+platformRouter.post('/platform/staff', (req, res) => {
+  const actor = requirePlatformPermission(req, 'staff.write');
+  const name = String(req.body?.name ?? '').trim().slice(0, 80);
+  if (!name) throw badRequest('Name is required.');
+  const email = String(req.body?.email ?? '').toLowerCase().trim();
+  if (!isValidEmail(email)) throw badRequest('A valid email is required.');
+  const role = staffRole(req.body?.role);
+  const password = String(req.body?.password ?? 'demo1234');
+  if (password.length < 6) throw badRequest('Password must be at least 6 characters.');
+  const created = DEMO.createPlatformStaff({ name, email, role, password });
+  if (!created) throw badRequest('A staff account with that email already exists.');
+  DEMO.appendPlatformAudit({ actor: actor.email, action: 'staff.created', resource: email, ip: '10.0.0.7' });
+  res.status(201).json(sanitizeStaff(created));
+});
+
+// PATCH /v1/platform/staff/:staffId — edit name/email, change role template,
+// suspend/activate, or reset the account password (no current-password proof:
+// a super admin or admin acting on another account). Two access modes:
+//   · self-service — any console staff may update their own name/password;
+//   · management — staff.write, and the account's role/status can never be
+//     changed by the person holding it (protects the console from lock-out).
+platformRouter.patch('/platform/staff/:staffId', (req, res) => {
+  const target = DEMO.platformStaff().find((m) => m.id === req.params.staffId);
+  if (!target) throw notFound('Staff account not found.');
+  const actor = platformStaffOfSession(req);
+  const selfEdit = actor.email === target.email;
+  if (!selfEdit) requirePlatformPermission(req, 'staff.write');
+  const patch: Partial<{ name: string; email: string; role: PlatformRole; status: 'active' | 'invited' | 'suspended'; password: string }> = {};
+  if (req.body?.name !== undefined) {
+    const name = String(req.body.name).trim().slice(0, 80);
+    if (!name) throw badRequest('Name cannot be empty.');
+    patch.name = name;
+  }
+  if (selfEdit && (req.body?.role !== undefined || req.body?.status !== undefined || req.body?.email !== undefined)) {
+    throw badRequest('You cannot change your own role, status or email.');
+  }
+  if (req.body?.email !== undefined) {
+    const email = String(req.body.email).toLowerCase().trim();
+    if (!isValidEmail(email)) throw badRequest('A valid email is required.');
+    patch.email = email;
+  }
+  if (req.body?.role !== undefined) patch.role = staffRole(req.body.role);
+  if (req.body?.status !== undefined) {
+    if (!['active', 'invited', 'suspended'].includes(String(req.body.status))) throw badRequest('Unknown status.');
+    patch.status = req.body.status as 'active' | 'invited' | 'suspended';
+  }
+  if (req.body?.password !== undefined) {
+    const password = String(req.body.password);
+    if (password.length < 6) throw badRequest('Password must be at least 6 characters.');
+    patch.password = password;
+  }
+  const updated = DEMO.patchPlatformStaff(target.id, patch);
+  if (!updated) throw badRequest('That email is already in use by another account.');
+  const action = patch.password ? (selfEdit ? 'staff.password_changed' : 'staff.password_reset') : 'staff.updated';
+  DEMO.appendPlatformAudit({ actor: actor.email, action, resource: updated.email, ip: '10.0.0.7' });
+  res.json(sanitizeStaff(updated));
+});
+
+// DELETE /v1/platform/staff/:staffId — remove a console account (super admin only).
+platformRouter.delete('/platform/staff/:staffId', (req, res) => {
+  const actor = requirePlatformPermission(req, 'platform.manage');
+  const target = DEMO.platformStaff().find((m) => m.id === req.params.staffId);
+  if (!target) throw notFound('Staff account not found.');
+  if (target.email === actor.email) throw badRequest('You cannot remove your own account.');
+  DEMO.deletePlatformStaff(target.id);
+  DEMO.appendPlatformAudit({ actor: actor.email, action: 'staff.removed', resource: target.email, ip: '10.0.0.7' });
+  res.json({ ok: true });
 });
 
 // GET /v1/platform/billing
 platformRouter.get('/platform/billing', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'billing.read');
   res.json({ monthlyMrrUsd: DEMO.mrrs().monthlyMrrUsd, invoices: DEMO.invoices() });
 });
 
@@ -293,12 +380,16 @@ platformRouter.get('/platform/webhooks', (req, res) => {
   res.json({ rows: DEMO.platformWebhooks() });
 });
 
-// GET /v1/platform/audit-logs
+// GET /v1/platform/audit-logs — every platform-level action. A tenantId query
+// narrows to the logs of one workspace (super admin visibility, §audit.all).
 platformRouter.get('/platform/audit-logs', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'audit.read');
   const query: Paging = req.query as Paging;
-  const sorted = DEMO.platformAuditEntries().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  res.json({ rows: paginate(sorted, query), total: sorted.length });
+  const tenantId = queryString(req, 'tenantId');
+  let sorted = DEMO.platformAuditEntries().filter((e) => !tenantId || e.resource === tenantId || e.tenantId === tenantId);
+  sorted = sorted.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const total = sorted.length;
+  res.json({ rows: paginate(sorted, query), total });
 });
 
 // GET /v1/platform/ai/providers
@@ -309,7 +400,7 @@ platformRouter.get('/platform/ai/providers', (req, res) => {
 
 // PATCH /v1/platform/ai/providers/:providerId
 platformRouter.patch('/platform/ai/providers/:providerId', (req, res) => {
-  requirePlatform(req);
+  requirePlatformPermission(req, 'platform.manage');
   const p = DEMO.setAiProviderEnabled(req.params.providerId, Boolean(req.body?.enabled));
   if (!p) throw notFound('Provider not found.');
   res.json(p);

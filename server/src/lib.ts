@@ -4,7 +4,7 @@
  * accounts/testimonials — restarting the server resets it).
  */
 import type { Request } from 'express';
-import { DEMO, type DemoFormQuestion, type DemoTenant, type DemoTestimonial, type DemoUser } from './demo-data';
+import { DEMO, platformPermissionsFor, type DemoFormQuestion, type DemoPlatformStaff, type DemoTenant, type DemoTestimonial, type DemoUser } from './demo-data';
 import { resolveSessionToken, type Session } from './session-tokens';
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,7 @@ export class HttpError extends Error {
 }
 
 export const badRequest = (message: string): HttpError => new HttpError(400, message);
+export const forbidden = (message: string): HttpError => new HttpError(403, message);
 export const unauthorized = (message: string): HttpError => new HttpError(401, message);
 export const notFound = (message: string): HttpError => new HttpError(404, message);
 
@@ -105,10 +106,33 @@ export function requireCompany(req: Request): SessionUser {
   return userLite(user)!;
 }
 
-/** Requires a signed-in platform admin; throws 401 otherwise. */
+/** Requires a signed-in platform session; throws 401 otherwise. */
 export function requirePlatform(req: Request): void {
   const session = sessionOf(req);
   if (!session || session.kind !== 'platform') throw unauthorized('No active session.');
+  const staff = DEMO.platformStaffByEmail(session.email);
+  if (staff && staff.status === 'suspended') throw forbidden('This account has been suspended.');
+}
+
+/** Platform staff account behind the session (401 when the account vanished). */
+export function platformStaffOfSession(req: Request): DemoPlatformStaff {
+  requirePlatform(req);
+  const staff = DEMO.platformStaffByEmail(sessionOf(req)!.email);
+  if (!staff) throw unauthorized('No active session.');
+  return staff;
+}
+
+/**
+ * Requires one platform permission for the signed-in platform staff member.
+ * Permissions come from the staff account's role template, and reads/writes
+ * are independent grants, so console routes never accidentally rely on role
+ * strings alone.
+ */
+export function requirePlatformPermission(req: Request, permission: string): DemoPlatformStaff {
+  const staff = platformStaffOfSession(req);
+  const perms = platformPermissionsFor(staff.role);
+  if (!perms.includes(permission)) throw forbidden('You do not have permission to do that.');
+  return staff;
 }
 
 /** Requires one of the given permissions for the signed-in company user. */

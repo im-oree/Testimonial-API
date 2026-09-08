@@ -185,6 +185,8 @@ export interface DemoAuditEntry {
   ip?: string;
   createdAt: string;
   appId?: string;
+  /** Tenant whose workspace produced this entry (workspace-scope audit). */
+  tenantId?: string;
 }
 
 export interface DemoApiKey {
@@ -215,13 +217,17 @@ export interface DemoInvoice {
   createdAt: string;
 }
 
+export type PlatformRole = 'platform_owner' | 'platform_admin' | 'platform_editor' | 'platform_support';
+
 export interface DemoPlatformStaff {
   id: string;
   name: string;
   email: string;
-  role: 'platform_admin' | 'platform_support';
+  role: PlatformRole;
   status: 'active' | 'invited' | 'suspended';
+  password?: string;
   lastActiveAt?: string;
+  createdAt?: string;
 }
 
 export interface DemoAiProvider {
@@ -332,6 +338,49 @@ function permissionsFor(role: DemoRole | 'platform_owner'): string[] {
   if (role === 'editor') return [...EDITOR_PERMISSIONS];
   if (role === 'viewer') return ['testimonials.read', 'audit.read'];
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// Platform role templates (RBAC presets). Each permission is independent —
+// reads and writes are separate grants, so e.g. "tenants.read" never implies
+// "tenants.write".
+// ---------------------------------------------------------------------------
+export interface PlatformRoleTemplate {
+  id: 'platform_owner' | 'platform_admin' | 'platform_editor' | 'platform_support';
+  name: string;
+  description: string;
+  perms: string[];
+}
+
+export const PLATFORM_ROLE_TEMPLATES: PlatformRoleTemplate[] = [
+  {
+    id: 'platform_owner',
+    name: 'Super admin',
+    description: 'Full control — every tenant, template, staff account, impersonation and every audit log (platform + workspaces).',
+    perms: ['tenants.read', 'tenants.write', 'templates.write', 'staff.read', 'staff.write', 'impersonate', 'billing.read', 'audit.read', 'audit.all', 'platform.manage'],
+  },
+  {
+    id: 'platform_admin',
+    name: 'Admin',
+    description: 'Runs tenants, templates, impersonation and billing; can view staff and audit logs but not manage accounts.',
+    perms: ['tenants.read', 'tenants.write', 'templates.write', 'staff.read', 'impersonate', 'billing.read', 'audit.read'],
+  },
+  {
+    id: 'platform_editor',
+    name: 'Editor',
+    description: 'Curates templates and browses tenants; no impersonation, accounts or billing.',
+    perms: ['tenants.read', 'templates.write', 'staff.read', 'audit.read'],
+  },
+  {
+    id: 'platform_support',
+    name: 'Support',
+    description: 'Read-only console access to help companies; cannot change anything.',
+    perms: ['tenants.read', 'audit.read'],
+  },
+];
+
+export function platformPermissionsFor(role: string): string[] {
+  return PLATFORM_ROLE_TEMPLATES.find((r) => r.id === role)?.perms ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -529,16 +578,19 @@ const IMPORTS: DemoImportJob[] = [
 ];
 
 const TENANT_AUDIT: DemoAuditEntry[] = [
-  { id: 'ta-1', actor: 'owner@acme.test', action: 'testimonial.approved', resource: 't-app-acme-1-a-0', ip: '192.168.1.10', createdAt: dayIso(8) },
-  { id: 'ta-2', actor: 'owner@acme.test', action: 'testimonial.rejected', resource: 't-app-acme-1-r-0', ip: '192.168.1.10', createdAt: dayIso(7) },
-  { id: 'ta-3', actor: 'editor@acme.test', action: 'form.published', resource: 'f-acme-2', ip: '192.168.1.11', createdAt: dayIso(6) },
-  { id: 'ta-4', actor: 'owner@acme.test', action: 'team.invite_sent', resource: 'chris@acme.test', ip: '192.168.1.10', createdAt: dayIso(5) },
-  { id: 'ta-5', actor: 'system', action: 'auth.login', resource: 'owner@acme.test', ip: '197.210.0.4', createdAt: dayIso(8) },
+  { id: 'ta-1', actor: 'owner@acme.test', action: 'testimonial.approved', resource: 't-app-acme-1-a-0', ip: '192.168.1.10', createdAt: dayIso(8), tenantId: 'tenant-acme' },
+  { id: 'ta-2', actor: 'owner@acme.test', action: 'testimonial.rejected', resource: 't-app-acme-1-r-0', ip: '192.168.1.10', createdAt: dayIso(7), tenantId: 'tenant-acme' },
+  { id: 'ta-3', actor: 'editor@acme.test', action: 'form.published', resource: 'f-acme-2', ip: '192.168.1.11', createdAt: dayIso(6), tenantId: 'tenant-acme' },
+  { id: 'ta-4', actor: 'owner@acme.test', action: 'team.invite_sent', resource: 'chris@acme.test', ip: '192.168.1.10', createdAt: dayIso(5), tenantId: 'tenant-acme' },
+  { id: 'ta-5', actor: 'system', action: 'auth.login', resource: 'owner@acme.test', ip: '197.210.0.4', createdAt: dayIso(8), tenantId: 'tenant-acme' },
+  { id: 'ta-6', actor: 'system', action: 'tenant.created', resource: 'owner@acme.test', createdAt: dayIso(20), tenantId: 'tenant-lumen' },
 ];
 
-const PLATFORM_STAFF: DemoPlatformStaff[] = [
-  { id: 'ps-1', name: 'Zojatech Admin', email: 'admin@zojatech.test', role: 'platform_admin', status: 'active', lastActiveAt: dayIso(8) },
-  { id: 'ps-2', name: 'Tolu Support', email: 'tolu@zojatech.test', role: 'platform_support', status: 'active', lastActiveAt: dayIso(6) },
+let PLATFORM_STAFF: DemoPlatformStaff[] = [
+  { id: 'ps-1', name: 'Zojatech Super Admin', email: 'admin@zojatech.test', role: 'platform_owner', password: 'demo1234', status: 'active', lastActiveAt: dayIso(8), createdAt: '2026-01-01T08:00:00.000Z' },
+  { id: 'ps-2', name: 'Tolu Admin', email: 'tolu@zojatech.test', role: 'platform_admin', password: 'demo1234', status: 'active', lastActiveAt: dayIso(7), createdAt: '2026-02-14T09:00:00.000Z' },
+  { id: 'ps-3', name: 'Kemi Editor', email: 'kemi@zojatech.test', role: 'platform_editor', password: 'demo1234', status: 'active', lastActiveAt: dayIso(5), createdAt: '2026-03-01T09:00:00.000Z' },
+  { id: 'ps-4', name: 'Bode Support', email: 'bode@zojatech.test', role: 'platform_support', password: 'demo1234', status: 'suspended', lastActiveAt: dayIso(9), createdAt: '2026-04-22T09:00:00.000Z' },
 ];
 
 const PLATFORM_WEBHOOKS: DemoWebhook[] = [
@@ -1136,6 +1188,57 @@ export const DEMO = {
   },
   platformStaff(): DemoPlatformStaff[] {
     return [...PLATFORM_STAFF];
+  },
+
+  platformStaffByEmail(email: string): DemoPlatformStaff | undefined {
+    return PLATFORM_STAFF.find((m) => m.email === email.toLowerCase().trim());
+  },
+  patchPlatformStaff(id: string, patch: Partial<Pick<DemoPlatformStaff, 'name' | 'email' | 'role' | 'status' | 'password'>>): DemoPlatformStaff | undefined {
+    const m = PLATFORM_STAFF.find((x) => x.id === id);
+    if (!m) return undefined;
+    if (patch.email && patch.email !== m.email && PLATFORM_STAFF.some((o) => o.email === patch.email)) return undefined;
+    Object.assign(m, patch, { lastActiveAt: new Date().toISOString() });
+    return m;
+  },
+  createPlatformStaff(input: { name: string; email: string; role: PlatformRole; password: string }): DemoPlatformStaff | undefined {
+    if (PLATFORM_STAFF.some((o) => o.email === input.email)) return undefined;
+    const m: DemoPlatformStaff = {
+      id: `ps-${randomUUID().slice(0, 6)}`,
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      password: input.password,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+    };
+    PLATFORM_STAFF.push(m);
+    return m;
+  },
+  deletePlatformStaff(id: string): boolean {
+    const before = PLATFORM_STAFF.length;
+    PLATFORM_STAFF = PLATFORM_STAFF.filter((x) => x.id !== id);
+    return PLATFORM_STAFF.length < before;
+  },
+  appendPlatformAudit(entry: Omit<DemoAuditEntry, 'id' | 'createdAt'>): DemoAuditEntry {
+    const row: DemoAuditEntry = { ...entry, id: `pa-${randomUUID().slice(0, 6)}`, createdAt: new Date().toISOString() };
+    PLATFORM_AUDIT.unshift(row);
+    return row;
+  },
+  appendTenantAudit(entry: Omit<DemoAuditEntry, 'id' | 'createdAt'> & { tenantId?: string }): DemoAuditEntry {
+    const row: DemoAuditEntry = { ...entry, id: `ta-${randomUUID().slice(0, 6)}`, createdAt: new Date().toISOString(), tenantId: entry.tenantId };
+    TENANT_AUDIT.unshift(row);
+    return row;
+  },
+  /**
+   * Sign-in lookup for the platform console: matches a platform staff account.
+   * A matching row is also enough to prove the account exists, even when the
+   * role has no direct permissions of its own (e.g. a suspended account).
+   */
+  platformSignIn(role: string): { account?: DemoPlatformStaff } {
+    const account = PLATFORM_STAFF.find((m) => m.role === role && m.status === 'active');
+    if (!account) return { account: undefined };
+    return { account };
   },
   platformWebhooks(): DemoWebhook[] {
     return [...PLATFORM_WEBHOOKS];
