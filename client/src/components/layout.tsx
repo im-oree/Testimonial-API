@@ -11,7 +11,7 @@
  * A platform admin impersonating a company sees a banner with one-click exit.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../auth';
 import { api } from '../lib/api';
@@ -19,16 +19,58 @@ import { initials } from '../lib/format';
 import type { AppSummary, MeTenant } from '../lib/types';
 import { InlineSpinner } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
+import { IconChevronDown } from './icons';
 
 export interface NavItem {
   label: string;
   to: string;
   end?: boolean;
+  /** Required platform/company permission; hidden when the session lacks it. */
+  perm?: string;
 }
 
 export interface NavGroup {
   label?: string | null;
   items: NavItem[];
+}
+
+/** A labelled nav section that can collapse to keep the sidebar from getting crowded. */
+function NavGroupBlock({ label, items }: { label?: string | null; items: NavItem[] }) {
+  const [open, setOpen] = useState(true);
+  if (items.length === 0) return null;
+  if (!label) {
+    return (
+      <div className="nav-group">
+        {items.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            {item.label}
+          </NavLink>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="nav-group">
+      <button
+        type="button"
+        className={`nav-group-toggle ${open ? '' : 'is-collapsed'}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="sidebar-section-label">{label}</span>
+        <IconChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="nav-group-items">
+          {items.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Sidebar({
@@ -42,8 +84,12 @@ function Sidebar({
   identity?: Pick<MeTenant, 'name' | 'brandColor' | 'logoUrl'> | null;
   extra?: ReactNode;
 }) {
-  const { user, signOut } = useAuth();
+  const { user, permissions, signOut } = useAuth();
   const navigate = useNavigate();
+
+  const visible = groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.perm || permissions.includes(it.perm)) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <aside className="sidebar">
@@ -76,15 +122,8 @@ function Sidebar({
       {extra && <div className="sidebar-extra">{extra}</div>}
 
       <nav className="sidebar-nav">
-        {groups.map((group, gi) => (
-          <div key={gi} className="nav-group">
-            {group.label && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-                {item.label}
-              </NavLink>
-            ))}
-          </div>
+        {visible.map((group, gi) => (
+          <NavGroupBlock key={gi} label={group.label} items={group.items} />
         ))}
       </nav>
 
@@ -94,12 +133,9 @@ function Sidebar({
             <span className="avatar">{initials(user.name)}</span>
             <span className="sidebar-user-text">
               <span className="strong">{user.name}</span>
-              <span className="muted small">{user.role.replace('_', ' ')}</span>
-              {!user.role.startsWith('platform') && (
-                <Link to="/app/settings/account" className="sidebar-account-link">
-                  Account settings
-                </Link>
-              )}
+              <span className="muted small">
+                {user.role.startsWith('platform_owner') ? 'Super admin' : user.role.startsWith('platform') ? 'Platform team' : user.role.replace('_', ' ')}
+              </span>
             </span>
           </div>
         )}
@@ -274,6 +310,13 @@ export function AppLayout() {
   const match = pathname.match(/^\/app\/a\/([^/]+)/);
   const appId = match?.[1] ?? null;
 
+  const workspaceManage: NavItem[] = [
+    { label: 'Settings', to: '/app/settings', end: true },
+    { label: 'Account', to: '/app/settings/account', end: true },
+    { label: 'Team & roles', to: '/app/team', perm: 'team.manage' },
+    { label: 'Audit logs', to: '/app/audit', perm: 'audit.read' },
+  ];
+
   const groups: NavGroup[] = appId
     ? [
         { items: [{ label: 'All products', to: '/app/products' }] },
@@ -287,15 +330,16 @@ export function AppLayout() {
             { label: 'Forms', to: `/app/a/${appId}/forms` },
           ],
         },
+        { label: 'Manage', items: workspaceManage },
       ]
     : [
         {
           items: [
             { label: 'Overview', to: '/app/overview', end: true },
             { label: 'Products', to: '/app/products', end: true },
-            { label: 'Settings', to: '/app/settings', end: true },
           ],
         },
+        { label: 'Manage', items: workspaceManage },
       ];
 
   return (
@@ -314,11 +358,21 @@ export function AppLayout() {
 export function PlatformLayout() {
   const groups: NavGroup[] = [
     {
+      label: 'Console',
       items: [
         { label: 'Overview', to: '/platform/overview', end: true },
         { label: 'Tenants', to: '/platform/tenants' },
-        { label: 'Theme Templates', to: '/platform/templates' },
-        { label: 'Audit Logs', to: '/platform/audit', end: true },
+      ],
+    },
+    {
+      label: 'Catalogue',
+      items: [{ label: 'Theme Templates', to: '/platform/templates', end: true }],
+    },
+    {
+      label: 'Team & access',
+      items: [
+        { label: 'Team accounts', to: '/platform/accounts', perm: 'staff.read' },
+        { label: 'Audit Logs', to: '/platform/audit', perm: 'audit.read', end: true },
       ],
     },
   ];
