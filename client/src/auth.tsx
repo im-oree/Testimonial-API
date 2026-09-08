@@ -5,6 +5,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { api, ApiError, fetchMeRaw, getSessionToken, recordAuthDebug, storeSessionToken } from './lib/api';
+import { ZojatechLoader } from './components/brand/ZojatechLoader';
 import type { MeImpersonating, MeResponse } from './lib/types';
 
 type AuthStatus = 'loading' | 'signedIn' | 'signedOut';
@@ -123,8 +124,8 @@ export function useAuth(): AuthState {
 export function FullScreenLoading({ label = 'Checking your session…' }: { label?: string }) {
   return (
     <div className="screen-center">
-      <div className="spinner" aria-hidden />
-      <p className="muted">{label}</p>
+      <ZojatechLoader size={40} />
+      <p className="muted" style={{ marginTop: 12 }}>{label}</p>
     </div>
   );
 }

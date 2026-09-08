@@ -19,6 +19,7 @@ import { initials } from '../lib/format';
 import type { AppSummary, MeTenant } from '../lib/types';
 import { useEditorStore } from '../design-studio/editor-store';
 import { InlineSpinner } from './ui';
+import { IconZojatechMark } from './icons/brand';
 import { ErrorBoundary } from './ErrorBoundary';
 import {
   IconBuilding, IconChevronDown, IconChevronLeft, IconClipboard, IconEdit, IconExternal, IconHome,
@@ -117,7 +118,7 @@ function Sidebar({
   return (
     <aside className={`sidebar ${rail ? 'rail' : ''}`}>
       <div className="sidebar-brand">
-        <span className="brand-dot" />
+        <IconZojatechMark size={24} />
         <span className="nav-label">{brand}</span>
       </div>
       <button

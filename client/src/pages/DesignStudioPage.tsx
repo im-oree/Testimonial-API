@@ -31,6 +31,7 @@ import { boundFieldId, boundValue, displayText, FIELD_DEFS, fieldDefOf } from '.
 import type { AppSummary } from '../lib/types';
 import type { ElementType, StudioElement, StudioRecord } from '../design-studio/types';
 import { Button, ErrorBanner, Toggle } from '../components/ui';
+import { ZojatechLoader } from '../components/brand/ZojatechLoader';
 import { Field, NumberInput, SelectField, TextAreaInput, TextInput } from '../components/fields';
 import { IconCheck, IconLayers, IconPlus, IconRefresh, IconSidebar, IconTrash, IconX, IconZoomMinus, IconZoomPlus } from '../components/icons';
 
@@ -360,8 +361,8 @@ export default function DesignStudioPage() {
           </div>
         </div>
         <div className="studio-stage">
-          <div className="studio-viewport">
-            <span className="sk" style={{ width: '56%', height: '70%', borderRadius: 14, margin: 'auto' }} />
+          <div className="studio-viewport" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ZojatechLoader size={52} label="Loading your design" />
           </div>
           <aside className="studio-ov studio-ov-left" style={{ padding: 10 }}>
             {Array.from({ length: 7 }).map((_, i) => (

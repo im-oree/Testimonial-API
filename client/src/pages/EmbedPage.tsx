@@ -139,6 +139,34 @@ export default function EmbedPage() {
 
       {error && <ErrorBanner message={error} onRetry={() => setTick((t) => t + 1)} />}
 
+      {!app && !error && (
+        <div aria-busy="true">
+          <div className="card" style={{ marginBottom: 16 }}>
+            <span className="sk" style={{ display: 'block', width: 180, height: 14, margin: '0 auto 14px' }} />
+            <span className="sk" style={{ display: 'block', height: 300, borderRadius: 14 }} />
+          </div>
+          <div className="connect-steps" style={{ marginBottom: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card connect-step">
+                <span className="sk" style={{ width: 26, height: 26, borderRadius: 999, flex: 'none' }} />
+                <span style={{ flex: 1 }}>
+                  <span className="sk" style={{ display: 'block', width: '40%', height: 13, marginBottom: 8 }} />
+                  <span className="sk" style={{ display: 'block', width: '85%', height: 10 }} />
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="embed-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card embed-card">
+                <span className="sk" style={{ display: 'block', width: 120, height: 13, marginBottom: 12 }} />
+                <span className="sk" style={{ display: 'block', width: '100%', height: 72, borderRadius: 10 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {app?.designDraft && (
         <div className="draft-banner" role="status">
           <span className="strong small">Draft in progress</span>

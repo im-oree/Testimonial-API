@@ -4,6 +4,7 @@
  * the API returns a session token that this app keeps and sends as a Bearer
  * header, so it also works inside embedded preview iframes).
  */
+import { IconZojatechMark } from '../components/icons/brand';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, FullScreenLoading } from '../auth';
@@ -17,14 +18,14 @@ type Mode = 'company' | 'platform';
 const MODE_META: Record<Mode, { title: string; subtitle: string; endpoint: string; home: string; demoLabel: string }> = {
   company: {
     title: 'Sign in to your workspace',
-    subtitle: 'Company / tenant staff',
+    subtitle: 'Products, reviews and widgets — all in one place.',
     endpoint: '/v1/auth/login',
     home: '/app',
     demoLabel: 'Company workspace · Acme Inc',
   },
   platform: {
     title: 'Platform admin',
-    subtitle: 'Zojatech staff',
+    subtitle: 'The Zojatech staff console.',
     endpoint: '/v1/platform/auth/login',
     home: '/platform/overview',
     demoLabel: 'Platform admin · Zojatech',
@@ -109,8 +110,8 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-dot" />
-          <span>Testimonial API</span>
+          <IconZojatechMark size={26} />
+          <span>Zojatech</span>
         </div>
         <h1>{cfg.title}</h1>
         <p className="muted">{cfg.subtitle}</p>

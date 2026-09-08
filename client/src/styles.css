@@ -2015,3 +2015,24 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   flex: none; width: 20px; height: 20px;
 }
 .nav-link .nav-ic svg { display: block; }
+
+/* ---- Zojatech brand loader + boot intro ----------------------------------- */
+.zj-loader { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; }
+
+/* Boot: the app scales up beneath the collapsing intro disc. The transform
+   class is dropped entirely once the intro is done so sticky/fixed positioning
+   inside the app is never affected by a transformed ancestor. */
+.app-root { min-height: 100%; }
+.app-root.app-boot { opacity: 0; transform: scale(0.965); transform-origin: 50% 42%; }
+.app-root.app-boot.is-in {
+  opacity: 1; transform: scale(1);
+  transition: transform .58s cubic-bezier(.22, .61, .36, 1), opacity .5s ease;
+}
+
+.app-intro { position: fixed; inset: 0; z-index: 999; display: flex; align-items: center; justify-content: center; }
+.app-intro-disc {
+  width: 165vmax; height: 165vmax; border-radius: 50%;
+  background: #002986;
+  display: flex; align-items: center; justify-content: center;
+  will-change: transform;
+}

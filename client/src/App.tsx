@@ -13,8 +13,10 @@
  *   /platform/...              -> platform console (guarded)
  *   anything else              -> role-aware 404 page
  */
+import { useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './auth';
+import { AppIntro } from './components/brand/AppIntro';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppLayout, PlatformLayout } from './components/layout';
 import LoginPage from './pages/LoginPage';
@@ -44,9 +46,25 @@ import TemplatesPage from './pages/platform/TemplatesPage';
 import PlatformStaffPage from './pages/platform/PlatformStaffPage';
 
 export default function App() {
+  // Boot intro: plays on every page load (tab open + hard refresh) and never
+  // on client-side navigation — the app only remounts on a real load.
+  // Public surfaces (embeds, walls, forms) skip it: speed beats ceremony there.
+  const { pathname } = useLocation();
+  const isPublicSurface = useRef(pathname.startsWith('/wall') || pathname.startsWith('/forms')).current;
+  const [revealed, setRevealed] = useState(false);
+  const [introDone, setIntroDone] = useState(isPublicSurface);
+
   return (
     <AuthProvider>
-      <AppRoutes />
+      {!introDone && <AppIntro onReveal={() => setRevealed(true)} onDone={() => setIntroDone(true)} />}
+      <div
+        className={
+          introDone || isPublicSurface ? 'app-root' : `app-root app-boot ${revealed ? 'is-in' : ''}`
+        }
+        style={introDone ? undefined : { pointerEvents: 'none' }}
+      >
+        <AppRoutes />
+      </div>
     </AuthProvider>
   );
 }
