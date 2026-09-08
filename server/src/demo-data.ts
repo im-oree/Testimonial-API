@@ -1056,6 +1056,13 @@ export const DEMO = {
     }
     return tenant;
   },
+  /** Renames the tenant (workspace profile setting). */
+  updateTenantWorkspace(tenantId: string, name: string): DemoTenant | undefined {
+    const tenant = TENANTS.find((t) => t.id === tenantId);
+    if (!tenant) return undefined;
+    tenant.name = name;
+    return tenant;
+  },
   /** Updates a tenant's visual identity (brand colour + logo) from its own workspace. */
   updateTenantIdentity(tenantId: string, input: { brandColor?: string | null; logoUrl?: string | null }): DemoTenant | undefined {
     const tenant = TENANTS.find((t) => t.id === tenantId);

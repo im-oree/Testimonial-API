@@ -442,3 +442,20 @@ describe('DOC 6 — company team management & tenant RBAC (role templates, staff
     assert.equal((await req('GET', '/v1/platform/audit-logs?scope=all', { token: editorStaff })).status, 403);
   });
 });
+
+describe('DOC 6 — company settings surface (workspace profile)', () => {
+  it('rename requires settings.manage and lands in /me + the workspace audit log', async () => {
+    const owner = await login('owner@acme.test', 'demo1234');
+    const viewer = await login('chris@acme.test', 'demo1234');
+
+    assert.equal((await req('PATCH', '/v1/settings/workspace', { token: viewer, body: { name: 'Nope' } })).status, 401);
+    assert.equal((await req('PATCH', '/v1/settings/workspace', { token: owner, body: { name: 'Acme Inc (QA)' } })).status, 200);
+    const me = await req('GET', '/v1/auth/me', { token: owner });
+    assert.equal((me.json as { tenant: { name: string } }).tenant.name, 'Acme Inc (QA)');
+    const audit = await req('GET', '/v1/audit-logs?perPage=5', { token: owner });
+    const actions = (audit.json as { rows: Array<{ action: string; resource: string }> }).rows.map((r) => r.action);
+    assert.ok(actions.includes('settings.workspace_updated'));
+    // restore the seed name so other suites keep working
+    assert.equal((await req('PATCH', '/v1/settings/workspace', { token: owner, body: { name: 'Acme Inc' } })).status, 200);
+  });
+});

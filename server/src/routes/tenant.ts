@@ -811,6 +811,22 @@ tenantRouter.patch('/settings/identity', (req, res) => {
   });
 });
 
+// PATCH /v1/settings/workspace — the workspace's own profile settings
+// (name). Slug stays immutable (public URLs depend on it); the platform side
+// handles plan/status. Changes show up in the sidebar identity after the
+// session refreshes and are recorded in the workspace audit log.
+tenantRouter.patch('/settings/workspace', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'settings.manage');
+  const name = String(req.body?.name ?? '').trim();
+  if (!name) throw badRequest('A workspace name is required.');
+  if (name.length > 80) throw badRequest('Workspace name must be 80 characters or fewer.');
+  const updated = DEMO.updateTenantWorkspace(tenant.id, name);
+  if (!updated) throw notFound('Tenant not found.');
+  DEMO.appendTenantAudit({ actor: sessionOf(req)?.email ?? 'unknown', action: 'settings.workspace_updated', resource: updated.name, tenantId: tenant.id });
+  res.json({ tenant: { id: updated.id, name: updated.name, slug: updated.slug, brandColor: updated.brandColor ?? null, logoUrl: updated.logoUrl ?? null } });
+});
+
 // GET /v1/audit-logs — this workspace's own log. Members only ever see their
 // tenant's entries: other workspaces' rows never leave the server.
 tenantRouter.get('/audit-logs', (req, res) => {
