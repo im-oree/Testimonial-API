@@ -341,6 +341,46 @@ function permissionsFor(role: DemoRole | 'platform_owner'): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Company role templates (tenant RBAC presets). These are the grants each role
+// enforces — reads and writes are separate permissions, so e.g. viewing a
+// review queue never grants the right to moderate it. The owner is the tenant's
+// super admin: its row and membership cannot be changed by another member.
+// ---------------------------------------------------------------------------
+export interface CompanyRoleTemplate {
+  id: DemoRole;
+  name: string;
+  description: string;
+  perms: string[];
+}
+
+export const COMPANY_ROLE_TEMPLATES: CompanyRoleTemplate[] = [
+  {
+    id: 'owner',
+    name: 'Owner',
+    description: 'Super admin of this tenant: full control over products, reviews, moderation, forms, widgets, team, settings and the audit log. Owns the workspace and cannot be demoted or suspended by other members.',
+    perms: [...OWNER_PERMISSIONS],
+  },
+  {
+    id: 'admin',
+    name: 'Admin',
+    description: 'Runs day-to-day operations with the same broad grants as the owner — products, reviews, team invitations and role changes, settings — except ownership itself stays with the owner account.',
+    perms: [...OWNER_PERMISSIONS],
+  },
+  {
+    id: 'editor',
+    name: 'Editor',
+    description: 'Content work: add and edit testimonials, publish forms and shape the widget. Cannot moderate the queue, invite people or touch settings.',
+    perms: [...EDITOR_PERMISSIONS],
+  },
+  {
+    id: 'viewer',
+    name: 'Viewer',
+    description: 'Read-only stakeholder access: approved reviews, public walls and the tenant audit log. Nothing can be changed.',
+    perms: ['testimonials.read', 'audit.read'],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Platform role templates (RBAC presets). Each permission is independent —
 // reads and writes are separate grants, so e.g. "tenants.read" never implies
 // "tenants.write".
@@ -963,16 +1003,27 @@ export const DEMO = {
   teamOfTenant(tenantId: string): DemoTeamMember[] {
     return TEAM.filter((m) => m.tenantId === tenantId);
   },
-  inviteTeamMember(tenantId: string, email: string, role: DemoRole): DemoTeamMember {
+  /**
+   * Adds a member AND a working sign-in account (same email, demo password).
+   * The demo has no outbound email, so the inviter receives the credentials
+   * once; the member then signs in like any other account and can manage their
+   * own profile under Account settings.
+   */
+  inviteTeamMember(tenantId: string, email: string, role: DemoRole, password = 'demo1234'): DemoTeamMember {
+    const name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     const member: DemoTeamMember = {
       id: `m-${randomUUID().slice(0, 6)}`, tenantId,
-      name: email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      email, role, status: 'invited',
+      name, email, role, status: 'active',
+      lastActiveAt: new Date().toISOString(),
     };
     TEAM.push(member);
+    USERS.push({ id: `u-${randomUUID().slice(0, 6)}`, email, password, name, role, tenantId });
     const tenant = TENANTS.find((t) => t.id === tenantId);
     if (tenant) tenant.seatsUsed = TEAM.filter((m) => m.tenantId === tenantId).length;
     return member;
+  },
+  companyUserByEmail(tenantId: string, email: string): DemoUser | undefined {
+    return USERS.find((u) => u.tenantId === tenantId && u.email === email);
   },
   patchTeamMember(memberId: string, patch: { role?: DemoRole; status?: 'active' | 'suspended' | 'invited' }): DemoTeamMember | undefined {
     const m = TEAM.find((x) => x.id === memberId);

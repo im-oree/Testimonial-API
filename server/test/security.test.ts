@@ -354,3 +354,91 @@ describe('DOC 6 — platform console RBAC (role templates & staff accounts)', ()
     assert.equal((auditUrl.rows ?? []).length > 0, true);
   });
 });
+
+describe('DOC 6 — company team management & tenant RBAC (role templates, staff accounts, scoped audit)', () => {
+  let adminToken = '';
+
+  before(async () => {
+    // Create a second super-tier member (role 'admin') via the owner's invite.
+    const created = await req('POST', '/v1/team/invites', {
+      token: ownerToken,
+      body: { email: 'boss@acme.test', role: 'admin' },
+    });
+    assert.equal(created.status, 201);
+    const creds = (created.json as { credentials: { email: string; password: string } }).credentials;
+    assert.equal(creds.password, 'demo1234');
+    adminToken = await login('boss@acme.test', 'demo1234');
+  });
+
+  it('role templates are served and mirror what the server enforces', async () => {
+    const res = await req('GET', '/v1/team/roles', { token: ownerToken });
+    assert.equal(res.status, 200);
+    const templates = (res.json as { templates: Array<{ id: string; perms: string[] }> }).templates;
+    assert.equal(templates.length, 4);
+    const owner = templates.find((t) => t.id === 'owner');
+    assert.ok(owner?.perms.includes('team.manage'));
+    assert.ok(owner?.perms.includes('audit.read'));
+    const viewer = templates.find((t) => t.id === 'viewer');
+    assert.ok(viewer && !viewer.perms.includes('team.manage') && viewer.perms.includes('testimonials.read'));
+  });
+
+  it('invited members get working credentials; wrong-role members cannot manage the team', async () => {
+    const team = await req('GET', '/v1/team', { token: ownerToken });
+    const rows = (team.json as { rows: Array<{ id: string; email: string; role: string }> }).rows;
+    assert.ok(rows.some((r) => r.email === 'boss@acme.test' && r.role === 'admin'));
+    assert.equal((await req('POST', '/v1/team/invites', { token: editorToken, body: { email: 'x@acme.test', role: 'viewer' } })).status, 401);
+    assert.equal((await req('POST', '/v1/team/invites', { token: viewerToken, body: { email: 'y@acme.test', role: 'viewer' } })).status, 401);
+  });
+
+  it('admin can reset another member’s password but not their own, and not the owner row', async () => {
+    const team = await req('GET', '/v1/team', { token: adminToken });
+    const rows = (team.json as { rows: Array<{ id: string; email: string; role: string }> }).rows;
+    const boss = rows.find((r) => r.email === 'boss@acme.test')!;
+    const eden = rows.find((r) => r.email === 'editor@acme.test')!;
+
+    // reset editor's password -> old login dies, new login works
+    assert.equal((await req('PATCH', `/v1/team/${eden.id}`, { token: adminToken, body: { password: 'fresh123' } })).status, 200);
+    assert.equal((await req('POST', '/v1/auth/login', { body: { email: 'editor@acme.test', password: 'demo1234' } })).status, 400);
+    assert.equal((await req('POST', '/v1/auth/login', { body: { email: 'editor@acme.test', password: 'fresh123' } })).status, 200);
+
+    // own role/status/password locked on the team surface
+    assert.equal((await req('PATCH', `/v1/team/${boss.id}`, { token: adminToken, body: { role: 'owner' } })).status, 400);
+    assert.equal((await req('PATCH', `/v1/team/${boss.id}`, { token: adminToken, body: { password: 'x12345' } })).status, 400);
+
+    // owner row is protected even for an admin actor
+    const ada = rows.find((r) => r.email === 'owner@acme.test')!;
+    assert.equal((await req('PATCH', `/v1/team/${ada.id}`, { token: adminToken, body: { role: 'viewer' } })).status, 400);
+  });
+
+  it('suspended members lose login and live sessions; reactivation restores both', async () => {
+    const team = await req('GET', '/v1/team', { token: ownerToken });
+    const rows = (team.json as { rows: Array<{ id: string; email: string }> }).rows;
+    const boss = rows.find((r) => r.email === 'boss@acme.test')!;
+    assert.equal((await req('PATCH', `/v1/team/${boss.id}`, { token: ownerToken, body: { status: 'suspended' } })).status, 200);
+    assert.equal((await req('POST', '/v1/auth/login', { body: { email: 'boss@acme.test', password: 'demo1234' } })).status, 403);
+    assert.equal((await req('GET', '/v1/team', { token: adminToken })).status, 403);
+    assert.equal((await req('PATCH', `/v1/team/${boss.id}`, { token: ownerToken, body: { status: 'active' } })).status, 200);
+    assert.equal((await req('POST', '/v1/auth/login', { body: { email: 'boss@acme.test', password: 'demo1234' } })).status, 200);
+  });
+
+  it('company audit log is scoped to the workspace', async () => {
+    const res = await req('GET', '/v1/audit-logs', { token: ownerToken });
+    assert.equal(res.status, 200);
+    const rows = (res.json as { rows: Array<{ id: string; tenantId?: string }> }).rows;
+    assert.ok(rows.length > 0);
+    for (const r of rows) assert.equal(r.tenantId, 'tenant-acme', 'no cross-workspace rows leak');
+    assert.ok(rows.some((r) => r.id === 'ta-4'), 'seeded invite entry visible');
+  });
+
+  it('super admin merges every workspace into the platform log; others cannot ask for it', async () => {
+    const superToken = await login('admin@zojatech.test', 'demo1234', true);
+    const all = await req('GET', '/v1/platform/audit-logs?scope=all&perPage=200', { token: superToken });
+    assert.equal(all.status, 200);
+    const body = all.json as { rows: Array<{ tenantId?: string }>; scope: string };
+    assert.equal(body.scope, 'all');
+    assert.ok(body.rows.some((r) => r.tenantId === 'tenant-acme'), 'workspace rows present in the merged log');
+
+    const editorStaff = await login('kemi@zojatech.test', 'demo1234', true);
+    assert.equal((await req('GET', '/v1/platform/audit-logs?scope=all', { token: editorStaff })).status, 403);
+  });
+});

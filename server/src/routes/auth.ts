@@ -27,6 +27,10 @@ function companyUser(req: Request): { id: string; email: string; name: string; r
   const password = String(req.body?.password ?? '');
   const user = DEMO.companyUsers().find((u) => u.email === email && u.password === password);
   if (!user) throw badRequest('Invalid email or password.');
+  if (user.tenantId) {
+    const member = DEMO.teamOfTenant(user.tenantId).find((m) => m.email === user.email);
+    if (member && member.status === 'suspended') throw forbidden('This account has been suspended. Contact the workspace owner.');
+  }
   return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 

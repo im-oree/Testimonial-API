@@ -103,6 +103,10 @@ export function requireCompany(req: Request): SessionUser {
   if (!session || session.kind !== 'company') throw unauthorized('No active session.');
   const user = DEMO.companyUsers().find((u) => u.email === session.email);
   if (!user) throw unauthorized('No active session.');
+  if (user.tenantId) {
+    const member = DEMO.teamOfTenant(user.tenantId).find((m) => m.email === user.email);
+    if (member && member.status === 'suspended') throw forbidden('This account has been suspended. Contact the workspace owner.');
+  }
   return userLite(user)!;
 }
 

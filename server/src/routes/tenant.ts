@@ -6,7 +6,7 @@
  * All routes require a company session (`Authorization: Bearer <token>`).
  */
 import { Router, type Request } from 'express';
-import { DEMO, WIDGET_DESIGN_IDS, type DemoRole, type DesignOptions, type DesignSort } from '../demo-data';
+import { COMPANY_ROLE_TEMPLATES, DEMO, WIDGET_DESIGN_IDS, type DemoRole, type DesignOptions, type DesignSort } from '../demo-data';
 import {
   appOfSession,
   badRequest,
@@ -587,33 +587,92 @@ tenantRouter.patch('/account', (req, res) => {
   res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role }, token: newToken });
 });
 
-// GET /v1/team
+// GET /v1/team — the tenant's member directory.
 tenantRouter.get('/team', (req, res) => {
   const tenant = tenantOfSession(req);
   res.json({ rows: DEMO.teamOfTenant(tenant.id) });
 });
 
-// POST /v1/team/invites
+// GET /v1/team/roles — company role templates (tenant RBAC presets). The UI
+// renders these as cards/matrices; the server enforces the same grants.
+tenantRouter.get('/team/roles', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({ tenantId: tenant.id, templates: COMPANY_ROLE_TEMPLATES });
+});
+
+// POST /v1/team/invites — create a member AND a working sign-in account. The
+// demo has no outbound email, so the inviter gets the one-time credentials.
 const INVITE_ROLES = new Set(['owner', 'admin', 'editor', 'viewer']);
 
 tenantRouter.post('/team/invites', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'team.manage');
-  if (!req.body?.email) throw badRequest('Email is required.');
+  const rawEmail = String(req.body?.email ?? '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) throw badRequest('A valid email is required.');
+  const email = rawEmail.toLowerCase().slice(0, 120);
+  if (DEMO.companyUsers().some((u) => u.email === email)) throw badRequest('A sign-in account with that email already exists.');
+  if (DEMO.teamOfTenant(tenant.id).some((m) => m.email === email)) throw badRequest('That person is already on the team.');
+  if (tenant.seatsUsed >= tenant.seatsLimit) throw badRequest('This workspace has reached its seat limit.');
   const role: DemoRole = INVITE_ROLES.has(String(req.body.role ?? '')) ? (req.body.role as DemoRole) : 'viewer';
-  res.status(201).json({ member: DEMO.inviteTeamMember(tenant.id, String(req.body.email).toLowerCase().slice(0, 120), role) });
+  const password = 'demo1234';
+  const member = DEMO.inviteTeamMember(tenant.id, email, role, password);
+  DEMO.appendTenantAudit({
+    actor: sessionOf(req)?.email ?? member.email,
+    action: 'team.invite_sent',
+    resource: email,
+    tenantId: tenant.id,
+  });
+  res.status(201).json({
+    member,
+    credentials: { email, password },
+    message: 'Member added. They can sign in now with the credentials shown once here.',
+  });
 });
 
-// PATCH /v1/team/:memberId
+// PATCH /v1/team/:memberId — change a member's role template, suspend/activate,
+// or reset their sign-in password. The owner row is the tenant's super admin:
+// no other member (and not the owner through this endpoint) may change it, and
+// nobody may edit their own role/status/password here (own profile lives in
+// Account settings).
 tenantRouter.patch('/team/:memberId', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'team.manage');
+  const actor = requireCompany(req);
   const member = DEMO.teamOfTenant(tenant.id).find((m) => m.id === req.params.memberId);
   if (!member) throw notFound('Member not found.');
+  const body = req.body ?? {};
+  const wantsRole = body.role !== undefined;
+  const wantsStatus = body.status !== undefined;
+  const wantsPassword = body.password !== undefined;
+
+  const ownerRow = member.email === tenant.ownerEmail;
+  if (ownerRow && (wantsRole || wantsStatus)) {
+    throw badRequest('The owner account is this workspace’s super admin and cannot be demoted or suspended from Team & roles.');
+  }
+  if (member.email === actor.email && (wantsRole || wantsStatus || wantsPassword)) {
+    throw badRequest('You cannot change your own role, status or password here — use Account settings for your profile.');
+  }
+  if (wantsPassword) {
+    const user = DEMO.companyUserByEmail(tenant.id, member.email);
+    if (!user) throw badRequest('That member has no sign-in account yet.');
+    const password = String(body.password);
+    if (password.length < 6) throw badRequest('Password must be at least 6 characters.');
+    user.password = password;
+    DEMO.appendTenantAudit({ actor: actor.email, action: 'team.password_reset', resource: member.email, tenantId: tenant.id });
+  }
   const patch: { role?: DemoRole; status?: 'active' | 'suspended' | 'invited' } = {};
-  if (req.body.role) patch.role = req.body.role as DemoRole;
-  if (req.body.status) patch.status = req.body.status as 'active' | 'suspended' | 'invited';
+  if (wantsRole) {
+    const role = String(body.role);
+    if (!INVITE_ROLES.has(role)) throw badRequest('Unknown role.');
+    patch.role = role as DemoRole;
+  }
+  if (wantsStatus) {
+    if (!['active', 'suspended', 'invited'].includes(String(body.status))) throw badRequest('Unknown status.');
+    patch.status = body.status as 'active' | 'suspended' | 'invited';
+  }
   const updated = DEMO.patchTeamMember(req.params.memberId, patch);
+  if (updated && patch.role) DEMO.appendTenantAudit({ actor: actor.email, action: 'team.role_changed', resource: member.email, tenantId: tenant.id });
+  if (updated && patch.status) DEMO.appendTenantAudit({ actor: actor.email, action: patch.status === 'suspended' ? 'team.suspended' : 'team.activated', resource: member.email, tenantId: tenant.id });
   res.json(updated);
 });
 
@@ -752,10 +811,13 @@ tenantRouter.patch('/settings/identity', (req, res) => {
   });
 });
 
-// GET /v1/audit-logs
+// GET /v1/audit-logs — this workspace's own log. Members only ever see their
+// tenant's entries: other workspaces' rows never leave the server.
 tenantRouter.get('/audit-logs', (req, res) => {
   requireCompany(req);
-  const sorted = DEMO.tenantAuditEntries().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const tenant = tenantOfSession(req);
+  const own = DEMO.tenantAuditEntries().filter((e) => e.tenantId === tenant.id);
+  const sorted = own.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const query: Paging = req.query as Paging;
   const rows = paginate(sorted, query);
   res.json({ rows, total: sorted.length });

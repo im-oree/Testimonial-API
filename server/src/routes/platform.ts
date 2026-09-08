@@ -3,7 +3,7 @@
  * audit log and AI provider management. All require a platform session.
  */
 import { Router, type Request } from 'express';
-import { DEMO, MONTHLY_BY_PLAN, PLATFORM_ROLE_TEMPLATES, WIDGET_DESIGN_IDS, type DemoTenant, type PlatformRole } from '../demo-data';
+import { DEMO, MONTHLY_BY_PLAN, PLATFORM_ROLE_TEMPLATES, WIDGET_DESIGN_IDS, platformPermissionsFor, type DemoTenant, type PlatformRole } from '../demo-data';
 import { badRequest, createSessionToken, forbidden, notFound, paginate, platformStaffOfSession, queryString, requirePlatform, requirePlatformPermission, sessionOf, type Paging } from '../lib';
 import { isValidHexColor, parseThemePatch, RADIUS_IDS, FONT_IDS, type ThemeFont, type ThemeRadius } from '../theme';
 
@@ -380,16 +380,24 @@ platformRouter.get('/platform/webhooks', (req, res) => {
   res.json({ rows: DEMO.platformWebhooks() });
 });
 
-// GET /v1/platform/audit-logs — every platform-level action. A tenantId query
-// narrows to the logs of one workspace (super admin visibility, §audit.all).
+// GET /v1/platform/audit-logs — console + (super admin) workspace events.
+// scope=platform (default) lists Zojatech console actions; scope=all merges
+// every tenant workspace's own audit log — that superset requires audit.all
+// and is how the super admin "sees everything". A tenantId query narrows to a
+// single workspace (its console entries by resource id, or its own log rows).
 platformRouter.get('/platform/audit-logs', (req, res) => {
-  requirePlatformPermission(req, 'audit.read');
+  const staff = requirePlatformPermission(req, 'audit.read');
   const query: Paging = req.query as Paging;
   const tenantId = queryString(req, 'tenantId');
-  let sorted = DEMO.platformAuditEntries().filter((e) => !tenantId || e.resource === tenantId || e.tenantId === tenantId);
-  sorted = sorted.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  const total = sorted.length;
-  res.json({ rows: paginate(sorted, query), total });
+  const scope = queryString(req, 'scope') === 'all' ? 'all' : 'platform';
+  if (scope === 'all' && !platformPermissionsFor(staff.role).includes('audit.all')) throw forbidden('Your role cannot view other workspaces’ audit logs.');
+  const inScope = (e: { resource: string; tenantId?: string }) => !tenantId || e.resource === tenantId || e.tenantId === tenantId;
+  let pool = DEMO.platformAuditEntries().filter(inScope);
+  if (scope === 'all') pool = pool.concat(DEMO.tenantAuditEntries().filter(inScope));
+  const sorted = pool.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const tenantNames: Record<string, string> = {};
+  for (const t of DEMO.allTenants()) tenantNames[t.id] = t.name;
+  res.json({ rows: paginate(sorted, query), total: sorted.length, scope, tenantNames });
 });
 
 // GET /v1/platform/ai/providers
