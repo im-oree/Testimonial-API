@@ -653,6 +653,17 @@ describe('DOC 6 — widget templates: catalogue, apply & the widget contract', (
   });
 });
 
+describe('DOC 7C — platform template catalogue', () => {
+  it('the global widget catalogue is platform-only', async () => {
+    assert.equal((await req('GET', '/v1/platform/widget-templates')).status, 401);
+    assert.equal((await req('GET', '/v1/platform/widget-templates', { token: ownerToken })).status, 401);
+    const res = await req('GET', '/v1/platform/widget-templates', { token: platformToken });
+    assert.equal(res.status, 200);
+    const rows = (res.json as { rows: Array<{ id: string; width: number }> }).rows;
+    assert.ok(rows.length >= 30, 'the full catalogue is visible to the platform');
+  });
+});
+
 describe('DOC 6 — design drafts: preview, customise and publish without applying', () => {
   it('draft endpoints require a company session with apps.manage and are app-scoped', async () => {
     assert.equal((await req('GET', '/v1/dashboard/apps/app-acme-1/design/draft')).status, 401);

@@ -24,7 +24,8 @@ import AppsHomePage from './pages/AppsHomePage';
 import CompanyOverviewPage from './pages/CompanyOverviewPage';
 import SettingsPage from './pages/SettingsPage';
 import ThemePage from './pages/ThemePage';
-import ThemeMarketplacePage from './pages/ThemeMarketplacePage';
+import WidgetTemplatesPage from './pages/TemplatesPage';
+import BuilderPage from './pages/BuilderPage';
 import DesignStudioPage from './pages/DesignStudioPage';
 import AccountPage from './pages/AccountPage';
 import OverviewPage from './pages/OverviewPage';
@@ -95,7 +96,8 @@ function AppRoutes() {
           <Route path="products" element={<AppsHomePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/theme" element={<ThemePage />} />
-          <Route path="settings/theme/marketplace" element={<ThemeMarketplacePage />} />
+          <Route path="templates" element={<WidgetTemplatesPage />} />
+          <Route path="builder" element={<BuilderPage />} />
           <Route path="settings/account" element={<AccountPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="audit" element={<AuditPage />} />

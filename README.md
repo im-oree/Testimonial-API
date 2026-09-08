@@ -108,6 +108,14 @@ The point of the app: **templated, editable widgets** you embed on any website.
   reviews), step-by-step instructions and the copy-paste snippets. The
   auto-sizing script also scales the widget down on narrow screens so a
   fixed-dimension design never overflows its container.
+- **Templates gallery** (`/app/templates`, workspace-wide) — browse every
+  template with category pills and search, preview it live, then apply it to
+  any product or start a draft — all free, one click. The platform console
+  sees the same catalogue at `/platform/templates`.
+- **Builder** (`/app/builder`) — the no-code wizard: pick a product and
+  template, configure what the widget does with your reviews (mode, timing,
+  count cap), tune the look (colours, radius, text size) with a live preview
+  of your real reviews at every step, then save as a draft or publish.
 - **The studio is a Figma-style editor** — real pan/zoom (space- or middle-drag
   to pan, ⌘/Ctrl+wheel to zoom at the cursor, Shift+0 to fit, Shift+1 for 100%),
   an immersive full-bleed stage (app sidebar collapses to the icon rail, the

@@ -12,56 +12,14 @@
  * snippets and the live preview live on the Connect tab.
  */
 import { IconCheck, IconEdit } from '../components/icons';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAppName } from '../lib/useAppName';
 import type { AppSummary, WidgetTemplateRow } from '../lib/types';
-import type { StudioRecord, StudioSchema } from '../design-studio/types';
-import { SchemaSurface } from '../design-studio/runtime';
+import { TemplatePreview } from '../components/TemplatePreview';
 import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { ConfirmDialog } from '../components/menu';
-
-const SAMPLE_RECORD: StudioRecord = {
-  content: 'The embed was live on our site before lunch and reviews started arriving the same day.',
-  authorName: 'Ada Okafor',
-  rating: 5,
-};
-
-/** A template preview scaled to fit its card — true live rendering, tiny size. */
-function TemplatePreview({ schema }: { schema: StudioSchema }) {
-  const boxRef = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0.3);
-
-  useLayoutEffect(() => {
-    const box = boxRef.current;
-    if (!box) return;
-    const measure = (): void => {
-      const w = box.clientWidth;
-      if (w > 0) setScale(w / schema.canvas.width);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(box);
-    return () => ro.disconnect();
-  }, [schema.canvas.width]);
-
-  return (
-    <div ref={boxRef} className="tpl-preview" style={{ aspectRatio: `${schema.canvas.width} / ${schema.canvas.height}` }}>
-      <div
-        className="tpl-preview-inner"
-        style={{
-          width: schema.canvas.width,
-          height: schema.canvas.height,
-          transform: `scale(${scale})`,
-          transformOrigin: '0 0',
-        }}
-      >
-        <SchemaSurface schema={schema} record={SAMPLE_RECORD} />
-      </div>
-    </div>
-  );
-}
 
 export default function ConnectPage() {
   const { appId = '' } = useParams();

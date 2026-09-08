@@ -2036,3 +2036,66 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: center;
   will-change: transform;
 }
+
+/* ---- Template gallery (marketplace) ---------------------------------------- */
+.tpl-cat-pill {
+  border: 1px solid var(--border); background: #fff; color: #3d4470;
+  border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.tpl-cat-pill:hover { border-color: #c7cdf3; background: #f6f7ff; }
+.tpl-cat-pill.active { background: var(--brand, #1b2559); border-color: var(--brand, #1b2559); color: #fff; }
+.market-search { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 220px; }
+.market-search .f-input-wrap, .market-search input { flex: 1; min-width: 0; }
+
+/* Cards that are buttons (marketplace + builder picker). */
+button.tpl-card, .tpl-card-click, .tpl-card-select {
+  font: inherit; text-align: left; cursor: pointer; color: inherit;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+button.tpl-card:hover, .tpl-card-click:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(27, 37, 89, 0.12); }
+.tpl-card-select.selected { border-color: var(--brand, #1b2559); box-shadow: 0 0 0 2px rgba(27, 37, 89, 0.14); }
+
+/* Template picker inside the builder: compact cards. */
+.tpl-grid-mini { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1180px) { .tpl-grid-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .tpl-grid-mini { grid-template-columns: 1fr; } }
+
+/* Preview + use modal. */
+.tpl-use { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.9fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .tpl-use { grid-template-columns: 1fr; } }
+.tpl-use-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.tpl-use-preview { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: #eef0f6; }
+.tpl-use-side { display: flex; flex-direction: column; gap: 12px; }
+.tpl-use-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- No-code builder -------------------------------------------------------- */
+.builder-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .builder-grid { grid-template-columns: 1fr; } }
+.builder-steps { padding: 16px 18px 14px; }
+.builder-step-indicator { display: flex; gap: 18px; list-style: none; margin: 0 0 16px; padding: 0 0 12px; border-bottom: 1px solid var(--border); }
+.builder-step-indicator li { display: flex; align-items: center; gap: 7px; color: #8b91b5; font-size: 13px; font-weight: 600; }
+.builder-step-dot {
+  width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: #eef0f6; color: #555b78; font-size: 11.5px; flex: none;
+  transition: background .2s ease, color .2s ease;
+}
+.builder-step-indicator li.passed { color: var(--good, #0c8a6e); }
+.builder-step-indicator li.passed .builder-step-dot { background: #d9f3ec; color: var(--good, #0c8a6e); }
+.builder-step-indicator li.active { color: var(--navy, #1b2559); }
+.builder-step-indicator li.active .builder-step-dot { background: var(--brand, #1b2559); color: #fff; }
+.builder-step { display: flex; flex-direction: column; gap: 12px; }
+.builder-footer { display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.builder-preview { position: sticky; top: 10px; }
+.builder-preview-frame {
+  border-radius: 14px; overflow: hidden; border: 1px solid var(--border);
+  background: radial-gradient(#d9dce8 1px, transparent 1px) 0 0 / 16px 16px, #eef0f6;
+}
+.builder-preview-scaler { position: relative; width: 100%; }
+.builder-preview-empty { border: 1px dashed var(--border); border-radius: 14px; padding: 34px 16px; text-align: center; }
+.builder-done { display: flex; flex-direction: column; align-items: center; padding: 44px 24px; text-align: center; }
+.builder-done-icon {
+  width: 46px; height: 46px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: #d9f3ec; color: var(--good, #0c8a6e);
+}
+.panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }

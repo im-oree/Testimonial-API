@@ -86,7 +86,7 @@ export default function ThemePage() {
       </div>
 
       {theme ? (
-        <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} catalogueHref="/app/settings/theme/marketplace" />
+        <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} catalogueHref="/app/templates" />
       ) : (
         <div className="card" aria-busy="true">
           <div className="block-center" style={{ padding: '26px 0' }}>
@@ -118,8 +118,8 @@ export default function ThemePage() {
           <ul className="plain-list">
             <li>
               <strong>Templates</strong>: the tiles in step 1 come from Zojatech&apos;s live template catalogue — new ones appear
-              here automatically. For templates that also pick the widget <em>design</em>, open the{' '}
-              <Link to="/app/settings/theme/marketplace">design template marketplace</Link>.
+              here automatically. Browse and apply widget designs in the{' '}
+              <Link to="/app/templates">template gallery</Link>.
             </li>
             <li>
               <strong>Per-product design</strong>: each product builds its widget from a fixed-dimension template and customises it
