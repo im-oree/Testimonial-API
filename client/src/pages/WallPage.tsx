@@ -75,10 +75,32 @@ export default function WallPage() {
     );
   }
   if (!wall) {
+    // Skeleton mirrors the wall: eyebrow, brand header, stat chips, then a
+    // grid of review cards in the classic layout.
     return (
       <div className="wall">
-        <div className="block-center">
-          <span className="spinner spinner-lg" aria-hidden />
+        <div className="wall-card wall-sk" aria-busy="true">
+          <header className="wall-head">
+            <span className="sk" style={{ display: 'inline-block', width: 130, height: 10, borderRadius: 999 }} />
+            <span className="sk" style={{ display: 'block', width: '44%', height: 30, margin: '12px auto 0', borderRadius: 8 }} />
+            <span className="sk" style={{ display: 'block', width: '68%', height: 11, margin: '10px auto 0' }} />
+          </header>
+          <div className="wall-actions">
+            {[110, 84].map((w, i) => (
+              <span key={i} className="sk" style={{ display: 'inline-block', width: w, height: 22, borderRadius: 999 }} />
+            ))}
+          </div>
+          <div className="wall-sk-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="wall-sk-card">
+                <span className="sk" style={{ display: 'block', width: 96, height: 13 }} />
+                <span className="sk" style={{ display: 'block', width: '100%', height: 11, marginTop: 9 }} />
+                <span className="sk" style={{ display: 'block', width: '88%', height: 11, marginTop: 6 }} />
+                <span className="sk" style={{ display: 'block', width: '54%', height: 11, marginTop: 6 }} />
+                <span className="sk" style={{ display: 'block', width: 70, height: 11, marginTop: 12 }} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

@@ -92,7 +92,10 @@ Everything is under `/v1` (public docs live in the code — see `server/src/rout
 
 - `POST /v1/auth/login`, `POST /v1/platform/auth/login`, `GET /v1/auth/me`
 - `GET|POST /v1/apps`, `PATCH /v1/apps/:appId` (company's apps — one per website)
-- `GET|PATCH /v1/apps/:appId/testimonials[...]` (list, moderate, tags, export)
+- `GET|POST|PATCH|DELETE /v1/apps/:appId/testimonials[...]` — list (paged, filtered, searchable),
+  manual create, full edit (content/author/rating/tags), live on-wall toggle (`visible`),
+  moderation moves, delete, `POST .../bulk` (approve/reject/archive/show/hide/delete)
+  and `POST .../bulk/moderation`
 - `GET|POST|PATCH /v1/apps/:appId/forms[...]` (list, create, publish)
 - `GET /v1/platform/overview`, `GET|PATCH /v1/platform/tenants[...]`,
   `POST /v1/platform/tenants/:tenantId/impersonate`, `POST /v1/auth/impersonation/exit`

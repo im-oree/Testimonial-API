@@ -185,7 +185,6 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .sidebar {
   width: var(--sidebar-w);
   flex: 0 0 var(--sidebar-w);
-  transition: width .26s cubic-bezier(.4, 0, .2, 1), flex-basis .26s cubic-bezier(.4, 0, .2, 1);
   min-width: 0;
   background: #ffffff;
   color: var(--text);
@@ -1712,4 +1711,36 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 @media (max-width: 780px) {
   .form-editor-body { grid-template-columns: 1fr; }
   .form-editor-preview { position: static; }
+}
+
+/* ---- Public form + wall skeletons (mirror the real content) -------------- */
+.public-form-sk { text-align: left; }
+.public-form-sk .sk-input { display: block; height: 36px; border-radius: 9px; margin-top: 6px; }
+.wall-sk .wall-head { text-align: center; }
+.wall-sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
+.wall-sk-card { border: 1px solid #eceef5; border-radius: 14px; padding: 16px; background: #fff; }
+
+/* ---- Responsive shell: small screens always get the icon rail ------------
+   The full sidebar is 236px — too much on a phone. Below 760px it collapses
+   to the 62px rail regardless of the saved preference, keeping every page
+   one tap away while the content keeps the width it needs. */
+@media (max-width: 760px) {
+  .sidebar { width: 62px; flex: 0 0 62px; }
+  .sidebar .nav-label,
+  .sidebar .sidebar-section-label,
+  .sidebar .ws-identity-text,
+  .sidebar .sidebar-user-text,
+  .sidebar .sidebar-extra,
+  .sidebar .sidebar-account-link { display: none; }
+  .sidebar .sidebar-brand { justify-content: center; padding: 14px 0 8px; }
+  .sidebar .sidebar-nav { padding: 6px 8px; }
+  .sidebar .nav-link { justify-content: center; gap: 0; padding: 10px 0; }
+  .sidebar .nav-group + .nav-group { border-top: 0; }
+  .sidebar .ws-identity { justify-content: center; padding: 10px 0 6px; }
+  .sidebar .sidebar-footer { align-items: center; padding: 12px 8px; }
+  .sidebar .sidebar-user { display: none; }
+  .sidebar .sidebar-footer .btn-block { width: 40px; padding: 8px 0; }
+  .sidebar .rail-toggle { margin: 2px auto 6px; width: 38px; padding: 7px 0; justify-content: center; border-color: transparent; }
+  .content > div { padding: 14px; }
+  .topbar { padding: 0 12px; }
 }

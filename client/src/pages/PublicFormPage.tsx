@@ -134,9 +134,18 @@ export default function PublicFormPage() {
         )}
 
         {!error && !form && (
-          <div className="public-state">
-            <div className="spinner" aria-hidden />
-            <p className="muted">Loading form…</p>
+          <div className="public-state public-form-sk" aria-busy="true">
+            <span className="sk" style={{ display: 'block', width: '62%', height: 26, margin: '0 auto' }} />
+            <span className="sk" style={{ display: 'block', width: '84%', height: 12, margin: '10px auto 0' }} />
+            <hr className="divider" style={{ margin: '18px 0' }} />
+            {/* mirrors the real form: name field then the question blocks */}
+            <span className="sk" style={{ display: 'block', width: '36%', height: 11 }} />
+            <span className="sk sk-input" />
+            <span className="sk" style={{ display: 'block', width: '48%', height: 11, marginTop: 16 }} />
+            <span className="sk sk-input" />
+            <span className="sk" style={{ display: 'block', width: '42%', height: 11, marginTop: 16 }} />
+            <span className="sk sk-input" style={{ height: 58 }} />
+            <span className="sk" style={{ display: 'block', width: '38%', height: 34, borderRadius: 9, margin: '20px auto 0' }} />
           </div>
         )}
 
