@@ -15,6 +15,7 @@ interface AuthState {
   user: MeResponse['user'] | null;
   tenant: MeResponse['tenant'];
   permissions: string[];
+  roleTemplates: MeResponse['roleTemplates'];
   impersonating: MeImpersonating | null;
   /** Swaps an impersonation session back to the platform admin's own session. */
   exitImpersonation: () => Promise<void>;
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: me?.user ?? null,
       tenant: me?.tenant ?? null,
       permissions: me?.permissions ?? [],
+      roleTemplates: me?.roleTemplates ?? undefined,
       impersonating: me?.impersonating ?? null,
       exitImpersonation: async () => {
         try {

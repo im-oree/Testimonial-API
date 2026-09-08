@@ -98,6 +98,27 @@ export interface MeResponse {
   permissions: string[];
   permissionsVersion: number;
   impersonating: MeImpersonating | null;
+  roleTemplates?: RoleTemplateSummary[];
+}
+
+/** A role preset with its permission grants (platform console templates). */
+export interface RoleTemplateSummary {
+  id: string;
+  name: string;
+  description: string;
+  perms: string[];
+}
+
+export type PlatformStaffRole = 'platform_owner' | 'platform_admin' | 'platform_editor' | 'platform_support';
+
+export interface PlatformStaffMember {
+  id: string;
+  name: string;
+  email: string;
+  role: PlatformStaffRole;
+  status: 'active' | 'invited' | 'suspended';
+  lastActiveAt: string | null;
+  createdAt: string | null;
 }
 
 export interface Overview {
