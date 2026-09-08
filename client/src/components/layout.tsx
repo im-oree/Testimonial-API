@@ -383,7 +383,7 @@ export function AppLayout() {
           label: 'Product pages',
           items: [
             { label: 'Overview', to: `/app/a/${appId}/overview`, end: true, icon: <IconHome size={16} /> },
-            { label: 'Connect', to: `/app/a/${appId}/connect`, end: true, icon: <IconEdit size={16} /> },
+            { label: 'Widget', to: `/app/a/${appId}/connect`, end: true, icon: <IconEdit size={16} /> },
             { label: 'Testimonials', to: `/app/a/${appId}/testimonials`, end: true, icon: <IconStar size={16} /> },
             { label: 'Moderation', to: `/app/a/${appId}/testimonials/moderation`, icon: <IconClipboard size={16} /> },
             { label: 'Forms', to: `/app/a/${appId}/forms`, icon: <IconEdit size={16} /> },

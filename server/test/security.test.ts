@@ -567,3 +567,88 @@ describe('DOC 6 — testimonial CRUD, live toggle & bulk management', () => {
     );
   });
 });
+
+describe('DOC 6 — widget templates: catalogue, apply & the widget contract', () => {
+  it('template catalogue requires a company session; cross-kind tokens are rejected', async () => {
+    assert.equal((await req('GET', '/v1/widget-templates')).status, 401);
+    assert.equal((await req('GET', '/v1/widget-templates', { token: platformToken })).status, 401);
+    const list = await req('GET', '/v1/widget-templates', { token: ownerToken });
+    assert.equal(list.status, 200);
+    const rows = (list.json as { rows: Array<{ id: string; width: number; height: number; schema: { elements: unknown[] } }> }).rows;
+    assert.ok(rows.length >= 5, 'catalogue should ship multiple templates');
+    for (const t of rows) {
+      assert.ok(Number.isFinite(t.width) && t.width > 0, 'templates must declare fixed dimensions');
+      assert.ok(Number.isFinite(t.height) && t.height > 0, 'templates must declare fixed dimensions');
+    }
+    assert.ok((list.json as { requiredFields: string[] }).requiredFields.includes('review_rating'));
+  });
+
+  it('applying a template requires apps.manage and is app-scoped', async () => {
+    assert.equal(
+      (await req('POST', '/v1/apps/app-acme-1/widget-template/quote-card/apply', { token: viewerToken })).status,
+      401,
+    );
+    // foreign tenant's app id -> 404, never a leak
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/quote-card/apply', { token: lumen })).status, 404);
+    assert.equal((await req('POST', '/v1/apps/app-acme-1/widget-template/nope/apply', { token: ownerToken })).status, 404);
+
+    const applied = await req('POST', '/v1/apps/app-acme-1/widget-template/hero-banner/apply', { token: ownerToken });
+    assert.equal(applied.status, 200);
+    const body = applied.json as { app: { designTemplateId: string; studioVersion: number }; template: { width: number; height: number } };
+    assert.equal(body.app.designTemplateId, 'hero-banner');
+    assert.ok(body.app.studioVersion >= 1, 'applying bumps the studio version');
+    assert.equal(body.template.width, 1200);
+
+    // the public wall now serves the applied template as the product's widget
+    const wall = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const widget = (wall.json as { widget: { templateId: string; width: number; height: number } }).widget;
+    assert.equal(widget.templateId, 'hero-banner');
+    assert.equal(widget.width, 1200);
+    assert.equal(widget.height, 420);
+  });
+
+  it('a saved design must keep the required widget components (widget contract)', async () => {
+    // strip every binding -> no longer a widget -> 400
+    const schema = {
+      name: 'Broken',
+      canvas: { width: 720, height: 560, background: '#fff' },
+      version: 1,
+      elements: [{ id: 'e1', type: 'text', layout: { x: 0, y: 0, width: 100, height: 40, z: 1 }, text: 'no bindings' }],
+    };
+    const res = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', { token: ownerToken, body: { schema } });
+    assert.equal(res.status, 400);
+    assert.ok(String((res.json as { error?: { message?: string } }).error?.message ?? '').includes('review_text'));
+
+    // a design that keeps the three bound components saves fine
+    const valid = {
+      name: 'Valid widget',
+      canvas: { width: 540, height: 760, background: '#0ea5a0' },
+      version: 2,
+      elements: [
+        { id: 'a', type: 'text', visible: true, name: 'Review', layout: { x: 80, y: 300, width: 380, height: 200, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: { fontSize: 18, fontWeight: 500, color: '#fff', align: 'center' }, text: 'sample', imageUrl: null, binding: { bindingKey: 'review_text', property: 'text' }, animation: null },
+        { id: 'b', type: 'heading', visible: true, name: 'Reviewer', layout: { x: 80, y: 520, width: 380, height: 30, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: { fontSize: 16, fontWeight: 700, color: '#fff', align: 'center' }, text: 'sample', imageUrl: null, binding: { bindingKey: 'reviewer_name', property: 'text' }, animation: null },
+        { id: 'c', type: 'rating-stars', visible: true, name: 'Rating', layout: { x: 210, y: 240, width: 120, height: 30, z: 10 }, style: { background: null, radius: 0, opacity: 1 }, typography: null, text: null, imageUrl: null, binding: { bindingKey: 'review_rating', property: 'rating' }, animation: null },
+      ],
+    };
+    const ok = await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', { token: ownerToken, body: { schema: valid } });
+    assert.equal(ok.status, 200);
+    assert.ok((ok.json as { studioVersion: number }).studioVersion >= 1);
+    // the public embed now serves the customised widget
+    const wall = await req('GET', '/v1/public/walls/acme-marketing-site');
+    const w = (wall.json as { widget: { width: number; height: number; schema: { canvas: { background: string } } } }).widget;
+    assert.equal(w.width, 540);
+    assert.equal(w.schema.canvas.background, '#0ea5a0');
+
+    // viewer cannot save either
+    assert.equal(
+      (
+        await req('PATCH', '/v1/dashboard/apps/app-acme-1/design/schema', {
+          token: viewerToken,
+          body: { schema: null },
+        })
+      ).status,
+      401,
+    );
+  });
+});

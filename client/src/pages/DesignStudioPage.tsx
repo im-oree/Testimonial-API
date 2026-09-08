@@ -68,6 +68,35 @@ export default function DesignStudioPage() {
   const scaleRef = useRef(1);
   scaleRef.current = scale;
 
+  // ---- Widget contract: required components can't be deleted. A design is
+  // only a widget while it renders the review text, reviewer name and rating.
+  const [guardError, setGuardError] = useState<string | null>(null);
+  const guardRef = useRef<() => void>(() => undefined);
+
+  function guardedDelete(): void {
+    const st = useEditorStore.getState();
+    const schema = st.schema;
+    if (!schema || st.selectedIds.length === 0) return;
+    const doomed = new Set(st.selectedIds);
+    const remaining = schema.elements.filter((e) => !doomed.has(e.id));
+    const lost: string[] = [];
+    for (const field of ['review_text', 'reviewer_name', 'review_rating']) {
+      const hasNow = schema.elements.some((e) => boundFieldId(e) === field);
+      const hasAfter = remaining.some((e) => boundFieldId(e) === field);
+      if (hasNow && !hasAfter) lost.push(field);
+    }
+    if (lost.length > 0) {
+      setGuardError(
+        `Required widget components can't be removed — every widget must show ${lost.join(', ')}. Add a replacement first, or unbind nothing: pick a different template on the Widget page.`,
+      );
+      window.setTimeout(() => setGuardError(null), 5200);
+      return;
+    }
+    setGuardError(null);
+    st.deleteSelected();
+  }
+  guardRef.current = guardedDelete;
+
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp || !schema) return;
@@ -166,7 +195,7 @@ export default function DesignStudioPage() {
       if (s.selectedIds.length === 0) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        s.deleteSelected();
+        guardRef.current();
       } else if (e.key === 'Escape') {
         s.clearSelection();
       } else if (mod && e.key.toLowerCase() === 'd') {
@@ -282,6 +311,9 @@ export default function DesignStudioPage() {
             <IconRefresh size={12} /> Redo
           </Button>
           <span className="studio-tb-sep" aria-hidden />
+          <span className="chip" title="Fixed template dimensions — the embed reserves exactly this space">
+            {schema.canvas.width} × {schema.canvas.height}
+          </span>
           <span className="chip" title={`Schema v${store.savedStudioVersion} · design v${store.designVersion}`}>
             v{store.savedStudioVersion}
           </span>
@@ -293,6 +325,11 @@ export default function DesignStudioPage() {
       {store.saveError && (
         <div className="banner banner-error" role="alert">
           <span>{store.saveError}</span>
+        </div>
+      )}
+      {guardError && (
+        <div className="banner banner-error" role="alert">
+          <span>{guardError}</span>
         </div>
       )}
 
@@ -350,7 +387,7 @@ export default function DesignStudioPage() {
                     <button type="button" className="btn btn-ghost btn-xs" title="Duplicate" onClick={() => { store.select(el.id); store.duplicateSelected(); }}>
                       Copy
                     </button>
-                    <button type="button" className="btn btn-ghost btn-xs" title="Delete" onClick={() => { store.select(el.id); store.deleteSelected(); }}>
+                    <button type="button" className="btn btn-ghost btn-xs" title="Delete" onClick={() => { store.select(el.id); guardRef.current(); }}>
                       <IconTrash size={12} />
                     </button>
                   </span>
@@ -490,7 +527,7 @@ export default function DesignStudioPage() {
                 <IconX size={14} />
               </button>
             </div>
-            <PropertiesPanel />
+            <PropertiesPanel onDeleteSelected={guardRef.current} />
           </div>
         </aside>
       </div>
@@ -632,7 +669,7 @@ function applyGesture(
 }
 
 /** Right-hand properties panel. */
-function PropertiesPanel() {
+function PropertiesPanel({ onDeleteSelected }: { onDeleteSelected: () => void }) {
   const schema = useEditorStore((st) => st.schema);
   const selectedIds = useEditorStore((st) => st.selectedIds);
   if (!schema) return null;
@@ -643,18 +680,16 @@ function PropertiesPanel() {
     return (
       <div className="studio-props">
         <div className="stack">
-          <Field label="Design name" hint="Shown in the product’s connect &amp; studio lists.">
+          <Field label="Design name" hint="Shown on the Widget page and in the studio.">
             <TextInput value={schema.name} onChange={(e) => st().updateSchemaName(e.target.value)} />
           </Field>
-          <div className="f-group f-group-2">
-            <Field label="Canvas width">
-              <NumberInput min={320} max={1600} value={schema.canvas.width} onChange={(e) => st().updateCanvas({ width: Number(e.target.value) || schema.canvas.width })} />
-            </Field>
-            <Field label="Canvas height">
-              <NumberInput min={240} max={2000} value={schema.canvas.height} onChange={(e) => st().updateCanvas({ height: Number(e.target.value) || schema.canvas.height })} />
-            </Field>
-          </div>
-          <Field label="Canvas background" hint="Colours and logo tokens below; previews render on this surface.">
+          <Field label="Template size" hint="Fixed by the template — the embed reserves exactly this space on every site, so devs always know where it fits.">
+            <div className="canvas-size-lock">
+              {schema.canvas.width} × {schema.canvas.height}
+              <span className="muted small">px · fixed</span>
+            </div>
+          </Field>
+          <Field label="Canvas background" hint="The surface your widget renders on — in the studio, in the embed, everywhere.">
             <div className="swatches" style={{ gap: 7 }}>
               <span className="swatch" style={{ background: schema.canvas.background }} />
               <label className="swatch swatch-custom">
@@ -668,8 +703,9 @@ function PropertiesPanel() {
         <hr className="divider" style={{ margin: '14px 0 8px' }} />
         <p className="muted small" style={{ margin: 0 }}>
           Select an element on the canvas or in <strong>Layers</strong> to edit it. Drag to move, drag a corner to resize — both snap to the
-          grid. Elements bound to a review field carry their field id (<code>reviewer_name</code>, <code>review_text</code>…) and fill in
-          automatically on <strong>Preview</strong> and when the wall goes live.
+          grid. Elements bound to a review field carry their field id (<code>reviewer_name</code>, <code>review_text</code>,{' '}
+          <code>review_rating</code>) and fill in automatically on <strong>Preview</strong> and in the live embed. The three bound
+          components are <strong>required</strong> — a design without them is not a widget.
         </p>
       </div>
     );
@@ -685,7 +721,7 @@ function PropertiesPanel() {
         <p className="muted small" style={{ margin: 0 }}>{sel.length} elements selected</p>
         <div className="studio-row">
           <Button variant="secondary" className="btn-xs" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
-          <Button variant="ghost" className="btn-xs" onClick={() => useEditorStore.getState().deleteSelected()}>
+          <Button variant="ghost" className="btn-xs" onClick={onDeleteSelected}>
             <IconTrash size={12} /> Delete
           </Button>
         </div>
@@ -885,7 +921,7 @@ function PropertiesPanel() {
         </div>
         <Button variant="secondary" className="btn-xs" onClick={() => useEditorStore.getState().duplicateSelected()}>Duplicate</Button>
       </div>
-      <Button variant="danger" className="btn-block" style={{ marginTop: 6 }} onClick={() => useEditorStore.getState().deleteSelected()}>
+      <Button variant="danger" className="btn-block" style={{ marginTop: 6 }} onClick={onDeleteSelected}>
         <IconTrash size={13} /> Delete {single.type === 'container' ? 'card' : single.type.replace('-', ' ')}
       </Button>
     </div>

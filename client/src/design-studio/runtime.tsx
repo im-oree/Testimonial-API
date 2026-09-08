@@ -18,6 +18,11 @@ interface Props {
   record?: StudioRecord | null;
   /** Apply entrance animations declared on elements (preview/public render). */
   animate?: boolean;
+  /**
+   * When set, button elements act as links to this href (used by the live
+   * embed so a template's CTA opens the public review form in a new tab).
+   */
+  ctaHref?: string | null;
 }
 
 function Star({ on, size }: { on: boolean; size: number }) {
@@ -28,10 +33,11 @@ function Star({ on, size }: { on: boolean; size: number }) {
   );
 }
 
-function ElementView({ el, record, animate }: { el: StudioElement; record?: StudioRecord | null; animate: boolean }) {
+function ElementView({ el, record, animate, ctaHref }: { el: StudioElement; record?: StudioRecord | null; animate: boolean; ctaHref?: string | null }) {
   const resolved = resolveFor(el, record);
   const css = elementToCSS(resolved);
   const animCss = animate && resolved.animation ? animationCssFor(resolved.id, resolved.animation) : '';
+  const isCta = el.type === 'button' && Boolean(ctaHref);
 
   let inner: ReactNode = null;
   switch (el.type) {
@@ -75,7 +81,21 @@ function ElementView({ el, record, animate }: { el: StudioElement; record?: Stud
   }
 
   return (
-    <div style={css} className={`studio-el ${el.type === 'button' ? 'studio-el-button' : ''}`} data-element-id={el.id}>
+    <div
+      style={css}
+      className={`studio-el ${el.type === 'button' ? 'studio-el-button' : ''}`}
+      data-element-id={el.id}
+      {...(isCta
+        ? {
+            role: 'link',
+            tabIndex: 0,
+            onClick: () => window.open(ctaHref as string, '_blank', 'noopener'),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') window.open(ctaHref as string, '_blank', 'noopener');
+            },
+          }
+        : {})}
+    >
       {animCss && <style>{animCss}</style>}
       {inner}
     </div>
@@ -87,7 +107,7 @@ function ElementView({ el, record, animate }: { el: StudioElement; record?: Stud
  * preview so nothing intercepts clicks; the studio canvas supplies its own
  * edit overlays around each element instead of using this wrapper.
  */
-export function SchemaSurface({ schema, record = null, animate = false }: Props) {
+export function SchemaSurface({ schema, record = null, animate = false, ctaHref = null }: Props) {
   const sorted = [...schema.elements].filter((e) => e.visible).sort((a, b) => a.layout.z - b.layout.z);
   return (
     <div
@@ -103,7 +123,7 @@ export function SchemaSurface({ schema, record = null, animate = false }: Props)
       data-testid="studio-surface"
     >
       {sorted.map((el) => (
-        <ElementView key={el.id} el={el} record={animate ? record : undefined} animate={animate} />
+        <ElementView key={el.id} el={el} record={animate ? record : undefined} animate={animate} ctaHref={ctaHref} />
       ))}
     </div>
   );

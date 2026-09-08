@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { DEMO } from '../demo-data';
 import { badRequest, notFound } from '../lib';
 import { hexSoft, RADIUS_PX, resolveTheme, type ThemeFont, type ThemeRadius } from '../theme';
+import { defaultWidgetTemplate, schemaCanvasSize } from '../widget-templates';
 
 export const publicRouter = Router();
 
@@ -94,6 +95,23 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
   if (typeof o.maxReviews === 'number') approved = approved.slice(0, o.maxReviews as number);
   const publishedForm = DEMO.formsOfApp(app.id).find((f) => f.published) ?? null;
   const themed = themeForApp(app.slug);
+
+  // The product's widget: its saved (template-based) design rendered by the
+  // embed iframe with live records. Products that never picked a template or
+  // opened the studio still get the default one, so the embed always works.
+  const savedSchema =
+    app.studioSchema && typeof app.studioSchema === 'object' && !Array.isArray(app.studioSchema) ? app.studioSchema : null;
+  const widgetSchema = savedSchema ?? JSON.parse(JSON.stringify(defaultWidgetTemplate().schema));
+  const size = schemaCanvasSize(widgetSchema);
+  const widgetName = (widgetSchema as { name?: unknown }).name;
+  const widget = {
+    templateId: savedSchema ? (app.designTemplateId ?? null) : defaultWidgetTemplate().id,
+    name: typeof widgetName === 'string' && widgetName.trim() ? widgetName.trim() : defaultWidgetTemplate().name,
+    width: size.width,
+    height: size.height,
+    schema: widgetSchema,
+  };
+
   res.json({
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
@@ -106,6 +124,7 @@ publicRouter.get('/public/walls/:appSlug', (req, res) => {
     designVersion: app.designVersion ?? 0,
     app: { id: app.id, name: app.name, slug: app.slug, websiteUrl: app.websiteUrl },
     form: publishedForm ? { slug: publishedForm.slug, name: publishedForm.name } : null,
+    widget,
     testimonials: approved.map((t) => ({
       id: t.id,
       content: t.content,

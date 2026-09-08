@@ -48,6 +48,25 @@ has its own isolated testimonials, moderation queue and public forms.
   one-click exit), while companies can never see another company's data
   (server-enforced — foreign apps return 404).
 
+## The widget system (the product's output)
+
+The point of the app: **templated, editable widgets** you embed on any website.
+
+- **Templates** (`GET /v1/widget-templates`) — a catalogue of fixed-dimension
+  designs (Quote Card 720×560, Spotlight Hero 1200×420, Slim Strip 1200×200,
+  Rating Badge 360×320, Story Card 540×760, Bold Statement 800×600). Every
+  template carries the **required rating components** — `review_text`,
+  `reviewer_name`, `review_rating` — plus decorative extras.
+- **Pick one** on the product's **Widget** page (`POST /v1/apps/:appId/widget-template/:id/apply`);
+  a fresh copy becomes the product's design. **Customise** it in the **design studio**
+  (colours, typography, positions, extra elements — required components are
+  protected client-side and enforced server-side on every save).
+- **Embed it** — the Widget page hands you the drop-in iframe and auto-sizing
+  script. The embed (`/widget/embed.js`) sizes itself to the template's exact
+  dimensions, and the wall inside renders the product's saved schema cycling its
+  live approved reviews — the same runtime the studio preview uses, so editing
+  and live output can never drift apart.
+
 ## Try the full loop
 
 1. Click **Company workspace · Acme Inc** on `/login` → you land on **Your apps**.
@@ -92,6 +111,9 @@ Everything is under `/v1` (public docs live in the code — see `server/src/rout
 
 - `POST /v1/auth/login`, `POST /v1/platform/auth/login`, `GET /v1/auth/me`
 - `GET|POST /v1/apps`, `PATCH /v1/apps/:appId` (company's apps — one per website)
+- `GET /v1/widget-templates`, `POST /v1/apps/:appId/widget-template/:templateId/apply`
+  (widget template catalogue + apply; `PATCH /v1/dashboard/apps/:appId/design/schema`
+  enforces the required components — review text, reviewer name, rating)
 - `GET|POST|PATCH|DELETE /v1/apps/:appId/testimonials[...]` — list (paged, filtered, searchable),
   manual create, full edit (content/author/rating/tags), live on-wall toggle (`visible`),
   moderation moves, delete, `POST .../bulk` (approve/reject/archive/show/hide/delete)

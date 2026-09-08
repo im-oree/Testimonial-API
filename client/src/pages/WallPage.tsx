@@ -1,21 +1,24 @@
 /**
- * Public testimonial wall — no login needed. Shows a product's approved
- * reviews using the product's chosen widget design (from the plug-and-play
- * library) with a CTA to the public form.
+ * Public testimonial wall — no login needed.
  *
  * Two modes:
- *   · Full page   — brand header, review count + average, then the design.
- *   · ?embed=1    — widget-only surface used inside the <iframe> created by
- *                   /widget/embed.js. No chrome, transparent background, and
- *                   it posts its rendered height to the parent so embeds are
- *                   never cropped (auto-height iframes).
+ *   · Full page   — brand header, the product's WIDGET (its template-based,
+ *                   studio-edited design cycling live reviews) as the hero,
+ *                   then every approved review below in the browse design.
+ *   · ?embed=1    — the widget itself, at its exact fixed dimensions, used
+ *                   inside the <iframe> created by /widget/embed.js. No chrome,
+ *                   transparent background. The embed is the product's main
+ *                   output: the same schema the design studio edits, rendered
+ *                   with live records — they can never drift apart.
  */
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import type { PublicWall } from '../lib/types';
+import type { StudioRecord } from '../design-studio/types';
 import { DEFAULT_WIDGET_DESIGN, getWidgetDesign, type WidgetItem, type WidgetTokens } from '../widgets';
+import { TemplateWidget } from '../widgets/TemplateWidget';
 import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
 import { FONT_OPTIONS } from '../lib/theme';
@@ -136,9 +139,26 @@ export default function WallPage() {
     rating: t.rating ?? null,
     createdAt: t.createdAt,
   }));
+  // Records that fill the product's widget template (same shape the studio
+  // preview uses — bound fields resolve from these).
+  const widgetRecords: StudioRecord[] = wall.testimonials.map((t) => ({
+    content: t.content,
+    authorName: t.authorName ?? 'Anonymous visitor',
+    rating: t.rating ?? 0,
+    createdAt: t.createdAt,
+  }));
+  const widgetCta = wall.form ? `${window.location.origin}/forms/${wall.form.slug}` : null;
 
-  // Widget mode: no chrome, no header, transparent — designed to be embedded.
+  // Widget mode: the product's template at its exact fixed dimensions —
+  // designed to be embedded on external websites.
   if (embed) {
+    if (wall.widget) {
+      return (
+        <div className="wall wall-embed wall-template">
+          <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+        </div>
+      );
+    }
     return (
       <div className="wall wall-embed" style={vars}>
         <div className="sr-only">{meta.name} — {count} review{count === 1 ? '' : 's'}</div>
@@ -170,6 +190,13 @@ export default function WallPage() {
           />
         ) : (
           <>
+            {/* The product's widget — its studio-edited template cycling live
+                reviews, exactly as it appears when embedded elsewhere. */}
+            {wall.widget && (
+              <div className="wall-hero-widget">
+                <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+              </div>
+            )}
             <div className="wall-actions">
               <span className="muted small">
                 {count} review{count === 1 ? '' : 's'}

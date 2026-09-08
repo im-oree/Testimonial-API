@@ -834,6 +834,18 @@ export const DEMO = {
     app.designUpdatedAt = new Date().toISOString();
     return { ...app };
   },
+  /**
+   * Apply a widget template to a product: a fresh copy of the template's
+   * fixed-dimension schema becomes the product's studio design (replacing any
+   * previous customisation) and the template id is remembered for the picker.
+   */
+  applyWidgetTemplate(appId: string, template: { id: string; schema: unknown }): DemoApp | undefined {
+    const app = APPS.find((a) => a.id === appId);
+    if (!app) return undefined;
+    app.designTemplateId = template.id;
+    const saved = DEMO.updateStudioSchema(appId, JSON.parse(JSON.stringify(template.schema)));
+    return saved ?? { ...app };
+  },
   /** Summary counts for one app/product (used by lists, dashboards, metrics). */
   appSummary(app: DemoApp) {
     const rows = TESTIMONIALS.filter((r) => r.appId === app.id);
@@ -859,6 +871,7 @@ export const DEMO = {
       widgetDesign: app.widgetDesign ?? null,
       designTemplateId: app.designTemplateId ?? null,
       designVersion: app.designVersion ?? 0,
+      studioVersion: app.studioVersion ?? 0,
       designOptions: app.designOptions ?? null,
       status: app.status,
       createdAt: app.createdAt,

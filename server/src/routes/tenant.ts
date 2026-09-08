@@ -17,6 +17,12 @@ import {
   type TestimonialStatus,
 } from '../demo-data';
 import {
+  missingWidgetFields,
+  REQUIRED_WIDGET_FIELDS,
+  widgetTemplateById,
+  widgetTemplateRows,
+} from '../widget-templates';
+import {
   appOfSession,
   badRequest,
   formOr404,
@@ -164,6 +170,31 @@ tenantRouter.patch('/apps/:appId', (req, res) => {
   res.json({ app: DEMO.appSummary(updated) });
 });
 
+// GET /v1/widget-templates — the widget template catalogue. Every template
+// carries the required rating components and fixed dimensions; schemas are
+// included so the picker can render true live previews.
+tenantRouter.get('/widget-templates', (req, res) => {
+  requireCompany(req);
+  res.json({ rows: widgetTemplateRows(), requiredFields: REQUIRED_WIDGET_FIELDS });
+});
+
+// POST /v1/apps/:appId/widget-template/:templateId/apply — apply a template to
+// a product: a fresh copy of its schema becomes the product's widget design
+// (the studio customises it from there) and the embed reflects it immediately.
+tenantRouter.post('/apps/:appId/widget-template/:templateId/apply', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!DEMO.appsOfTenant(tenant.id).some((a) => a.id === req.params.appId)) throw notFound('App not found.');
+  const template = widgetTemplateById(req.params.templateId);
+  if (!template) throw notFound('Template not found.');
+  const updated = DEMO.applyWidgetTemplate(req.params.appId, template);
+  if (!updated) throw notFound('App not found.');
+  res.json({
+    app: DEMO.appSummary(updated),
+    template: { id: template.id, name: template.name, width: template.width, height: template.height },
+  });
+});
+
 // GET /v1/dashboard/apps/:appId/design/schema — the product's visual-editor
 // schema draft (DOC 7B). Null until the studio saves one for this product.
 tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
@@ -181,8 +212,10 @@ tenantRouter.get('/dashboard/apps/:appId/design/schema', (req, res) => {
 });
 
 // PATCH /v1/dashboard/apps/:appId/design/schema — persist a studio save. The
-// schema is validated structurally (object or null) and capped in size; the
-// server never interprets element payloads.
+// schema is validated structurally (object or null) and capped in size, and
+// must keep the required widget components: a design without the rating
+// system (review text, reviewer name, rating stars) is not a widget and never
+// reaches the public embed.
 tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'apps.manage');
@@ -191,6 +224,12 @@ tenantRouter.patch('/dashboard/apps/:appId/design/schema', (req, res) => {
   if (schema !== null && (typeof schema !== 'object' || Array.isArray(schema))) throw badRequest('Schema must be a design JSON object or null.');
   const serialized = JSON.stringify(schema ?? {});
   if (serialized.length > 400_000) throw badRequest('Schema is too large (max 400 KB).');
+  if (schema !== null) {
+    const missing = missingWidgetFields(schema);
+    if (missing.length > 0) {
+      throw badRequest(`A widget must keep its required components — add back: ${missing.join(', ')}.`);
+    }
+  }
   const updated = DEMO.updateStudioSchema(req.params.appId, schema);
   if (!updated) throw notFound('App not found.');
   res.json({

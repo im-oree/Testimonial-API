@@ -216,7 +216,8 @@ export default function OverviewPage() {
               <QuickLink icon={<IconStar size={16} />} title="Testimonials" blurb="Browse all approved reviews" to={`/app/a/${app.id}/testimonials`} />
               <QuickLink icon={<IconClipboard size={16} />} title="Moderation" blurb={`${overview.totalPending} waiting`} to={`/app/a/${app.id}/testimonials/moderation`} />
               <QuickLink icon={<IconEdit size={16} />} title="Forms" blurb="Collect new reviews" to={`/app/a/${app.id}/forms`} />
-              <QuickLink icon={<IconLayers size={16} />} title="Design studio" blurb="Edit the public wall layout" to={`/app/a/${app.id}/studio`} />
+              <QuickLink icon={<IconLayers size={16} />} title="Widget" blurb="Pick a template &amp; get the embed code" to={`/app/a/${app.id}/connect`} />
+              <QuickLink icon={<IconLayers size={16} />} title="Design studio" blurb="Customise your widget template" to={`/app/a/${app.id}/studio`} />
               <QuickLink
                 icon={<IconExternal size={16} />}
                 title="Public form"
