@@ -1086,3 +1086,40 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .review-snapshot .wall-quote { color: var(--navy); font-size: 14px; margin: 0; }
 .public-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
 .public-actions .btn + .btn { margin-left: 0; }
+
+/* ---- Appearance & theme page: organised three-zone editor ---------------- */
+.theme-status-strip {
+  display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 10px 16px; margin-bottom: 16px;
+}
+.theme-status-item { display: flex; flex-direction: column; gap: 1px; }
+.theme-status-item .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+.theme-status-item .color-dots { margin-top: 3px; }
+
+.theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
+@media (max-width: 1060px) { .theme-layout { grid-template-columns: 1fr; } }
+
+.theme-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.te-section {
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px;
+}
+.te-section h3 { font-size: 15px; }
+.theme-presets .theme-preset { min-height: 64px; justify-content: flex-start; }
+.theme-preset .muted.small {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; text-transform: capitalize;
+}
+.theme-field-wide { grid-column: 1 / -1; }
+
+.theme-side {
+  position: sticky; top: 10px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+}
+@media (max-width: 1060px) { .theme-side { position: static; } }
+.theme-side-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.theme-side-actions .btn { justify-content: center; }
+.theme-pv-body { min-height: 210px; display: flex; flex-direction: column; justify-content: center; }
+.theme-pv-designs { display: inline-flex; }

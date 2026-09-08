@@ -1,4 +1,10 @@
-/** Company workspace — Appearance & theme (own page under Settings). */
+/** Company workspace — Appearance & theme (own page under Settings).
+ *
+ * Organised as: a status strip up top, then the three-zone ThemeEditor
+ * (template catalogue -> fine-tune -> live preview with real widgets), then
+ * two short explainer cards. Everything here is company-wide; per-product
+ * designs live on each product's Connect & design page.
+ */
 import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -6,7 +12,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../auth';
 import ThemeEditor from '../components/ThemeEditor';
 import type { ResolvedTheme, ThemeSaveResponse } from '../lib/types';
-import { Breadcrumbs, Card, ErrorBanner, PageHeader } from '../components/ui';
+import { Breadcrumbs, ErrorBanner, PageHeader } from '../components/ui';
 
 export default function ThemePage() {
   const { tenant, refresh } = useAuth();
@@ -44,50 +50,87 @@ export default function ThemePage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Settings', to: '/app/settings' }, { label: 'Appearance & theme' }]} />
-      <PageHeader title="Appearance & theme" subtitle="One look for your company — applied to every form, wall and widget embed." />
+      <PageHeader
+        title="Appearance & theme"
+        subtitle={`One look for ${tenant?.name ?? 'your company'} — applied to every public form, wall and widget embed. Products can still layer their own design and tokens on top.`}
+        actions={
+          <Link className="btn btn-secondary" to="/app/products">
+            Products &amp; per-product designs
+          </Link>
+        }
+      />
 
       {error && <ErrorBanner message={error} onRetry={() => setTick((t) => t + 1)} />}
       {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
-      <Card className="stack">
-        <div className="brand-id">
-          {logo ? (
-            <img src={logo} alt={`${tenant?.name ?? ''} logo`} className="brand-logo" onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')} />
-          ) : (
-            <span className="ws-avatar" style={{ background: theme?.primary ?? 'var(--navy)', width: 46, height: 46, fontSize: 20 }}>
-              {(tenant?.name?.[0] ?? '?').toUpperCase()}
-            </span>
-          )}
-          <div>
-            <h2 style={{ margin: 0 }}>Theme &amp; branding</h2>
-            <p className="muted small" style={{ margin: '2px 0 0' }}>
-              Pick a template made by Zojatech, then fine-tune it — colours, corners and font are saved server-side and versioned.
-            </p>
+      <div className="theme-status-strip">
+        <span className="theme-status-item">
+          <span className="muted small">Company</span>
+          <span className="strong">{tenant?.name ?? '…'}</span>
+        </span>
+        <span className="theme-status-item">
+          <span className="muted small">Theme version</span>
+          <span className="chip chip-approved">v{theme?.version ?? 0}</span>
+        </span>
+        <span className="theme-status-item">
+          <span className="muted small">Colours</span>
+          <span className="color-dots">
+            <i style={{ background: theme?.primary ?? 'var(--navy)' }} />
+            <i style={{ background: theme?.accent ?? 'var(--teal)' }} />
+          </span>
+        </span>
+        <span className="theme-status-item">
+          <span className="muted small">Updated by</span>
+          <span className="strong">Zojatech or {tenant?.name ?? 'you'}</span>
+        </span>
+      </div>
+
+      {theme ? (
+        <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} />
+      ) : (
+        <div className="card" aria-busy="true">
+          <div className="block-center" style={{ padding: '26px 0' }}>
+            <span className="sk" style={{ display: 'block', width: '60%', height: 14, margin: '0 auto 8px' }} />
+            <span className="sk" style={{ display: 'block', width: '100%', height: 30, margin: '0 auto 8px' }} />
+            <span className="sk" style={{ display: 'block', width: '80%', height: 30, margin: '0 auto' }} />
           </div>
         </div>
+      )}
 
-        {theme ? (
-          <ThemeEditor endpoint="/v1/settings/theme" initial={theme} initialLogo={logo} onSaved={onSaved} />
-        ) : (
-          <div aria-busy="true">
-            <span className="sk" style={{ display: 'block', width: '60%', height: 14 }} />
-            <span className="sk" style={{ display: 'block', width: '100%', height: 30, marginTop: 10 }} />
-            <span className="sk" style={{ display: 'block', width: '100%', height: 30, marginTop: 8 }} />
-          </div>
-        )}
-      </Card>
+      <div className="two-col" style={{ marginTop: 16 }}>
+        <details className="card collapse-card" open>
+          <summary>Where this theme shows up</summary>
+          <ul className="plain-list">
+            <li>
+              Every product&apos;s <strong>public review form</strong> and <strong>wall</strong> (set up under{' '}
+              <Link to="/app/products">Products</Link>, then Connect &amp; design) render with these tokens.
+            </li>
+            <li>
+              The <strong>widget script</strong> and <strong>iframe embeds</strong> on external sites pull the same theme on every
+              load — change it once here and all embeds follow on their next visit. Nothing to redeploy.
+            </li>
+            <li>Zojatech can restyle your company from its panel — you keep the final say from this page.</li>
+          </ul>
+        </details>
 
-      <details className="card collapse-card">
-        <summary>Where does this theme show up? (and why it updates everywhere)</summary>
-        <ul className="plain-list">
-          <li>Every product&apos;s <strong>public review form</strong> and <strong>wall</strong> ({' '}
-            <Link to="/app/products">Products</Link> — set up under Connect &amp; design) render with these tokens.
-          </li>
-          <li>The <strong>widget script</strong> and <strong>iframe embeds</strong> on your external sites pull the same theme on every load — change it once here and all embeds follow on their next visit. Nothing to redeploy.</li>
-          <li>A single product can still <strong>override</strong> specific tokens on its own Connect &amp; design page (e.g. one website with its own accent).</li>
-          <li>Zojatech can also restyle your company from its panel — you keep the final say from this page.</li>
-        </ul>
-      </details>
+        <details className="card collapse-card" open>
+          <summary>Designs, templates and overrides</summary>
+          <ul className="plain-list">
+            <li>
+              <strong>Templates</strong>: the tiles in step 1 come from Zojatech&apos;s live template catalogue — new ones appear
+              here automatically.
+            </li>
+            <li>
+              <strong>Per-product design</strong>: each product picks its own widget look (classic grid, wall of love, carousel,
+              spotlight, marquee, orbit) and can override any token on its Connect &amp; design page.
+            </li>
+            <li>
+              <strong>Versioning</strong>: every save here (and every product design save) bumps a version that public surfaces pick
+              up on their next load.
+            </li>
+          </ul>
+        </details>
+      </div>
     </div>
   );
 }

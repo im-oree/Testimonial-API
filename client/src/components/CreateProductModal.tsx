@@ -6,13 +6,15 @@
  * The product is created server-side the moment the user leaves step 2; the
  * API provisions its public review form so links work immediately.
  */
-import {IconCheck, IconStar, IconX, IconChevronLeft } from './icons';
+import { IconCheck, IconChevronLeft, IconPlus, IconX } from './icons';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { AppSummary } from '../lib/types';
 import { Button, Label, TextInput } from './ui';
+import { softOf } from '../lib/theme';
+import { getWidgetDesign, SAMPLE_ITEMS } from '../widgets';
 import Modal from './Modal';
 
 export function productCodePreview(name: string): string {
@@ -279,31 +281,28 @@ export default function CreateProductModal({
                   ))}
                   <label className="swatch swatch-custom" title="Custom colour">
                     <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} />
-                    +
+                    <IconPlus size={12} />
                   </label>
                 </div>
               </div>
 
               <div>
                 <Label>Live preview — what visitors see on your wall</Label>
-                <div className="wall-preview">
-                  <div className="wall-preview-bar" style={{ background: accent }} />
-                  <div className="wall-preview-body">
-                    <div className="strong" style={{ color: accent }}>
-                      {name.trim() || 'Your product'}
-                    </div>
-                    <div className="stars">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <span key={n} className="star on">
-                          <IconStar />
-                        </span>
-                      ))}
-                    </div>
-                    <p className="wall-preview-quote">“Absolutely love it — onboarding took minutes and support is superb.”</p>
-                    <div className="muted small">— Sara Okafor · 2 days ago</div>
-                    <button type="button" className="btn" style={{ background: accent, color: '#fff' }}>
-                      Add a Review +
-                    </button>
+                <div className="preview-frame">
+                  <div className="preview-frame-bar">
+                    <i /><i /><i />
+                    <span>wall preview</span>
+                  </div>
+                  <div className="preview-frame-body" style={{ paddingTop: 14 }}>
+                    {name.trim() && (
+                      <div className="strong" style={{ textAlign: 'center', marginBottom: 12, color: accent }}>
+                        {name.trim()}
+                      </div>
+                    )}
+                    {(() => {
+                      const W = getWidgetDesign('classic').component;
+                      return <W items={SAMPLE_ITEMS.slice(0, 2)} tokens={{ primary: accent, soft: softOf(accent), accent: accent, radiusPx: 14, font: 'system' }} cta={null} />;
+                    })()}
                   </div>
                 </div>
               </div>
