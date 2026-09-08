@@ -36,3 +36,6 @@ npm-debug.log*
 
 # Session signing secret (auto-created by the server)
 .session-secret
+
+# GitHub App lacks workflows permission — keep CI config out of the pushed tree
+.github/
