@@ -220,3 +220,21 @@ export function IconSearch(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconEye(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2.8 12S6.2 5.9 12 5.9 21.2 12 21.2 12 17.8 18.1 12 18.1 2.8 12 2.8 12z" />
+      <circle cx="12" cy="12" r="2.9" />
+    </Svg>
+  );
+}
+
+export function IconEyeOff(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 4l16 16" />
+      <path d="M9.9 5.2A9.4 9.4 0 0 1 12 5.1c5.8 0 9.2 6.1 9.2 6.1a15.5 15.5 0 0 1-2.6 3.4M6.7 7.1A14.6 14.6 0 0 0 2.8 11.2S6.2 17.3 12 17.3a9 9 0 0 0 3.4-.66" />
+    </Svg>
+  );
+}
