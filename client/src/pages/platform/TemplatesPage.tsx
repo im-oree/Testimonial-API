@@ -70,8 +70,10 @@ export default function TemplatesPage() {
         <div className="tpl-grid" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="card tpl-card">
-              <span className="sk tpl-preview-sk" />
-              <span className="sk" style={{ display: 'block', width: '55%', height: 15, marginTop: 12 }} />
+              <div className="tpl-card-preview"><span className="sk tpl-preview-sk" /></div>
+              <div className="tpl-card-body">
+                <span className="sk" style={{ display: 'block', width: '55%', height: 15 }} />
+              </div>
             </div>
           ))}
         </div>

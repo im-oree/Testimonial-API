@@ -17,7 +17,8 @@
  *     and the required-component guard (a widget must keep review text,
  *     reviewer name and rating)
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useEditorStore } from '../design-studio/editor-store';
@@ -74,6 +75,48 @@ export default function DesignStudioPage() {
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  // The add-element popover renders in a body-level portal (fixed position),
+  // so the layers panel's overflow never clips it.
+  const addBtnRef = useRef<HTMLButtonElement | null>(null);
+  const addPopRef = useRef<HTMLDivElement | null>(null);
+  const [addPos, setAddPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!addOpen || !addBtnRef.current) return;
+    const place = (): void => {
+      const r = addBtnRef.current!.getBoundingClientRect();
+      const width = 262;
+      setAddPos({
+        top: Math.min(r.bottom + 6, window.innerHeight - 120),
+        left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+        width,
+      });
+    };
+    place();
+  }, [addOpen]);
+
+  useEffect(() => {
+    if (!addOpen) return;
+    const onDoc = (e: MouseEvent): void => {
+      const t = e.target as Node;
+      if (addBtnRef.current?.contains(t) || addPopRef.current?.contains(t)) return;
+      setAddOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setAddOpen(false);
+    };
+    const close = (): void => setAddOpen(false);
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [addOpen]);
 
   // ---- Figma-style viewport: pan {x,y} + zoom, applied to the world layer.
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -568,7 +611,7 @@ export default function DesignStudioPage() {
               <div className="studio-ov-head">
                 <div className="studio-panel-title" style={{ margin: 0 }}>Layers</div>
                 <span className="studio-ov-tools">
-                  <button type="button" className="ctx-trigger" title="Add an element" aria-label="Add an element" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>
+                  <button ref={addBtnRef} type="button" className="ctx-trigger" title="Add an element" aria-label="Add an element" aria-expanded={addOpen} onClick={() => setAddOpen((v) => !v)}>
                     <IconPlus size={14} />
                   </button>
                   <button type="button" className="ctx-trigger" title="Hide layers" aria-label="Hide layers" onClick={() => setShowLeft(false)}>
@@ -576,8 +619,8 @@ export default function DesignStudioPage() {
                   </button>
                 </span>
               </div>
-              {addOpen && (
-                <div className="studio-add-pop">
+              {addOpen && addPos && createPortal(
+                <div ref={addPopRef} className="studio-add-pop" style={{ position: 'fixed', top: addPos.top, left: addPos.left, width: addPos.width, right: 'auto', zIndex: 400 }}>
                   {ELEMENTS.map((e) => (
                     <button
                       key={e.type}
@@ -595,7 +638,8 @@ export default function DesignStudioPage() {
                       </span>
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body,
               )}
               <div className="studio-ov-body">
                 <div className="studio-layers" style={{ maxHeight: 'none' }}>

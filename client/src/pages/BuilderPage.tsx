@@ -207,7 +207,12 @@ export default function BuilderPage() {
                 <div className="panel-label">Pick a starting template</div>
                 {!templates ? (
                   <div className="tpl-grid tpl-grid-mini" aria-busy="true">
-                    {Array.from({ length: 4 }).map((_, i) => <div key={i} className="card tpl-card"><span className="sk tpl-preview-sk" /></div>)}
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="card tpl-card">
+                        <div className="tpl-card-preview"><span className="sk tpl-preview-sk" /></div>
+                        <div className="tpl-card-body"><span className="sk" style={{ display: 'block', width: '60%', height: 13 }} /></div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="tpl-grid tpl-grid-mini">
