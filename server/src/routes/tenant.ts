@@ -44,6 +44,7 @@ import {
   type RawQuestion,
 } from '../lib';
 import { parseThemePatch, presetSummary, THEME_PRESETS } from '../theme';
+import { addMediaAsset, mediaOfTenant, removeMediaAsset } from '../demo-data';
 
 export const tenantRouter = Router();
 
@@ -79,6 +80,41 @@ tenantRouter.get('/apps', (req, res) => {
 });
 
 // POST /v1/apps  (create an app for a website)
+// ---------------------------------------------------------------------------
+// Media library — saved image URLs for reuse in designs.
+
+// GET /v1/media
+tenantRouter.get('/media', (req, res) => {
+  const tenant = tenantOfSession(req);
+  res.json({ rows: mediaOfTenant(tenant.id) });
+});
+
+// POST /v1/media  { name, url }
+tenantRouter.post('/media', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  const url = String(req.body?.url ?? '').trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw badRequest('A valid http(s) image URL is required.');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw badRequest('Only http(s) URLs are supported.');
+  }
+  const name = (String(req.body?.name ?? '').trim() || parsed.hostname).slice(0, 80);
+  res.status(201).json({ asset: addMediaAsset(tenant.id, name, url) });
+});
+
+// DELETE /v1/media/:mediaId
+tenantRouter.delete('/media/:mediaId', (req, res) => {
+  const tenant = tenantOfSession(req);
+  requirePermission(req, 'apps.manage');
+  if (!removeMediaAsset(tenant.id, req.params.mediaId)) throw notFound('Media asset not found.');
+  res.json({ ok: true });
+});
+
 tenantRouter.post('/apps', (req, res) => {
   const tenant = tenantOfSession(req);
   requirePermission(req, 'apps.manage');

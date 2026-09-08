@@ -12,7 +12,7 @@ import type { AppSummary, FormRow, Overview, Testimonial } from '../lib/types';
 import { Breadcrumbs, ErrorBanner, PageHeader, StatCard } from '../components/ui';
 import { SkeletonChart, SkeletonStats } from '../components/Skeleton';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { IconClipboard, IconEdit, IconExternal, IconLayers, IconStar } from '../components/icons';
 
@@ -42,11 +42,61 @@ function QuickLink({ icon, title, blurb, to, disabled, hint }: { icon: React.Rea
   );
 }
 
+const DAY_MS = 86_400_000;
+
+/** Bucket reviews into a per-day / per-week / per-month series for the period. */
+function buildOverTime(rows: Testimonial[], period: '30' | '90' | 'all'): Array<{ label: string; Reviews: number }> {
+  const now = new Date();
+  const dayKey = (d: Date): string => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const weekKey = (d: Date): string => {
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return dayKey(monday);
+  };
+  const monthKey = (d: Date): string => `${d.getFullYear()}-${d.getMonth()}`;
+
+  const axis: Array<{ k: string; label: string }> = [];
+  if (period === '30') {
+    for (let i = 29; i >= 0; i -= 1) {
+      const d = new Date(now.getTime() - i * DAY_MS);
+      axis.push({ k: dayKey(d), label: `${d.getMonth() + 1}/${d.getDate()}` });
+    }
+  } else if (period === '90') {
+    for (let i = 12; i >= 0; i -= 1) {
+      const d = new Date(now.getTime() - i * 7 * DAY_MS);
+      axis.push({ k: weekKey(d), label: `${d.getMonth() + 1}/${d.getDate()}` });
+    }
+  } else {
+    const oldest = rows.length
+      ? new Date(Math.min(...rows.map((r) => new Date(r.createdAt).getTime())))
+      : now;
+    const months = Math.min(12, (now.getFullYear() - oldest.getFullYear()) * 12 + (now.getMonth() - oldest.getMonth()) + 1);
+    for (let i = months - 1; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      axis.push({ k: monthKey(d), label: d.toLocaleString('en', { month: 'short' }) });
+    }
+  }
+
+  const keyOf = (d: Date): string => (period === '30' ? dayKey(d) : period === '90' ? weekKey(d) : monthKey(d));
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const k = keyOf(new Date(r.createdAt));
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  const thin = axis.length > 9;
+  return axis.map((a, i) => ({
+    label: thin && i % 2 === 1 ? '' : a.label,
+    Reviews: counts.get(a.k) ?? 0,
+  }));
+}
+
 export default function OverviewPage() {
   const { appId = '' } = useParams();
   const [app, setApp] = useState<AppSummary | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [recent, setRecent] = useState<Testimonial[]>([]);
+  const [allRows, setAllRows] = useState<Testimonial[]>([]);
+  const [period, setPeriod] = useState<'30' | '90' | 'all'>('90');
   const [publishedForm, setPublishedForm] = useState<FormRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,9 +109,10 @@ export default function OverviewPage() {
       api.get<{ rows: AppSummary[] }>(`/v1/apps?perPage=200`).then((d) => d.rows.find((a) => a.id === appId) ?? null),
       api.get<Overview>(`/v1/dashboard/overview?appId=${appId}`),
       api.get<{ rows: Testimonial[]; total: number }>(`/v1/apps/${appId}/testimonials?status=pending&perPage=5`),
+      api.get<{ rows: Testimonial[]; total: number }>(`/v1/apps/${appId}/testimonials?perPage=200`).catch(() => ({ rows: [], total: 0 })),
       api.get<{ rows: FormRow[] }>(`/v1/apps/${appId}/forms`).then((d) => d.rows.find((f) => f.published) ?? null),
     ])
-      .then(([appRow, ov, pending, form]) => {
+      .then(([appRow, ov, pending, every, form]) => {
         if (!alive) return;
         if (!appRow) {
           setError('This app does not exist or you do not have access to it.');
@@ -69,6 +120,7 @@ export default function OverviewPage() {
         setApp(appRow);
         setOverview(ov);
         setRecent(pending.rows);
+        setAllRows(every.rows);
         setPublishedForm(form);
       })
       .catch((err: unknown) => {
@@ -111,6 +163,14 @@ export default function OverviewPage() {
       </div>
     );
   if (error || !app) return <ErrorBanner message={error ?? 'App not found.'} />;
+
+  const funnelRows = [
+    { label: 'Received', value: allRows.length },
+    { label: 'Approved', value: allRows.filter((r) => r.status === 'approved').length },
+    { label: 'Live on wall', value: allRows.filter((r) => r.status === 'approved' && r.visible !== false).length },
+  ];
+
+  const overTimeRows = buildOverTime(allRows, period);
 
   const chartRows = overview
     ? [
@@ -204,6 +264,73 @@ export default function OverviewPage() {
                   Open moderation ({overview.totalPending})
                 </Link>
               )}
+            </section>
+          </div>
+
+          <div className="two-col">
+            <section className="card">
+              <div className="chart-head">
+                <div>
+                  <h2 style={{ margin: 0 }}>Reviews over time</h2>
+                  <p className="muted small" style={{ margin: '2px 0 0' }}>
+                    When this product&apos;s reviews arrived.
+                  </p>
+                </div>
+                <div className="chip-row" role="tablist" aria-label="Time period">
+                  {(['30', '90', 'all'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      role="tab"
+                      aria-selected={period === p}
+                      className={`tpl-cat-pill ${period === p ? 'active' : ''}`}
+                      onClick={() => setPeriod(p)}
+                    >
+                      {p === '30' ? '30 days' : p === '90' ? '90 days' : 'All time'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ height: 220, width: '100%' }}>
+                {allRows.length === 0 ? (
+                  <div className="block-center" style={{ height: '100%' }}>
+                    <p className="muted">No reviews yet — the chart fills in as they arrive.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={overTimeRows} margin={{ top: 10, right: 18, left: -14, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f2f4" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#e5e7eb' }} tick={{ fill: '#6b7280', fontSize: 11 }} interval="preserveStartEnd" />
+                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }} />
+                      <Line type="monotone" dataKey="Reviews" stroke="#0ea5a0" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
+
+            <section className="card stack">
+              <h2 style={{ margin: 0 }}>Collection funnel</h2>
+              <p className="muted small" style={{ margin: '2px 0 0' }}>
+                From every review received to what visitors actually see.
+              </p>
+              <div className="funnel">
+                {funnelRows.map((f) => (
+                  <div key={f.label} className="funnel-step">
+                    <div className="funnel-step-label">
+                      <span>{f.label}</span>
+                      <span className="strong">{f.value}</span>
+                    </div>
+                    <div className="funnel-bar">
+                      <span style={{ width: `${allRows.length ? Math.round((f.value / allRows.length) * 100) : 0}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small" style={{ margin: 0 }}>
+                Reviews drop out when they are rejected or switched off — nothing else stands between an approved review and the wall.
+              </p>
             </section>
           </div>
 

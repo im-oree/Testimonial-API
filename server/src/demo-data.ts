@@ -1477,7 +1477,46 @@ export class DemoSessions {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Media library — image assets (by URL) a tenant saves for reuse in designs.
+// Deleting an asset never breaks a design: designs store the URL itself, so
+// externally hosted images keep rendering; the library is just the saved list.
+// ---------------------------------------------------------------------------
+
+export interface DemoMediaAsset {
+  id: string;
+  tenantId: string;
+  name: string;
+  url: string;
+  createdAt: string;
+}
+
+const MEDIA: DemoMediaAsset[] = [];
+
 export function demoAccountLabel(role: 'company' | 'platform'): { email: string; password: string } {
   if (role === 'platform') return { email: 'admin@zojatech.test', password: 'demo1234' };
   return { email: 'owner@acme.test', password: 'demo1234' };
+}
+
+export function mediaOfTenant(tenantId: string): DemoMediaAsset[] {
+  return MEDIA.filter((m) => m.tenantId === tenantId).map((m) => ({ ...m }));
+}
+
+export function addMediaAsset(tenantId: string, name: string, url: string): DemoMediaAsset {
+  const asset: DemoMediaAsset = {
+    id: `media-${MEDIA.length + 1}`,
+    tenantId,
+    name,
+    url,
+    createdAt: new Date().toISOString(),
+  };
+  MEDIA.push(asset);
+  return { ...asset };
+}
+
+export function removeMediaAsset(tenantId: string, id: string): boolean {
+  const i = MEDIA.findIndex((m) => m.tenantId === tenantId && m.id === id);
+  if (i === -1) return false;
+  MEDIA.splice(i, 1);
+  return true;
 }

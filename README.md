@@ -116,6 +116,15 @@ The point of the app: **templated, editable widgets** you embed on any website.
   template, configure what the widget does with your reviews (mode, timing,
   count cap), tune the look (colours, radius, text size) with a live preview
   of your real reviews at every step, then save as a draft or publish.
+- **Designs** (`/app/designs`) — every product's design in one gallery:
+  live mini-previews, draft badges with publish/discard (confirmed), and the
+  "New design" paths to templates, builder or AI.
+- **Media library** (`/app/media`) — the team's saved images by URL: add with
+  a live preview, search, copy into any design; removing an asset only
+  removes it from the list (designs keep their URLs).
+- **Product analytics** — the product overview now has a reviews-over-time
+  line chart (30 days / 90 days / all time, day/week/month buckets) and a
+  collection funnel (received → approved → live on the wall).
 - **AI Studio** (`/app/ai`) — describe the widget you want in plain words
   ("a dark midnight carousel with gold star ratings"); the generator
   synthesises a complete design — palette, motion mode, canvas, layout —

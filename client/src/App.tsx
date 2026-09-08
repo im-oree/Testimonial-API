@@ -26,7 +26,9 @@ import SettingsPage from './pages/SettingsPage';
 import ThemePage from './pages/ThemePage';
 import WidgetTemplatesPage from './pages/TemplatesPage';
 import BuilderPage from './pages/BuilderPage';
+import DesignsPage from './pages/DesignsPage';
 import AiPage from './pages/AiPage';
+import MediaPage from './pages/MediaPage';
 import DesignStudioPage from './pages/DesignStudioPage';
 import AccountPage from './pages/AccountPage';
 import OverviewPage from './pages/OverviewPage';
@@ -98,8 +100,10 @@ function AppRoutes() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/theme" element={<ThemePage />} />
           <Route path="templates" element={<WidgetTemplatesPage />} />
+          <Route path="designs" element={<DesignsPage />} />
           <Route path="builder" element={<BuilderPage />} />
           <Route path="ai" element={<AiPage />} />
+          <Route path="media" element={<MediaPage />} />
           <Route path="settings/account" element={<AccountPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="audit" element={<AuditPage />} />

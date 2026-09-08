@@ -423,9 +423,11 @@ export function AppLayout() {
           items: [
             { label: 'Overview', to: '/app/overview', end: true, icon: <IconHome size={16} /> },
             { label: 'Products', to: '/app/products', end: true, icon: <IconLayers size={16} /> },
+            { label: 'Designs', to: '/app/designs', end: true, icon: <IconPalette size={16} /> },
             { label: 'Templates', to: '/app/templates', end: true, icon: <IconStar size={16} /> },
             { label: 'Builder', to: '/app/builder', end: true, icon: <IconEdit size={16} /> },
             { label: 'AI Studio', to: '/app/ai', end: true, icon: <IconStar size={16} /> },
+            { label: 'Media', to: '/app/media', end: true, icon: <IconPalette size={16} /> },
           ],
         },
         { label: 'Manage', items: workspaceManage },

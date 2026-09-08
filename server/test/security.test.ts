@@ -653,6 +653,25 @@ describe('DOC 6 — widget templates: catalogue, apply & the widget contract', (
   });
 });
 
+describe('DOC 7C — media library', () => {
+  it('requires a company session and validates URLs', async () => {
+    assert.equal((await req('GET', '/v1/media')).status, 401);
+    assert.equal((await req('GET', '/v1/media', { token: platformToken })).status, 401);
+    const bad = await req('POST', '/v1/media', { token: ownerToken, body: { url: 'javascript:alert(1)' } });
+    assert.equal(bad.status, 400);
+    const ok = await req('POST', '/v1/media', { token: ownerToken, body: { url: 'https://cdn.example.com/a.png', name: 'Logo' } });
+    assert.equal(ok.status, 201);
+    const id = (ok.json as { asset: { id: string } }).asset.id;
+    const list = await req('GET', '/v1/media', { token: ownerToken });
+    assert.equal(list.status, 200);
+    assert.ok((list.json as { rows: unknown[] }).rows.some((r) => (r as { id: string }).id === id));
+    // Another tenant cannot delete it.
+    const lumen = await login('hello@lumen.test', 'demo1234');
+    assert.equal((await req('DELETE', `/v1/media/${id}`, { token: lumen })).status, 404);
+    assert.equal((await req('DELETE', `/v1/media/${id}`, { token: ownerToken })).status, 200);
+  });
+});
+
 describe('DOC 7C — platform template catalogue', () => {
   it('the global widget catalogue is platform-only', async () => {
     assert.equal((await req('GET', '/v1/platform/widget-templates')).status, 401);
