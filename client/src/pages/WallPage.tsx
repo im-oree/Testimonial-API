@@ -22,6 +22,7 @@ import { TemplateWidget } from '../widgets/TemplateWidget';
 import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
 import { FONT_OPTIONS } from '../lib/theme';
+import { IconZojatechMark } from '../components/icons/brand';
 
 function useEmbedHeight(enabled: boolean, ready: boolean): void {
   useEffect(() => {
@@ -202,6 +203,7 @@ export default function WallPage() {
         )}
 
         <footer className="wall-foot">
+          <IconZojatechMark size={15} />
           <span>Powered by Zojatech — collect testimonials on any website.</span>
         </footer>
       </div>

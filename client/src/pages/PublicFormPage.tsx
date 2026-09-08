@@ -243,7 +243,7 @@ export default function PublicFormPage() {
                 );
               })}
 
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" className="btn-lg" disabled={busy}>
                 {busy ? 'Sending…' : 'Submit feedback'}
               </Button>
             </form>
