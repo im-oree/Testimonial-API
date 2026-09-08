@@ -1,0 +1,630 @@
+// ============================================================
+// Testimonial API — Prisma schema (Postgres adapter)
+//
+// Canonical, hand-reviewable DDL lives in infra/postgres/schema.sql
+// and is THE production source of truth (docs/01-skeleton.md §6).
+// This file mirrors it 1:1 for the Postgres adapter + local dev
+// (prisma migrate/db push), with documented deviations:
+//
+//   • audit_logs is a plain table here — PRODUCTION partitions it
+//     monthly per infra/postgres/schema.sql. Prisma queries against
+//     the partitioned parent table work unchanged.
+//   • updated_at triggers come from schema.sql (not Prisma); every
+//     repository.update() also sets updatedAt explicitly.
+//   • FK constraints are declared in schema.sql only (single source);
+//     Prisma models stay column-mirrors (relation-free) on purpose so
+//     mapper translation is the one and only place data shape is owned.
+//
+// Column naming = snake_case (native); domain entities are camelCase;
+// per-entity mappers in ./mappers/* translate.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- enums (mirror infra/postgres/schema.sql) ----------
+enum tenant_status {
+  active
+  suspended
+  pending_setup
+}
+
+enum plan_tier {
+  free
+  starter
+  pro
+  enterprise
+}
+
+enum tenant_role {
+  owner
+  admin
+  editor
+  contributor
+  viewer
+}
+
+enum platform_role {
+  owner
+  admin
+  support
+  billing
+  developer
+  read_only
+}
+
+enum staff_status {
+  invited
+  active
+  disabled
+}
+
+enum app_status {
+  active
+  disabled
+}
+
+enum api_key_type {
+  public
+  secret
+}
+
+enum api_key_env {
+  live
+  test
+}
+
+enum api_key_status {
+  active
+  revoked
+  expired
+}
+
+enum testimonial_source {
+  manual
+  form
+  api
+  twitter_import
+  csv_import
+}
+
+enum testimonial_status {
+  pending
+  approved
+  rejected
+  archived
+}
+
+enum rating_type {
+  star5
+  nps
+  thumbs
+  none
+}
+
+enum template_type {
+  widget
+  form
+}
+
+enum widget_layout {
+  carousel
+  grid
+  wall
+  spotlight
+  badge
+  video_wall
+}
+
+enum form_status {
+  draft
+  active
+  paused
+}
+
+enum question_type {
+  text
+  textarea
+  rating
+  video
+  photo
+  select
+}
+
+enum integration_provider {
+  twitter
+  google_reviews
+  producthunt
+  slack
+  zapier
+  webhook
+}
+
+enum integration_status {
+  connected
+  error
+  disabled
+}
+
+enum webhook_status {
+  active
+  disabled
+}
+
+enum delivery_status {
+  pending
+  success
+  failed
+  retrying
+}
+
+enum invite_scope {
+  platform
+  tenant
+}
+
+enum actor_type {
+  platform_admin
+  tenant_staff
+  api_key
+  system
+}
+
+enum auth_provider {
+  password
+  google
+  magic_link
+}
+
+// ---- AI Service Engine (Doc 2 Additive A) ----
+enum ai_provider_type {
+  openai
+  groq
+  gemini
+  anthropic
+  azure_openai
+  custom
+  mock
+}
+
+enum ai_provider_status {
+  active
+  disabled
+  rate_limited
+  error
+}
+
+enum ai_task_type {
+  classify_testimonial
+  summarize
+  translate
+  extract_sentiment
+  detect_spam
+  generate_reply
+  custom
+}
+
+enum ai_routing_strategy {
+  round_robin
+  weighted
+  failover
+  cheapest
+  fastest
+  single
+}
+
+enum ai_request_status {
+  success
+  error
+  timeout
+  rate_limited
+  low_confidence
+  human_override
+}
+
+// ---------- identity ----------
+model User {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email               String   @unique @db.Citext
+  password_hash       String?
+  name                String
+  avatar_url          String?
+  auth_provider       auth_provider @default(password)
+  mfa_enabled         Boolean  @default(false)
+  mfa_secret_encrypted String?
+  email_verified_at   DateTime?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("users")
+}
+
+model PlatformAdmin {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id            String   @unique @db.Uuid
+  role               platform_role @default(read_only)
+  permissions        String[] @default([])
+  status             staff_status @default(invited)
+  two_factor_enabled Boolean  @default(false)
+  last_login_at      DateTime? @db.Timestamptz(6)
+  invited_by         String?  @db.Uuid
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("platform_admins")
+}
+
+model Plan {
+  id                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tier                      plan_tier @unique
+  name                      String
+  price_cents               Int      @default(0)
+  max_apps                  Int
+  max_testimonials_per_month Int
+  max_seats                 Int
+  features                  Json     @default("{}")
+  rate_limit_per_min        Int      @default(60)
+  created_at                DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("plans")
+}
+
+model Tenant {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String
+  slug                   String   @unique @db.Citext
+  logo_url               String?
+  brand_color            String   @default("#4F46E5")
+  custom_domain          String?  @unique
+  custom_domain_verified Boolean  @default(false)
+  plan                   plan_tier @default(free)
+  status                 tenant_status @default(pending_setup)
+  owner_email            String   @db.Citext
+  stripe_customer_id     String?
+  current_period_end     DateTime? @db.Timestamptz(6)
+  testimonials_this_month Int     @default(0)
+  apps_count             Int      @default(0)
+  staff_count            Int      @default(0)
+  deleted_at             DateTime? @db.Timestamptz(6)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("tenants")
+}
+
+model TenantStaff {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String      @db.Uuid
+  user_id      String      @db.Uuid
+  role         tenant_role @default(viewer)
+  permissions  String[]    @default([])
+  status       staff_status @default(invited)
+  invited_at   DateTime    @default(now()) @db.Timestamptz(6)
+  activated_at DateTime?   @db.Timestamptz(6)
+  last_login_at DateTime?  @db.Timestamptz(6)
+
+  @@unique([tenant_id, user_id])
+  @@map("tenant_staff")
+}
+
+model App {
+  id                          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  public_id                   String     @unique
+  tenant_id                   String     @db.Uuid
+  name                        String
+  description                 String?
+  status                      app_status @default(active)
+  quota_testimonials_per_month Int       @default(50)
+  quota_widgets_max           Int        @default(3)
+  quota_forms_max             Int        @default(3)
+  quota_seat_max              Int        @default(5)
+  allowed_origins             String[]   @default([])
+  ip_allow_list               String[]?
+  require_captcha_on_forms    Boolean    @default(true)
+  archived_at                 DateTime?  @db.Timestamptz(6)
+  created_at                  DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime   @default(now()) @db.Timestamptz(6)
+
+  @@map("apps")
+}
+
+model ApiKey {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id      String         @db.Uuid
+  type        api_key_type
+  environment api_key_env
+  key_prefix  String
+  key_hash    String?
+  plain_value String?
+  status      api_key_status @default(active)
+  version     Int            @default(1)
+  created_at  DateTime       @default(now()) @db.Timestamptz(6)
+  revoked_at  DateTime?      @db.Timestamptz(6)
+  last_used_at DateTime?     @db.Timestamptz(6)
+
+  @@index([app_id])
+  @@index([key_hash])
+  @@map("api_keys")
+}
+
+model Testimonial {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id            String            @db.Uuid
+  environment       api_key_env       @default(live)
+  author_name       String
+  author_title      String?
+  author_company    String?
+  author_avatar_url String?
+  author_email      String?
+  message           String
+  rating            Int?
+  rating_type       rating_type       @default(star5)
+  media_urls        String[]          @default([])
+  video_url         String?
+  source            testimonial_source @default(manual)
+  source_ref        String?
+  status            testimonial_status @default(pending)
+  reviewed_by       String?           @db.Uuid
+  reviewed_at       DateTime?         @db.Timestamptz(6)
+  rejection_reason  String?
+  tags              String[]          @default([])
+  featured          Boolean           @default(false)
+  sort_order        Int               @default(0)
+  custom_fields     Json              @default("{}")
+  fingerprint       String
+  language          String?
+  consent_given     Boolean           @default(false)
+  deleted_at        DateTime?         @db.Timestamptz(6)
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime          @default(now()) @db.Timestamptz(6)
+
+  @@index([app_id, status])
+  @@index([app_id, fingerprint])
+  @@map("testimonials")
+}
+
+model Template {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type              template_type
+  name              String
+  description       String?
+  preview_image_url String?
+  is_premium        Boolean       @default(false)
+  version           Int           @default(1)
+  config_schema     Json          @default("[]")
+  component_ref     String
+  status            String        @default("active")
+  created_at        DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@map("templates")
+}
+
+model CollectionForm {
+  id                     String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id                 String      @db.Uuid
+  name                   String
+  slug                   String
+  template_id            String      @db.Uuid
+  status                 form_status @default(draft)
+  rating_type            rating_type @default(star5)
+  collect_video          Boolean     @default(false)
+  collect_consent        Boolean     @default(true)
+  redirect_url_on_success String?
+  style_overrides        Json        @default("{}")
+  submission_count       Int         @default(0)
+  created_at             DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime    @default(now()) @db.Timestamptz(6)
+
+  @@unique([app_id, slug])
+  @@map("collection_forms")
+}
+
+model FormQuestion {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  form_id    String        @db.Uuid
+  type       question_type
+  label      String
+  required   Boolean       @default(true)
+  options    String[]?
+  sort_order Int           @default(0)
+
+  @@index([form_id, sort_order])
+  @@map("form_questions")
+}
+
+model Widget {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id              String        @db.Uuid
+  name                String
+  template_id         String        @db.Uuid
+  template_version    Int
+  layout_type         widget_layout
+  filter_tags         String[]      @default([])
+  filter_min_rating   Int?
+  filter_featured_only Boolean      @default(false)
+  filter_limit        Int           @default(10)
+  style_overrides     Json          @default("{}")
+  embed_type          String        @default("script")
+  is_published        Boolean       @default(false)
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@index([app_id])
+  @@map("widgets")
+}
+
+model Integration {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id                String   @db.Uuid
+  provider              integration_provider
+  credentials_encrypted String?
+  config                Json     @default("{}")
+  status                integration_status @default(connected)
+  last_sync_at          DateTime? @db.Timestamptz(6)
+  last_error            String?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([app_id, provider])
+  @@map("integrations")
+}
+
+model WebhookEndpoint {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_id        String         @db.Uuid
+  url           String
+  secret        String
+  events        String[]       @default([])
+  status        webhook_status @default(active)
+  failure_count Int            @default(0)
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  webhook_endpoint_id String          @db.Uuid
+  event               String
+  payload             Json
+  response_status     Int?
+  attempt             Int             @default(1)
+  status              delivery_status @default(pending)
+  next_retry_at       DateTime?       @db.Timestamptz(6)
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+
+  @@map("webhook_deliveries")
+}
+
+model Invite {
+  token      String        @id
+  email      String        @db.Citext
+  scope      invite_scope
+  tenant_id  String?       @db.Uuid
+  role       String
+  expires_at DateTime      @db.Timestamptz(6)
+  used_at    DateTime?     @db.Timestamptz(6)
+  revoked    Boolean       @default(false)
+  invited_by String        @db.Uuid
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@index([email])
+  @@map("invites")
+}
+
+model AuditLog {
+  id          BigInt      @id @default(autoincrement())
+  actor_id    String?
+  actor_type  actor_type
+  actor_label String?
+  action      String
+  target_type String?
+  target_id   String?
+  tenant_id   String?     @db.Uuid
+  ip          String?
+  user_agent  String?
+  metadata    Json        @default("{}")
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+
+  @@index([tenant_id, created_at(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model AppStats {
+  app_id               String   @id @db.Uuid
+  total_testimonials   Int      @default(0)
+  approved_count       Int      @default(0)
+  pending_count        Int      @default(0)
+  avg_rating           Decimal  @default(0) @db.Decimal(3, 2)
+  by_source            Json     @default("{}")
+  by_month             Json     @default("{}")
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("app_stats")
+}
+
+// AI provider rows: key_encrypted holds a KMS blob (never plaintext).
+// NOTE: ai_request_logs is a plain table here — PRODUCTION partitions it
+// monthly per infra/postgres/schema.sql (same deviation as audit_logs).
+// provider_ids is text[] in Prisma vs uuid[] in canonical schema.sql —
+// values are UUID strings either way; schema.sql stays authoritative.
+model AiProvider {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String
+  type                   ai_provider_type
+  status                 ai_provider_status   @default(active)
+  api_key_encrypted      String
+  base_url               String?
+  default_model          String
+  max_tokens_per_request Int                  @default(2048)
+  rate_limit_per_minute  Int                  @default(60)
+  rate_limit_per_day     Int                  @default(10000)
+  cost_per_input_token   Decimal              @default(0) @db.Decimal(12, 8)
+  cost_per_output_token  Decimal              @default(0) @db.Decimal(12, 8)
+  priority               Int                  @default(100)
+  is_fallback            Boolean              @default(false)
+  settings               Json                 @default("{}")
+  last_error_at          DateTime?            @db.Timestamptz(6)
+  last_error             String?
+  consecutive_failures   Int                  @default(0)
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime             @default(now()) @db.Timestamptz(6)
+
+  @@map("ai_providers")
+}
+
+model AiTaskConfig {
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_type              ai_task_type
+  name                   String
+  prompt_template        String
+  response_schema        Json?
+  routing_strategy       ai_routing_strategy @default(failover)
+  provider_ids           String[]            @default([])
+  provider_weights       Json                @default("{}")
+  confidence_threshold   Decimal             @default(0.7) @db.Decimal(3, 2)
+  auto_approve_threshold Decimal?            @db.Decimal(3, 2)
+  max_retries            Int                 @default(2)
+  timeout_ms             Int                 @default(10000)
+  cache_ttl_seconds      Int                 @default(3600)
+  is_active              Boolean             @default(true)
+  created_at             DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime            @default(now()) @db.Timestamptz(6)
+
+  @@map("ai_task_configs")
+}
+
+model AiRequestLog {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_config_id       String             @db.Uuid
+  provider_id          String             @db.Uuid
+  model                String
+  prompt               String
+  input_tokens         Int                @default(0)
+  output_tokens        Int                @default(0)
+  cost_usd             Decimal            @default(0) @db.Decimal(10, 6)
+  latency_ms           Int                @default(0)
+  raw_response         String?
+  parsed_response      Json?
+  confidence_score     Decimal?           @db.Decimal(3, 2)
+  status               ai_request_status
+  error_message        String?
+  human_override       Boolean            @default(false)
+  human_override_value String?
+  quality_rating       Int?
+  tenant_id            String?            @db.Uuid
+  app_id               String?            @db.Uuid
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+
+  @@index([task_config_id, created_at(sort: Desc)])
+  @@index([provider_id, created_at(sort: Desc)])
+  @@index([status, created_at(sort: Desc)])
+  @@index([tenant_id, created_at(sort: Desc)])
+  @@map("ai_request_logs")
+}

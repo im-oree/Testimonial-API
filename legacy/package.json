@@ -1,0 +1,53 @@
+{
+  "name": "testimonial-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant, API-first testimonial collection & display platform (Zojatech / white-label). Monorepo skeleton per docs/01-skeleton.md.",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/config/eslint-plugin-repo-boundaries"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.9.8",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "prisma generate --schema apps/api/src/infrastructure/database/postgres/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema apps/api/src/infrastructure/database/postgres/schema.prisma",
+    "db:push": "prisma db push --schema apps/api/src/infrastructure/database/postgres/schema.prisma",
+    "db:studio": "prisma studio --schema apps/api/src/infrastructure/database/postgres/schema.prisma",
+    "emulators": "firebase emulators:start --project demo-testimonial --config apps/api/firebase.json",
+    "seed:firestore": "tsx scripts/seed-firestore.ts",
+    "verify:doc1": "tsx scripts/check-doc1.ts",
+    "smoke:firestore": "tsx scripts/smoke-firestore-repo.ts",
+    "verify:rules": "tsx scripts/verify-firestore-rules.ts",
+    "verify:doc2": "tsx scripts/check-doc2.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
+    "@testimonial-api/config": "*",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "autoprefixer": "^10.5.5",
+    "eslint": "^8.57.0",
+    "eslint-plugin-repo-boundaries": "*",
+    "postcss": "^8.5.28",
+    "prettier": "^3.3.3",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "next-themes": "^0.4.6"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "testimonial-api",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Testimonial collection platform — plain Express + TypeScript API (server/) and React + Vite + TypeScript app (client/).",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "start:server": "npm --prefix server start",
+    "build:client": "npm --prefix client run build",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "test:security": "npm --prefix server run test:security"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@testimonial-api/domain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared domain layer for Testimonial API — pure entities, repository ports (interfaces), value objects, errors, utils. Zero framework / zero storage-driver imports. Imported by apps/api AND apps/worker (single source of truth).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

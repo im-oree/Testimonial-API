@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// ============================================================
+// TESTIMONIAL API — Firestore security rules
+// Doc 1 §7: Firestore is a prototyping database ONLY. No browser
+// or third-party client ever talks to Firestore directly — all
+// access is mediated by the NestJS API service using the Admin SDK.
+// These rules are therefore defense-in-depth: deny everything from
+// client SDKs, allow only service-account access.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Deny ALL client access. The API service (Admin SDK) bypasses
+    // rules entirely; nothing else is allowed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

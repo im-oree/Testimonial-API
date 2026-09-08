@@ -1,0 +1,32 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env"],
+  "globalEnv": [
+    "DATABASE_PROVIDER",
+    "NODE_ENV",
+    "FIRESTORE_EMULATOR_HOST",
+    "GCLOUD_PROJECT",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "PORT",
+    "JWT_SECRET"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    }
+  }
+}

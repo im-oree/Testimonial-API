@@ -1,0 +1,8 @@
+{
+  "name": "eslint-plugin-repo-boundaries",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custom ESLint plugin enforcing Testimonial API architecture boundaries (docs/01-skeleton.md §11): storage drivers only inside infrastructure/, DB adapters unreachable outside infrastructure/database.",
+  "main": "index.js",
+  "files": ["index.js"]
+}

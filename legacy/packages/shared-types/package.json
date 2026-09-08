@@ -1,0 +1,31 @@
+{
+  "name": "@testimonial-api/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DTO/enum/zod/rbac types shared between backend and all frontends. Doc 3 (API layer) grows the DTO catalogue here.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@testimonial-api/domain": "*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
