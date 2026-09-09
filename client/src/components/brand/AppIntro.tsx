@@ -2,13 +2,11 @@
  * AppIntro — the boot animation, played once per page load.
  *
  * Sequence (all smooth, eased):
- *   1. SWEEP        the Zojatech mark as a looping trim-path outline — a
- *                   bright stroke travels the contour with its end trailing
- *                   a bit behind its head (one lap while the app boots)
- *   2. FILL         the solid mark fades in over the sweep
- *   3. WIPE         a circular clip-path matte closes over the full-screen
- *                   navy backdrop, track-matting the logo out while the app
- *                   scales up beneath it at the same time
+ *   1. TRIM PATH   the Zojatech mark draws on as a stroke
+ *   2. FILL        the solid mark fades in over the stroke
+ *   3. WIPE        a circular clip-path matte closes over the full-screen
+ *                  navy backdrop, track-matting the logo out while the app
+ *                  scales up beneath it at the same time
  *
  * Client-side navigation never remounts the app, so the intro only appears
  * when the tab is opened or the page is hard-refreshed — exactly once per
@@ -50,16 +48,21 @@ export function AppIntro({ onReveal, onDone }: { onReveal: () => void; onDone: (
           everything at first — no visible edge, no aspect-ratio tricks — then
           closes to nothing, wiping the logo out with it. */}
       <div className="app-intro-matte">
-        {/* The mark as a looping trim-path outline (same loader language as
-            LogoLoader): a bright stroke sweeps the contour with its end
-            trailing a bit behind its head, one lap while the app boots. The
-            solid mark then fades in over it and the matte wipes away. */}
-        <svg className="logo-loader logo-loader-intro" width="150" height="150" viewBox="56 49 88 98" fill="none">
-          {/* the whole contour, faint — the shape reads at a glance */}
-          <path className="logo-loader-base" d={ZOJATECH_MARK_PATH} fill="none" />
-          {/* the traveling trim-path segment: head leads, end a bit behind */}
-          <path className="logo-loader-trim" d={ZOJATECH_MARK_PATH} fill="none" pathLength={1} />
-          {/* the solid mark fades in over the sweep. */}
+        <svg width="150" height="150" viewBox="56 49 88 98" fill="none">
+          {/* 1 — the stroke draws on (trim path). */}
+          <motion.path
+            d={ZOJATECH_MARK_PATH}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={6}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            fillRule="evenodd"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.05, ease: [0.65, 0, 0.35, 1] }}
+          />
+          {/* 2 — the solid mark fades in over it. */}
           <motion.path
             d={ZOJATECH_MARK_PATH}
             fill="#ffffff"

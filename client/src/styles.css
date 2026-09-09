@@ -3059,7 +3059,9 @@ a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat
 /* LogoLoader — the Zojatech mark as a looping trim-path outline (see
    components/brand/LogoLoader.tsx). pathLength="1" on the SVG path
    normalises the dash units, so the pattern period is exactly 1 and the
-   offset animation loops seamlessly. */
+   offset animation loops seamlessly. Used for indefinite loading states
+   (route-chunk fallback) — the boot intro keeps its own one-shot
+   draw-then-fill sequence in AppIntro.tsx. */
 .logo-loader { display: block; color: var(--navy); }
 .logo-loader .logo-loader-base,
 .logo-loader .logo-loader-trim {
@@ -3084,9 +3086,3 @@ a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat
   .logo-loader .logo-loader-trim { animation: none; stroke-dasharray: none; }
   .logo-loader .logo-loader-base { display: none; }
 }
-
-/* Boot intro instance of the LogoLoader: white on the navy matte, and the
-   sweep completes exactly one lap per boot phase (1.1s) — the solid fill
-   lands just as the stroke closes the circle. */
-.app-intro-matte .logo-loader { color: #fff; }
-.app-intro-matte .logo-loader .logo-loader-trim { animation-duration: 1.1s; }
