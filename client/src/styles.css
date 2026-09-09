@@ -3084,3 +3084,9 @@ a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat
   .logo-loader .logo-loader-trim { animation: none; stroke-dasharray: none; }
   .logo-loader .logo-loader-base { display: none; }
 }
+
+/* Boot intro instance of the LogoLoader: white on the navy matte, and the
+   sweep completes exactly one lap per boot phase (1.1s) — the solid fill
+   lands just as the stroke closes the circle. */
+.app-intro-matte .logo-loader { color: #fff; }
+.app-intro-matte .logo-loader .logo-loader-trim { animation-duration: 1.1s; }
