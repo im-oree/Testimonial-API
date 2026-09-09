@@ -11,7 +11,7 @@
  *                   output: the same schema the design studio edits, rendered
  *                   with live records — they can never drift apart.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
@@ -23,6 +23,41 @@ import { WidgetEmpty } from '../widgets/primitives';
 import { ErrorBanner, RatingStars } from '../components/ui';
 import { FONT_OPTIONS } from '../lib/theme';
 import { IconZojatechMark } from '../components/icons/brand';
+
+/**
+ * FitWidget — the product's template renders at its EXACT studio dimensions
+ * (that is the contract with embeds), but the column around it may be any
+ * width: a phone screen, a narrow iframe on a customer's site. Instead of
+ * flex-shrinking (which crops the design, because the widget clips at its
+ * own border) the whole widget is uniformly scaled to fit — the same
+ * letterbox approach as the studio preview. Nothing is cut, no sideways
+ * scrolling; on wide containers it renders 1:1.
+ */
+function FitWidget({ width, height, children }: { width: number; height: number; children: ReactNode }) {
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box || width < 1) return;
+    const measure = (): void => {
+      const cw = box.clientWidth;
+      if (cw > 0) setScale(Math.min(1, cw / width));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [width]);
+
+  return (
+    <div ref={boxRef} className="wall-fit" style={{ height: Math.max(1, Math.round(height * scale)) }}>
+      <div className="wall-fit-inner" style={{ width, height, transform: `scale(${scale})` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function useEmbedHeight(enabled: boolean, ready: boolean): void {
   useEffect(() => {
@@ -141,13 +176,15 @@ export default function WallPage() {
   }));
   const widgetCta = wall.form ? `${window.location.origin}/forms/${wall.form.slug}` : null;
 
-  // Widget mode: the product's template at its exact fixed dimensions —
-  // designed to be embedded on external websites.
+  // Widget mode: the product's template, scaled to fit its container exactly
+  // — designed to be embedded on external websites of any width.
   if (embed) {
     return (
       <div className="wall wall-embed wall-template">
         {wall.widget ? (
-          <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+          <FitWidget width={wall.widget.schema.canvas.width} height={wall.widget.schema.canvas.height}>
+            <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+          </FitWidget>
         ) : (
           <WidgetEmpty tokens={tokens} cta={wall.form ? { href: `/forms/${wall.form.slug}`, label: 'Add a Review +' } : null} />
         )}
@@ -178,7 +215,9 @@ export default function WallPage() {
                 reviews, exactly as it appears when embedded elsewhere. */}
             {wall.widget && (
               <div className="wall-hero-widget">
-                <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+                <FitWidget width={wall.widget.schema.canvas.width} height={wall.widget.schema.canvas.height}>
+                  <TemplateWidget schema={wall.widget.schema} records={widgetRecords} ctaHref={widgetCta} />
+                </FitWidget>
               </div>
             )}
             <div className="wall-actions">

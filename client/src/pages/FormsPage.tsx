@@ -7,7 +7,7 @@
  * always visible without scrolling: add/remove/reorder questions, change
  * types and labels, and watch the public form update as you type.
  */
-import { IconCheck, IconEdit, IconExternal, IconPlus, IconTrash, IconX } from '../components/icons';
+import { IconEdit, IconExternal, IconPlus, IconTrash, IconX } from '../components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -20,6 +20,7 @@ import { Field, SelectField, TextInput } from '../components/fields';
 import { KebabMenu } from '../components/menu';
 import { SkeletonTable } from '../components/Skeleton';
 import Modal from '../components/Modal';
+import { toast } from '../components/Toast';
 
 type QType = 'text' | 'rating' | 'select';
 
@@ -63,7 +64,6 @@ export default function FormsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [draft, setDraft] = useState<FormDraft | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
-  const [okNote, setOkNote] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!appId) return;
@@ -108,8 +108,7 @@ export default function FormsPage() {
   }
 
   function flash(msg: string): void {
-    setOkNote(msg);
-    window.setTimeout(() => setOkNote((cur) => (cur === msg ? null : cur)), 2200);
+    toast(msg);
   }
 
   function editDraft(form: FormRow): void {
@@ -179,13 +178,6 @@ export default function FormsPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {okNote && (
-        <div className="banner banner-ok" role="status">
-          <span>
-            <IconCheck size={13} /> {okNote}
-          </span>
-        </div>
-      )}
 
       {loading && <SkeletonTable rows={4} cols={5} />}
       {!loading && rows.length === 0 && (

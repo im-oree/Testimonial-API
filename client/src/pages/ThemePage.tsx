@@ -5,7 +5,6 @@
  * two short explainer cards. Everything here is company-wide; per-product
  * widget designs live in each product's design studio.
  */
-import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -13,13 +12,13 @@ import { useAuth } from '../auth';
 import ThemeEditor from '../components/ThemeEditor';
 import type { ResolvedTheme, ThemeSaveResponse } from '../lib/types';
 import { Breadcrumbs, ErrorBanner, PageHeader } from '../components/ui';
+import { toast } from '../components/Toast';
 
 export default function ThemePage() {
   const { tenant, refresh } = useAuth();
   const [theme, setTheme] = useState<ResolvedTheme | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -43,7 +42,7 @@ export default function ThemePage() {
   function onSaved(res: ThemeSaveResponse): void {
     setTheme(res.theme);
     setLogo(res.logoUrl ?? null);
-    setNotice('Theme saved — your workspace chrome and every public form, wall and embed use it now.');
+    toast('Theme saved — forms, walls and embeds use it now.');
     void refresh();
   }
 
@@ -61,7 +60,6 @@ export default function ThemePage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={() => setTick((t) => t + 1)} />}
-      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <div className="theme-status-strip">
         <span className="theme-status-item">

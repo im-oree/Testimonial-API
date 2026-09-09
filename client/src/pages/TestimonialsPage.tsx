@@ -24,6 +24,7 @@ import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager, Rating
 import { Field, SelectField, TextAreaInput, TextInput } from '../components/fields';
 import { ConfirmDialog, KebabMenu, type MenuAction } from '../components/menu';
 import Modal from '../components/Modal';
+import { toast } from '../components/Toast';
 import { IconCheck, IconEdit, IconEye, IconEyeOff, IconLayers, IconPlus, IconTrash, IconX } from '../components/icons';
 
 type Filter = 'all' | 'pending' | 'approved' | 'rejected' | 'archived';
@@ -68,7 +69,6 @@ export default function TestimonialsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Testimonial | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [okNote, setOkNote] = useState<string | null>(null);
 
   // Bulk work
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -128,8 +128,7 @@ export default function TestimonialsPage() {
     load(filter, q, page, perPage);
   }
   function flash(msg: string): void {
-    setOkNote(msg);
-    window.setTimeout(() => setOkNote((cur) => (cur === msg ? null : cur)), 2200);
+    toast(msg);
   }
 
   // ---- selection helpers -------------------------------------------------
@@ -310,13 +309,6 @@ export default function TestimonialsPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={refresh} />}
-      {okNote && (
-        <div className="banner banner-ok" role="status">
-          <span>
-            <IconCheck size={13} /> {okNote}
-          </span>
-        </div>
-      )}
 
       <div className="toolbar">
         <div className="segmented">
@@ -418,11 +410,11 @@ export default function TestimonialsPage() {
                     </th>
                   )}
                   <th>Author</th>
-                  <th>Rating</th>
+                  <th className="t-col-rating">Rating</th>
                   <th className="t-content">Content</th>
                   <th>Status</th>
                   <th>On wall</th>
-                  <th>Received</th>
+                  <th className="t-col-received">Received</th>
                   {!nothingEditable && <th className="t-menu" />}
                 </tr>
               </thead>
@@ -446,7 +438,7 @@ export default function TestimonialsPage() {
                         <div className="strong">{t.authorName ?? 'Anonymous'}</div>
                         {t.tags.length > 0 && <div className="muted small">{t.tags.join(', ')}</div>}
                       </td>
-                      <td>{t.rating ? <RatingStars value={t.rating} size="sm" /> : <span className="muted">—</span>}</td>
+                      <td className="t-col-rating">{t.rating ? <RatingStars value={t.rating} size="sm" /> : <span className="muted">—</span>}</td>
                       <td className="t-content">
                         <button
                           type="button"
@@ -477,7 +469,7 @@ export default function TestimonialsPage() {
                           </span>
                         )}
                       </td>
-                      <td className="muted small">{timeAgo(t.createdAt)}</td>
+                      <td className="t-col-received muted small">{timeAgo(t.createdAt)}</td>
                       {!nothingEditable && (
                         <td className="t-menu">
                           <KebabMenu actions={rowMenu(t)} label={`Actions for ${t.authorName ?? 'anonymous'}'s review`} />
@@ -632,11 +624,11 @@ function SkeletonTestimonialTable({ rows = 7, selectable = true }: { rows?: numb
               </th>
             )}
             <th>Author</th>
-            <th>Rating</th>
+            <th className="t-col-rating">Rating</th>
             <th className="t-content">Content</th>
             <th>Status</th>
             <th>On wall</th>
-            <th>Received</th>
+            <th className="t-col-received">Received</th>
             {selectable && <th className="t-menu" />}
           </tr>
         </thead>
@@ -652,7 +644,7 @@ function SkeletonTestimonialTable({ rows = 7, selectable = true }: { rows?: numb
                 <span className="sk" style={{ width: `${70 + ((i * 13) % 20)}%`, height: 12 }} />
                 <span className="sk" style={{ width: '50%', height: 9, marginTop: 5 }} />
               </td>
-              <td>
+              <td className="t-col-rating">
                 <span className="sk" style={{ width: 58, height: 12 }} />
               </td>
               <td className="t-content">
@@ -665,7 +657,7 @@ function SkeletonTestimonialTable({ rows = 7, selectable = true }: { rows?: numb
               <td>
                 <span className="sk" style={{ width: 46, height: 17, borderRadius: 999 }} />
               </td>
-              <td>
+              <td className="t-col-received">
                 <span className="sk" style={{ width: 44, height: 11 }} />
               </td>
               {selectable && (

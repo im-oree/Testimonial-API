@@ -41,19 +41,26 @@ export function RatingStars({ value, onChange, size = 'md' }: { value?: number; 
   const interactive = Boolean(onChange);
   return (
     <span className={`stars stars-${size}${interactive ? ' stars-interactive' : ''}`} role={interactive ? 'radiogroup' : undefined} aria-label={`Rating: ${value ?? 0} of 5`}>
-      {stars.map((n) => (
-        <button
-          key={n}
-          type="button"
-          disabled={!interactive}
-          onClick={() => onChange?.(n)}
-          aria-checked={value === n}
-          role={interactive ? 'radio' : undefined}
-          className={n <= (value ?? 0) ? 'star on' : 'star'}
-        >
-          <IconStar />
-        </button>
-      ))}
+      {stars.map((n) =>
+        interactive ? (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange?.(n)}
+            aria-checked={value === n}
+            role="radio"
+            className={n <= (value ?? 0) ? 'star on' : 'star'}
+          >
+            <IconStar />
+          </button>
+        ) : (
+          // Display-only: plain glyphs, not fake disabled buttons — the wrapper's
+          // aria-label already reads the rating to assistive tech.
+          <span key={n} aria-hidden="true" className={n <= (value ?? 0) ? 'star on' : 'star'}>
+            <IconStar />
+          </span>
+        )
+      )}
     </span>
   );
 }

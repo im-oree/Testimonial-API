@@ -14,6 +14,7 @@ import CreateProductModal from '../components/CreateProductModal';
 import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager } from '../components/ui';
 import { SkeletonTable } from '../components/Skeleton';
 import { KebabMenu } from '../components/menu';
+import { toast } from '../components/Toast';
 
 type Filter = 'all' | 'active' | 'paused';
 const PAGE_SIZE = 8;
@@ -69,9 +70,12 @@ export default function AppsHomePage() {
     setError(null);
     try {
       await api.patch(`/v1/apps/${app.id}`, { status: app.status === 'active' ? 'paused' : 'active' });
+      toast(app.status === 'active' ? 'Product paused — its form and wall stop accepting reviews.' : 'Product active again.');
       load(filter, q, page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the product.');
+      const msg = err instanceof Error ? err.message : 'Could not update the product.';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setBusyPause(null);
     }

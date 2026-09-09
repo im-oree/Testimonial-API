@@ -1,11 +1,11 @@
 /** Company workspace — Account settings: profile (name/email) + password. */
-import { IconCheck } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { api, storeSessionToken } from '../lib/api';
 import { useAuth } from '../auth';
 import { Breadcrumbs, Button, Card, ErrorBanner, PageHeader } from '../components/ui';
 import { Field, PasswordInput, TextInput } from '../components/fields';
 import { SkeletonCards } from '../components/Skeleton';
+import { toast } from '../components/Toast';
 
 interface AccountInfo {
   user: { id: string; email: string; name: string; role: string };
@@ -16,7 +16,6 @@ export default function AccountPage() {
   const { refresh } = useAuth();
   const [info, setInfo] = useState<AccountInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [name, setName] = useState('');
@@ -40,7 +39,6 @@ export default function AccountPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    setNotice(null);
     try {
       const res = await api.patch<{ user: { id: string; email: string; name: string; role: string }; token?: string }>('/v1/account', {
         name,
@@ -49,7 +47,7 @@ export default function AccountPage() {
       if (res.token) storeSessionToken(res.token);
       await refresh();
       setInfo((prev) => (prev ? { ...prev, user: res.user } : prev));
-      setNotice('Profile saved.');
+      toast('Profile saved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your profile.');
     } finally {
@@ -65,13 +63,12 @@ export default function AccountPage() {
     }
     setBusy(true);
     setError(null);
-    setNotice(null);
     try {
       await api.patch('/v1/account', { currentPassword, newPassword });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setNotice('Password updated.');
+      toast('Password updated.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not change the password.');
     } finally {
@@ -88,7 +85,6 @@ export default function AccountPage() {
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
       {!info && !error && <SkeletonCards count={2} height={250} wrap="two-col" />}
 
       {info && (

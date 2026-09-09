@@ -12,6 +12,7 @@ import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { Field, TextInput } from '../components/fields';
 import { ConfirmDialog, KebabMenu } from '../components/menu';
 import { IconClipboard, IconPlus, IconSearch } from '../components/icons';
+import { toast } from '../components/Toast';
 
 interface MediaAsset {
   id: string;
@@ -23,7 +24,6 @@ interface MediaAsset {
 export default function MediaPage() {
   const [assets, setAssets] = useState<MediaAsset[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -44,8 +44,7 @@ export default function MediaPage() {
   }, [load]);
 
   function flash(msg: string): void {
-    setNotice(msg);
-    window.setTimeout(() => setNotice(null), 2600);
+    toast(msg);
   }
 
   async function add(): Promise<void> {
@@ -104,11 +103,6 @@ export default function MediaPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && (
-        <div className="banner banner-ok" role="status">
-          {notice}
-        </div>
-      )}
 
       {adding && (
         <div className="card media-add">

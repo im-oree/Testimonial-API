@@ -41,6 +41,24 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/** True while the viewport is phone-sized. Drives the mobile bottom tab bar:
+ *  nav groups flatten into one scrollable row (a group toggle would hide
+ *  links behind a tap) and the collapsed "rail" mode never applies — the
+ *  phone layout is owned by CSS, not by the saved desktop preference. */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(() =>
+    typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 760px)').matches : false,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 760px)');
+    const onChange = (): void => setMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
+
 function RowLink({ item, rail }: { item: NavItem; rail: boolean }) {
   return (
     <NavLink
@@ -57,12 +75,12 @@ function RowLink({ item, rail }: { item: NavItem; rail: boolean }) {
 }
 
 /** A labelled nav section that can collapse to keep the sidebar from getting crowded. */
-function NavGroupBlock({ label, items, rail }: { label?: string | null; items: NavItem[]; rail: boolean }) {
+function NavGroupBlock({ label, items, rail, mobile }: { label?: string | null; items: NavItem[]; rail: boolean; mobile?: boolean }) {
   const [open, setOpen] = useState(true);
   if (items.length === 0) return null;
-  // Collapsed rail: sections are flattened into plain icon rows so every
-  // destination stays reachable (group toggles would trap content).
-  if (rail || !label) {
+  // Collapsed rail + phones: sections are flattened into plain icon rows so
+  // every destination stays reachable (group toggles would trap content).
+  if (rail || mobile || !label) {
     return (
       <div className="nav-group">
         {items.map((item) => (
@@ -100,6 +118,7 @@ function Sidebar({
   extra,
   rail,
   onToggleRail,
+  mobile,
 }: {
   brand: string;
   groups: NavGroup[];
@@ -107,16 +126,20 @@ function Sidebar({
   extra?: ReactNode;
   rail: boolean;
   onToggleRail: (rail: boolean) => void;
+  mobile: boolean;
 }) {
   const { user, permissions, signOut } = useAuth();
   const navigate = useNavigate();
+  // Phones use the bottom tab bar — the desktop rail preference must not
+  // leak into that layout (labels would disappear behind `.sidebar.rail`).
+  const effectiveRail = rail && !mobile;
 
   const visible = groups
     .map((g) => ({ ...g, items: g.items.filter((it) => !it.perm || permissions.includes(it.perm)) }))
     .filter((g) => g.items.length > 0);
 
   return (
-    <aside className={`sidebar ${rail ? 'rail' : ''}`}>
+    <aside className={`sidebar ${effectiveRail ? 'rail' : ''}`}>
       <div className="sidebar-brand">
         <IconZojatechMark size={24} />
         <span className="nav-label">{brand}</span>
@@ -124,13 +147,13 @@ function Sidebar({
       <button
         type="button"
         className="rail-toggle"
-        title={rail ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-label={rail ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-expanded={!rail}
-        onClick={() => onToggleRail(!rail)}
+        title={effectiveRail ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={effectiveRail ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!effectiveRail}
+        onClick={() => onToggleRail(!effectiveRail)}
       >
-        {rail ? <IconChevronLeft size={15} style={{ transform: 'rotate(180deg)' }} /> : <IconChevronLeft size={15} />}
-        {!rail && <span className="nav-label">Collapse</span>}
+        {effectiveRail ? <IconChevronLeft size={15} style={{ transform: 'rotate(180deg)' }} /> : <IconChevronLeft size={15} />}
+        {!effectiveRail && <span className="nav-label">Collapse</span>}
       </button>
 
       {identity && (
@@ -158,7 +181,7 @@ function Sidebar({
 
       <nav className="sidebar-nav">
         {visible.map((group, gi) => (
-          <NavGroupBlock key={gi} label={group.label} items={group.items} rail={rail} />
+          <NavGroupBlock key={gi} label={group.label} items={group.items} rail={effectiveRail} mobile={mobile} />
         ))}
       </nav>
 
@@ -183,8 +206,8 @@ function Sidebar({
             navigate('/login', { replace: true });
           }}
         >
-          {!rail && 'Sign out'}
-          {rail && <IconLogout size={16} />}
+          {!effectiveRail && 'Sign out'}
+          {effectiveRail && <IconLogout size={16} />}
         </button>
       </div>
     </aside>
@@ -214,6 +237,7 @@ function Shell({
 }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const mobile = useIsMobile();
   const [rail, setRail] = useState<boolean>(() => {
     try {
       const stored = window.localStorage.getItem(RAIL_KEY);
@@ -253,7 +277,7 @@ function Shell({
 
   return (
     <div className={`shell ${immersive ? 'shell-immersive' : ''}`}>
-      <Sidebar brand={brand} groups={groups} identity={identity} extra={sidebarExtra} rail={rail} onToggleRail={toggleRail} />
+      <Sidebar brand={brand} groups={groups} identity={identity} extra={sidebarExtra} rail={rail} onToggleRail={toggleRail} mobile={mobile} />
       <div className="shell-main">
         {banner}
         {!immersive && (

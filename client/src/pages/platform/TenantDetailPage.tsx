@@ -1,5 +1,4 @@
 /** Platform console — tenant detail: metrics + trend chart + products + identity + team + impersonate. */
-import { IconCheck } from '../../components/icons';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth';
@@ -12,6 +11,7 @@ import {
 import { Breadcrumbs, Button, Card, ErrorBanner, Label, PageHeader, Select, StatCard, TextInput } from '../../components/ui';
 import { SkeletonChart, SkeletonStats, SkeletonTable } from '../../components/Skeleton';
 import ThemeEditor from '../../components/ThemeEditor';
+import { toast } from '../../components/Toast';
 
 
 export default function TenantDetailPage() {
@@ -23,7 +23,6 @@ export default function TenantDetailPage() {
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [staff, setStaff] = useState<TeamMember[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
 
@@ -62,8 +61,11 @@ export default function TenantDetailPage() {
     try {
       const updated = await api.patch<TenantDetail>(`/v1/platform/tenants/${tenant.id}`, patch);
       setTenant(updated);
+      toast('Tenant updated.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save changes.');
+      const msg = err instanceof Error ? err.message : 'Could not save changes.';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setBusy(false);
     }
@@ -75,9 +77,12 @@ export default function TenantDetailPage() {
     setError(null);
     try {
       await api.patch<TenantDetail>(`/v1/platform/tenants/${tenant.id}`, { ownerEmail, ownerName });
+      toast('Owner account updated.');
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the owner account.');
+      const msg = err instanceof Error ? err.message : 'Could not update the owner account.';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setBusy(false);
     }
@@ -139,7 +144,6 @@ export default function TenantDetailPage() {
       />
 
       {error && <ErrorBanner message={error} />}
-      {notice && <div className="banner banner-ok"><IconCheck size={13} /> {notice}</div>}
 
       <div className="stat-grid">
         <StatCard label="Monthly MRR" value={`$${tenant.monthlyCostUsd}`} />
@@ -207,7 +211,7 @@ export default function TenantDetailPage() {
               initialLogo={tenant.logoUrl}
               onSaved={(res: ThemeSaveResponse) => {
                 setTenant((prev) => (prev ? { ...prev, theme: res.theme, brandColor: res.brandColor ?? prev.brandColor, logoUrl: res.logoUrl ?? prev.logoUrl } : prev));
-                setNotice('Theme saved — the company’s public form, walls and embeds reflect it on next load.');
+                toast('Theme saved — the company’s public pages reflect it on next load.');
               }}
             />
           </div>

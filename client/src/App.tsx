@@ -18,6 +18,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './auth';
 import { AppIntro } from './components/brand/AppIntro';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Toaster } from './components/Toast';
 import { AppLayout, PlatformLayout } from './components/layout';
 import LoginPage from './pages/LoginPage';
 import AppsHomePage from './pages/AppsHomePage';
@@ -69,6 +70,9 @@ export default function App() {
       >
         <AppRoutes />
       </div>
+      {/* Global success/error feedback for actions whose result is otherwise
+          invisible — mounted above every route, page and modal. */}
+      <Toaster />
     </AuthProvider>
   );
 }

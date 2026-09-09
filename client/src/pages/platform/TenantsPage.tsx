@@ -8,6 +8,7 @@ import type { Paged, TenantRow } from '../../lib/types';
 import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager } from '../../components/ui';
 import { SkeletonTable } from '../../components/Skeleton';
 import CreateTenantModal from './CreateTenantModal';
+import { toast } from '../../components/Toast';
 
 type Filter = 'all' | 'active' | 'trialing' | 'suspended';
 const PAGE_SIZE = 10;
@@ -134,6 +135,7 @@ export default function TenantsPage() {
           setPage(1);
           setQ('');
           load('all', '', 1);
+          toast('Company workspace created.');
         }}
       />
     </div>

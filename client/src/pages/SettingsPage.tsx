@@ -12,7 +12,7 @@
  * Appearance (theme tokens + logo) intentionally stays its own full editor at
  * /app/settings/theme; Account is your personal profile at /app/settings/account.
  */
-import { IconCheck, IconClipboard, IconLayers, IconPalette } from '../components/icons';
+import { IconClipboard, IconLayers, IconPalette } from '../components/icons';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -21,6 +21,7 @@ import { useAuth } from '../auth';
 import type { AuditRow } from '../lib/types';
 import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { Field, TextInput } from '../components/fields';
+import { toast } from '../components/Toast';
 
 interface BillingSummary {
   plan: 'starter' | 'growth' | 'scale';
@@ -46,7 +47,6 @@ export default function SettingsPage() {
   const [name, setName] = useState(tenant?.name ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setName(tenant?.name ?? '');
@@ -72,10 +72,10 @@ export default function SettingsPage() {
     if (!tenant) return;
     setSaving(true);
     setError(null);
-    setNotice(null);
+
     try {
       await api.patch(`/v1/settings/workspace`, { name });
-      setNotice('Workspace name saved.');
+      toast('Workspace name saved.');
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the workspace name.');
@@ -96,11 +96,6 @@ export default function SettingsPage() {
       <PageHeader title="Settings" subtitle={`Workspace preferences and overview for ${tenant.name}.`} />
 
       {error && <ErrorBanner message={error} />}
-      {notice && (
-        <div className="banner banner-ok">
-          <IconCheck size={13} /> {notice}
-        </div>
-      )}
 
       <div className="settings-stack">
         {/* Workspace profile — real, editable setting */}

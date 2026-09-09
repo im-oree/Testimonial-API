@@ -19,6 +19,7 @@ import type { Paged, Testimonial } from '../lib/types';
 import { Breadcrumbs, Button, EmptyState, ErrorBanner, PageHeader, Pager, RatingStars } from '../components/ui';
 import { SkeletonCards } from '../components/Skeleton';
 import { ConfirmDialog } from '../components/menu';
+import { toast } from '../components/Toast';
 
 const PAGE_SIZES = [7, 15, 30];
 const DEFAULT_PAGE_SIZE = 7;
@@ -92,10 +93,15 @@ export default function ModerationPage() {
         action,
         reason: item.reason?.trim() || undefined,
       });
-      setItems((prev) => prev.filter((i) => i.id !== item.id));
+      setItems((prev) => prev.filter((i) => (i.id !== item.id)));
       setTotal((t) => Math.max(0, t - 1));
+      toast(action === 'approve' ? 'Review approved — it is live on the wall.' : 'Review rejected.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That action failed.');
+      const msg = err instanceof Error ? err.message : 'That action failed.';
+      // The queue is long and scrollable: a toast guarantees the failure is
+      // seen even when the error banner at the top is scrolled out of view.
+      toast(msg, 'error');
+      setError(msg);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, busy: false } : i)));
     }
   }
@@ -128,11 +134,15 @@ export default function ModerationPage() {
     setError(null);
     try {
       await api.post(`/v1/apps/${appId}/testimonials/bulk/moderation`, { action, ids: [...selected] });
+      const n = selected.size;
       setSelected(new Set());
       setConfirmBulk(null);
       load(page, perPage);
+      toast(`${n} review${n === 1 ? '' : 's'} ${action === 'approve' ? 'approved' : 'rejected'}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'That bulk action failed.');
+      const msg = err instanceof Error ? err.message : 'That bulk action failed.';
+      toast(msg, 'error');
+      setError(msg);
     } finally {
       setBulkBusy(false);
     }

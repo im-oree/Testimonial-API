@@ -15,6 +15,7 @@ import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { Field, SelectField, TextAreaInput } from '../components/fields';
 import { ConfirmDialog } from '../components/menu';
 import { IconRefresh } from '../components/icons';
+import { toast } from '../components/Toast';
 
 type HistoryStatus = 'new' | 'draft' | 'live';
 
@@ -135,8 +136,11 @@ export default function AiPage() {
       }
       setHistory((h) => h.map((e) => (e.id === currentId ? { ...e, status: mode === 'draft' ? 'draft' : 'live' } : e)));
       setConfirmApply(false);
+      toast(mode === 'draft' ? 'Draft saved — pick it up in the design studio.' : 'Design published — embeds now use it.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the design.');
+      const msg = err instanceof Error ? err.message : 'Could not save the design.';
+      setError(msg);
+      toast(msg, 'error');
     } finally {
       setBusy(null);
     }
