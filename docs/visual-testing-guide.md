@@ -70,6 +70,7 @@ decides pass/fail itself:
 | `verify-surfaces.js` | Public form + wall (fit-scaled hero, full-width CTAs, ≥40px rating stars), the immersive design studio (panels on-screen), the platform console pages incl. tenant detail and 404, touch-target sizes |
 | `verify-phone.js` | Interaction flows on a 390×844 phone: tab-bar taps navigate, kebab menus open as bottom sheets, modals center/scroll-lock/close correctly, actions fire visible toasts, wide tables swipe inside their card |
 | `verify-modals.js` | Every remaining dialog (team invite, new testimonial, AI apply confirm, create tenant, create staff, manage staff) opens, centers, scroll-locks and closes on a phone |
+| `verify-embed.js` | The customer-facing integration: the external-site demo page (embed.js iframe + modal.js review popup at phone/tablet/desktop widths — popup goes fullscreen ≤520px) and the public form's full submission flow (fill → submit → thank-you + snapshot) |
 
 ```bash
 cd e2e
@@ -78,6 +79,7 @@ SIZES=phone-390,desktop-1920 node verify-layout.js   # subset (fast)
 node verify-surfaces.js
 node verify-phone.js
 node verify-modals.js
+node verify-embed.js
 ```
 
 Reading output:
