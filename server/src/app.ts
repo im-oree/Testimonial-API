@@ -3,6 +3,9 @@
  * Mounting everything under /v1 keeps the same API shape as before, so the
  * frontend only ever talks to /v1/... paths.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import './env';
 import { authRouter } from './routes/auth';
@@ -80,6 +83,24 @@ export function createApp(): express.Express {
   app.use('/v1', (_req, res) => {
     res.status(404).json(errorResponse(404, 'Not found.'));
   });
+
+  // Production: serve the built web app (client/dist) same-origin.
+  const webDist = join(fileURLToPath(new URL('../..', import.meta.url)), 'client', 'dist');
+  if (existsSync(webDist)) {
+    app.use(
+      express.static(webDist, {
+        setHeaders: (res, filePath) => {
+          res.setHeader('Cache-Control', filePath.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache');
+        },
+      }),
+    );
+    // SPA fallback: client-side routes get index.html; API paths pass through.
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/v1') || req.path.startsWith('/health')) return next();
+      res.sendFile(join(webDist, 'index.html'));
+    });
+    console.log(`[api] serving web app from ${webDist}`);
+  }
 
   // Everything thrown by a handler lands here as a JSON error.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
