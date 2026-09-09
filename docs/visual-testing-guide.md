@@ -9,6 +9,10 @@ Everything lives in [`e2e/`](../e2e/). No test framework, no globals — plain
 Node scripts that print `FACTS` (what was measured) and `PROBLEMS` (what
 failed). If the `PROBLEMS` section is empty, the check passed.
 
+> Need just the browser stack (Playwright + headless Chromium in a locked-down
+> environment), independent of this app's suites? See the self-contained
+> **[Playwright sandbox setup guide](playwright-sandbox-setup.md)**.
+
 ---
 
 ## 1. Why this exists
