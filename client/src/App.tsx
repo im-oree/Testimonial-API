@@ -17,6 +17,7 @@ import { Suspense, lazy, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './auth';
 import { AppIntro } from './components/brand/AppIntro';
+import { LogoLoader } from './components/brand/LogoLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toaster } from './components/Toast';
 import { AppLayout, PlatformLayout } from './components/layout';
@@ -160,11 +161,12 @@ function AppRoutes() {
 }
 
 /** What shows while a route's chunk streams in (first uncached visit; the
- *  boot intro usually covers it on authed loads). */
+ *  boot intro usually covers it on authed loads). The Zojatech mark as a
+ *  looping trim-path outline — same drawing language as the boot intro. */
 function RouteLoading() {
   return (
-    <div className="route-loading" role="status" aria-label="Loading page">
-      <span className="spinner" aria-hidden="true" />
+    <div className="route-loading">
+      <LogoLoader size={104} label="Loading page" />
     </div>
   );
 }

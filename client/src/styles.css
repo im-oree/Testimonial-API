@@ -3055,3 +3055,32 @@ a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat
   align-items: center;
   justify-content: center;
 }
+
+/* LogoLoader — the Zojatech mark as a looping trim-path outline (see
+   components/brand/LogoLoader.tsx). pathLength="1" on the SVG path
+   normalises the dash units, so the pattern period is exactly 1 and the
+   offset animation loops seamlessly. */
+.logo-loader { display: block; color: var(--navy); }
+.logo-loader .logo-loader-base,
+.logo-loader .logo-loader-trim {
+  stroke: currentColor;
+  stroke-width: 7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.logo-loader .logo-loader-base { opacity: 0.14; }
+.logo-loader .logo-loader-trim {
+  /* the drawn segment covers most of the contour; the gap behind it is the
+     "end back a bit". Animating dashoffset by exactly one period (−1) walks
+     the gap around the mark forever. */
+  stroke-dasharray: 0.82 0.18;
+  animation: logo-trim 1.7s linear infinite;
+}
+@keyframes logo-trim {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-loader .logo-loader-trim { animation: none; stroke-dasharray: none; }
+  .logo-loader .logo-loader-base { display: none; }
+}
