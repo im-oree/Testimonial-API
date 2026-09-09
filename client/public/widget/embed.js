@@ -58,6 +58,15 @@
   frame.style.maxWidth = '680px';
   frame.style.minHeight = (manualHeight ? manualHeight : 320) + 'px';
   frame.style.height = 'auto';
+  frame.style.position = 'absolute';
+  frame.style.top = '0';
+  frame.style.left = '0';
+  // The iframe is resized below after the public schema is fetched. Keeping it
+  // absolutely positioned prevents a CSS transform used for narrow embeds
+  // from leaving an extra inline-box gap or shifting the widget off-center.
+  container.style.position = 'relative';
+  container.style.overflow = 'visible';
+  container.style.minHeight = (manualHeight ? manualHeight : 320) + 'px';
   container.appendChild(frame);
 
   // Auto-height for non-template walls: the wall page reports its rendered
@@ -94,12 +103,18 @@
       // container — the whole iframe scales down proportionally instead.
       function fit() {
         var avail = Math.max(60, container.clientWidth || width);
+        // The outer container is the source of truth for layout. The iframe
+        // itself is absolute so scaling it never changes the container's
+        // measured width or introduces a centered/offset inline box.
+        container.style.width = Math.min(avail, width) + 'px';
+        container.style.maxWidth = '100%';
         if (avail >= width) {
           frame.style.transform = '';
-          frame.style.width = '100%';
-          frame.style.maxWidth = width + 'px';
+          frame.style.width = width + 'px';
+          frame.style.maxWidth = 'none';
           frame.style.height = height + 'px';
-          container.style.height = '';
+          frame.style.transformOrigin = 'top left';
+          container.style.height = height + 'px';
         } else {
           var k = avail / width;
           frame.style.maxWidth = 'none';
