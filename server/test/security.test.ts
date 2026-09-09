@@ -22,6 +22,7 @@
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../src/app.js';
@@ -246,6 +247,17 @@ describe('DOC 6 — write-time hygiene on public submissions', () => {
   it('rejects non-object answers', async () => {
     const res = await req('POST', '/v1/public/forms/website-review/submissions', { body: { answers: 'nope' } });
     assert.equal(res.status, 400);
+  });
+});
+
+describe('Production SPA hosting', () => {
+  const hasWebBuild = existsSync(new URL('../../client/dist/index.html', import.meta.url));
+
+  it('serves index.html for a non-/v1 client-side route', { skip: !hasWebBuild }, async () => {
+    const res = await fetch(`${base}/app/designs`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /^text\/html\b/);
+    assert.match(await res.text(), /<!doctype html>/i);
   });
 });
 

@@ -1,81 +1,79 @@
 # Deployment
 
-The app is two packages:
+The recommended production setup is a **single Render Web Service**. Express
+serves both the `/v1` API and the built React SPA, so browser requests remain
+same-origin and client-side routes can fall back to `client/dist/index.html`.
 
-| Piece | What it is | Where it runs |
+> The demo data is still stored in memory. Every restart, sleep, or redeploy
+> resets it to the seeded state. Persistent storage requires a database and is
+> outside the scope of this deployment setup.
+
+## Recommended: one Render Web Service
+
+Create a Render **Web Service**, connect this repository, and use:
+
+| Setting | Value |
+|---|---|
+| Root Directory | Leave blank (repository root) |
+| Build Command | `npm install && npm --prefix client run build` |
+| Start Command | `npm --prefix server start` |
+
+The root `postinstall` script installs both `server/` and `client/`
+dependencies. The build command then creates `client/dist`, which Express
+serves in production. Render supplies `PORT`; the server already binds to
+`0.0.0.0` by default.
+
+Set only this environment variable:
+
+| Variable | Value |
+|---|---|
+| `SESSION_SECRET` | 64 hex characters; generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+
+Do **not** set `VITE_API_BASE`. Its same-origin default is correct for this
+setup. No `CORS_ORIGINS` setting is needed either, because the browser and API
+use the same service and origin.
+
+After deployment, verify:
+
+- `/health` returns JSON with `"ok": true`.
+- `/` loads the web app.
+- A client-side deep link such as `/app/designs`, `/login`, or `/wall/<slug>`
+  loads the web app instead of returning 404.
+- `/v1/auth/me` still returns the API's JSON `401` response when signed out.
+
+## Alternative: separate frontend and API services
+
+A two-service deployment still works when needed:
+
+- Run `server/` as a Render Web Service.
+- Deploy `client/` to Vercel or a Render Static Site.
+- Build the client with `VITE_API_BASE` set to the public API URL.
+- Set the API's `CORS_ORIGINS` to the frontend origin.
+
+The static frontend host must also route unknown browser paths to the SPA. On
+a **Render Static Site**, add this Rewrite rule:
+
+| Source | Destination | Status |
 |---|---|---|
-| `server/` | **Express** (Node + TypeScript) API — `/v1/*` + `/health` | A long-running host: **Render** (or Railway/Fly) |
-| `client/` | **React + Vite** static bundle (`npm run build` → `dist/`) | Any static host: **Vercel** (or Render Static Site) |
+| `/*` | `/index.html` | `200` |
 
-> Why not Vercel for the API? Vercel runs functions serverless: every cold
-> start would restart the Node process and wipe the in-memory data. The API
-> needs a persistent process — that's Render's Web Service.
+Without that rewrite, direct visits and refreshes on client-side routes return
+404. Configure the equivalent SPA fallback when using another static host.
 
-## Where are the `.env` files?
+## Local environment files
 
-**They are gitignored on purpose (secrets never go in git)** — a fresh pull
-only contains the templates:
+Environment files are gitignored so secrets never enter the repository. The
+committed templates are:
 
-```
-server/.env.example   →  copy to server/.env
-client/.env.example   →  copy to client/.env
+```text
+server/.env.example
+client/.env.example
 ```
 
-Locally that's all you need; every variable has a default and the app runs
-with **no** `.env` at all (the demo experience).
+Local development works without either file. Copy a template only when you
+need to override a default; hosted deployments should use the provider's
+environment-variable settings instead of committing `.env` files.
 
-On a host you don't create `.env` files — you set the same variables in the
-host's dashboard (Render: Environment, Vercel: Settings → Environment
-Variables).
-
-## Option A (recommended): Vercel + Render
-
-### 1. API on Render
-
-- New → **Web Service** → connect the repo
-- **Root directory:** `server`
-- **Build command:** `npm install`
-- **Start command:** `npm start`
-- Instance: free is fine for a demo
-- **Environment variables:**
-
-| Variable | Value |
-|---|---|
-| `SESSION_SECRET` | 64+ hex chars — generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| `CORS_ORIGINS` | your frontend URL, e.g. `https://your-app.vercel.app` (only needed because the frontend is on a different domain) |
-
-`PORT` is injected by Render automatically; `HOST` already defaults to
-`0.0.0.0`. Your API is then `https://<service>.onrender.com` — check
-`https://<service>.onrender.com/health`.
-
-### 2. Frontend on Vercel
-
-- Import the repo → **Root directory:** `client`
-- Framework preset: **Vite** (build `npm run build`, output `dist`)
-- **Environment variable:**
-
-| Variable | Value |
-|---|---|
-| `VITE_API_BASE` | `https://<service>.onrender.com` |
-
-`VITE_API_PROXY_TARGET` and `VITE_PORT` are **dev-only** (Vite dev server) —
-not needed in production. In production the browser calls the API directly at
-`VITE_API_BASE`, so the server needs the `CORS_ORIGINS` above.
-
-## Option B: everything on Render
-
-Same API service as above, plus a **Static Site** for the frontend:
-root `client`, build `npm install && npm run build`, publish `dist`, env
-`VITE_API_BASE` = the API URL, and the same `CORS_ORIGINS` on the API.
-
-(There is also a single-service option — Express serving the built client —
-which removes CORS entirely; ask and it can be added.)
-
-## Things to know
-
-- **Data is in-memory and seeded with demo accounts.** Every restart, sleep
-  (free tier) or redeploy resets it to the demo state. Persistent storage
-  needs a database later.
-- Changing `SESSION_SECRET` invalidates all existing sign-ins.
-- The platform login is `admin@zojatech.test / demo1234`; company logins are
-  `owner@acme.test` etc. (all `demo1234`).
+Changing `SESSION_SECRET` invalidates existing sessions. Demo logins are
+`owner@acme.test / demo1234` for a company and
+`admin@zojatech.test / demo1234` for the platform console.
