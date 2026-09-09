@@ -4,8 +4,35 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 import { Link } from 'react-router-dom';
 import type { TestimonialStatus } from '../lib/types';
 
-export function Button({ variant = 'primary', className = '', ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' }) {
-  return <button className={`btn btn-${variant} ${className}`} {...rest} />;
+/**
+ * Button — the shared action button.
+ *
+ * `loading` is the canonical busy state: disables (no double-submit), sets
+ * aria-busy for assistive tech and shows a spinner before the label. Pages
+ * that only swap the label text ('Saving…') work too — this is the upgrade
+ * path, not a requirement.
+ */
+export function Button({
+  variant = 'primary',
+  className = '',
+  loading = false,
+  loadingLabel,
+  children,
+  disabled,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+  /** Shows a spinner, disables the button and announces it as busy. */
+  loading?: boolean;
+  /** Optional text shown while loading (defaults to the current children). */
+  loadingLabel?: string;
+}) {
+  return (
+    <button className={`btn btn-${variant} ${className}`} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+      {loading && <span className="spinner spinner-sm" aria-hidden="true" />}
+      {loading ? (loadingLabel ?? children) : children}
+    </button>
+  );
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {

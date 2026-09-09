@@ -120,6 +120,26 @@ const { launchOptions, BASE, login, settle, OFFENDER_SCAN, pickSizes } = require
         const oX = off.overflowX;
         if (oX > 2 || off.offenders.length) problems.push(`${size.name} ${r}: docOverflow=${oX} ${off.offenders.join(',')}`);
       }
+
+      // tenant detail (charts + theme editor + team tables — the densest platform page)
+      await page.goto(`${BASE}/platform/tenants`, { waitUntil: 'networkidle' });
+      await settle(page);
+      const tenantHref = await page.evaluate(() => document.querySelector('a[href*="/platform/tenants/"]')?.getAttribute('href'));
+      const tenantId = tenantHref?.match(/\/platform\/tenants\/([^/]+)/)?.[1];
+      if (tenantId) {
+        await page.goto(`${BASE}/platform/tenants/${tenantId}`, { waitUntil: 'networkidle' });
+        await settle(page);
+        await page.waitForTimeout(500);
+        const off = await page.evaluate(OFFENDER_SCAN);
+        if (off.overflowX > 2 || off.offenders.length) problems.push(`${size.name} tenant detail: docOverflow=${off.overflowX} ${off.offenders.join(',')}`);
+        info.push(`${size.name}: tenant detail (${tenantId}) scanned`);
+      }
+
+      // 404 page
+      await page.goto(`${BASE}/nope-not-a-route`, { waitUntil: 'networkidle' }).catch(() => {});
+      await settle(page);
+      const nf = await page.evaluate(OFFENDER_SCAN);
+      if (nf.overflowX > 2 || nf.offenders.length) problems.push(`${size.name} 404: docOverflow=${nf.overflowX} ${nf.offenders.join(',')}`);
       info.push(`${size.name}: platform pages scanned`);
     } catch (e) {
       problems.push(`${size.name}: FATAL ${String(e).split('\n')[0]}`);

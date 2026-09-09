@@ -33,21 +33,24 @@ export default function Modal({
 
   // Lock the page behind the dialog (restored when the last dialog closes),
   // compensating for the scrollbar width so the layout never jumps sideways.
+  // The count is ALWAYS decremented in cleanup — including the branch that
+  // took the lock — so a session of open/close/open keeps the arithmetic
+  // exact, and the effect is idempotent under StrictMode double-invocation.
   useEffect(() => {
     if (!open) return;
+    const { overflow, paddingRight } = document.body.style;
     openCount += 1;
     if (openCount === 1) {
-      const { overflow, paddingRight } = document.body.style;
       const scrollbar = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
       if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`;
-      return () => {
-        document.body.style.overflow = overflow;
-        document.body.style.paddingRight = paddingRight;
-      };
     }
     return () => {
       openCount -= 1;
+      if (openCount === 0) {
+        document.body.style.overflow = overflow;
+        document.body.style.paddingRight = paddingRight;
+      }
     };
   }, [open]);
 

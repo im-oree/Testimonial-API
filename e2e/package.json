@@ -7,6 +7,7 @@
     "verify:layout": "node verify-layout.js",
     "verify:surfaces": "node verify-surfaces.js",
     "verify:phone": "node verify-phone.js",
+    "verify:modals": "node verify-modals.js",
     "shoot": "node shoot.js",
     "css:check": "node css-check.js"
   },

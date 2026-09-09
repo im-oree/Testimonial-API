@@ -67,8 +67,9 @@ decides pass/fail itself:
 | Script | What it proves |
 |---|---|
 | `verify-layout.js` | 10 viewport classes × ~18 routes: the document **never scrolls sideways**; phones get the bottom tab bar, landscape phones the 62px rail, desktop the left sidebar; both modals are centered, unclipped and scroll internally |
-| `verify-surfaces.js` | Public form + wall (fit-scaled hero, full-width CTAs, ≥40px rating stars), the immersive design studio (panels on-screen), the platform console pages, touch-target sizes |
+| `verify-surfaces.js` | Public form + wall (fit-scaled hero, full-width CTAs, ≥40px rating stars), the immersive design studio (panels on-screen), the platform console pages incl. tenant detail and 404, touch-target sizes |
 | `verify-phone.js` | Interaction flows on a 390×844 phone: tab-bar taps navigate, kebab menus open as bottom sheets, modals center/scroll-lock/close correctly, actions fire visible toasts, wide tables swipe inside their card |
+| `verify-modals.js` | Every remaining dialog (team invite, new testimonial, AI apply confirm, create tenant, create staff, manage staff) opens, centers, scroll-locks and closes on a phone |
 
 ```bash
 cd e2e
@@ -76,6 +77,7 @@ node verify-layout.js                 # all sizes
 SIZES=phone-390,desktop-1920 node verify-layout.js   # subset (fast)
 node verify-surfaces.js
 node verify-phone.js
+node verify-modals.js
 ```
 
 Reading output:

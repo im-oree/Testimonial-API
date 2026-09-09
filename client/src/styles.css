@@ -488,6 +488,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   animation: spin 0.8s linear infinite;
 }
 .spinner-sm { width: 16px; height: 16px; border-width: 2px; }
+/* A spinner inside a button follows the button's own text color, so it is
+   visible on every variant (primary navy, danger red, ghost, outline). */
+.btn .spinner-sm { border-color: currentColor; border-top-color: transparent; opacity: 0.75; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .empty-state {
