@@ -207,6 +207,15 @@ flags — never copy raw launch args into new scripts.
    restart the API server to reset.
 8. **`networkidle` is usually enough**, but skeleton → data swaps can take a
    beat; use `WAIT=` (shoot.js) or an extra `waitForTimeout(400)`.
+9. **Sandbox resets wipe `node_modules/` and `e2e/.browser/`** (they are
+   snapshot-excluded). After a reset: `npm install` at the repo root, restart
+   `npm run dev`, then re-run `bash e2e/setup-browser.sh` — it is idempotent
+   and takes ~6s. Dev servers do not survive resets either.
+10. **Testing the PRODUCTION build, not just dev.** `npm --prefix client run
+    preview` serves `dist/` on :4173 (API proxy included). Run the suites
+    with `BASE_URL=http://127.0.0.1:4173` — this is the only way to catch
+    bundling bugs (e.g. a `manualChunks` split that broke React's chunk-init
+    order was invisible in dev).
 
 ## 6. CI notes
 

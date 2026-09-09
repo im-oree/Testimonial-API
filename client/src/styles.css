@@ -3046,3 +3046,12 @@ a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat
 @media (min-width: 1800px) {
   .content > div { max-width: 1280px; }
 }
+
+/* Route-level code splitting: what shows while a lazy route's chunk streams
+   in (first uncached visit). Centered in the content area, no layout shift. */
+.route-loading {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
