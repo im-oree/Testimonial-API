@@ -385,6 +385,8 @@ Testimonial-API/
 ## Further reading
 
 - 📘 **[Full product & API documentation](docs/DOCUMENTATION.md)** — every feature, every endpoint, every role permission, every design-system detail, explained in full.
+- 🖥️ **[Visual & layout testing guide](docs/visual-testing-guide.md)** — headless-browser verification of the UI in restricted environments (works without a display; includes a screenshot workflow for vision-capable reviewers).
+- 🧭 **[Playwright in restricted sandboxes](docs/playwright-sandbox-setup.md)** — self-contained install + usage guide for the headless-Chromium stack (Playwright + npm-sourced Chromium, no CDN/apt needed).
 - 🚢 **[Deployment notes](DEPLOYMENT.md)**
 - 🧪 **[Integration test guide](docs/integration-test-guide.md)**
 - 🗂 **[`legacy/README.md`](legacy/README.md)** — notes on the preserved Next.js + NestJS codebase.

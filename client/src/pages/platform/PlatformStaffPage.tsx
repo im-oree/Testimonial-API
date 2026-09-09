@@ -19,6 +19,7 @@ import { SearchField } from '../../components/fields';
 import { SkeletonTable } from '../../components/Skeleton';
 import ManageStaffModal from './ManageStaffModal';
 import CreateStaffModal from './CreateStaffModal';
+import { toast } from '../../components/Toast';
 
 export const ROLE_COLOR: Record<string, string> = {
   platform_owner: 'navy',
@@ -42,7 +43,6 @@ export default function PlatformStaffPage() {
   const [rows, setRows] = useState<PlatformStaffMember[] | null>(null);
   const [templates, setTemplates] = useState<RoleTemplateSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [manage, setManage] = useState<PlatformStaffMember | null>(null);
   const [creating, setCreating] = useState(false);
@@ -90,7 +90,6 @@ export default function PlatformStaffPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && <div className="banner banner-ok">{notice}</div>}
 
       <div className="role-grid role-grid-templates" style={{ marginBottom: 14 }}>
         {templates.map((t) => (
@@ -162,7 +161,7 @@ export default function PlatformStaffPage() {
         later milestone — for now every console account is bound to one of the four presets above.
       </p>
 
-      <CreateStaffModal open={creating} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); load(); }} />
+      <CreateStaffModal open={creating} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); toast('Account created — they can sign in now.'); load(); }} />
 
       <ManageStaffModal
         member={manage}
@@ -172,7 +171,7 @@ export default function PlatformStaffPage() {
         isSuper={isSuper}
         isSelf={me ? manage?.id === me.id : false}
         onClose={() => setManage(null)}
-        onChanged={(message) => { setNotice(message); setManage(null); load(); }}
+        onChanged={(message) => { toast(message); setManage(null); load(); }}
       />
     </div>
   );

@@ -48,7 +48,7 @@ export function AppIntro({ onReveal, onDone }: { onReveal: () => void; onDone: (
           everything at first — no visible edge, no aspect-ratio tricks — then
           closes to nothing, wiping the logo out with it. */}
       <div className="app-intro-matte">
-        <svg width="124" height="124" viewBox="56 49 88 98" fill="none">
+        <svg width="150" height="150" viewBox="56 49 88 98" fill="none">
           {/* 1 — the stroke draws on (trim path). */}
           <motion.path
             d={ZOJATECH_MARK_PATH}

@@ -13,41 +13,50 @@
  *   /platform/...              -> platform console (guarded)
  *   anything else              -> role-aware 404 page
  */
-import { useRef, useState } from 'react';
+import { Suspense, lazy, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, RequireAuth } from './auth';
 import { AppIntro } from './components/brand/AppIntro';
+import { LogoLoader } from './components/brand/LogoLoader';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Toaster } from './components/Toast';
 import { AppLayout, PlatformLayout } from './components/layout';
+// LoginPage stays static: it is the first thing most sessions render.
+// NotFoundPage stays static: the 404 must never depend on a network fetch.
 import LoginPage from './pages/LoginPage';
-import AppsHomePage from './pages/AppsHomePage';
-import CompanyOverviewPage from './pages/CompanyOverviewPage';
-import SettingsPage from './pages/SettingsPage';
-import ThemePage from './pages/ThemePage';
-import WidgetTemplatesPage from './pages/TemplatesPage';
-import BuilderPage from './pages/BuilderPage';
-import DesignsPage from './pages/DesignsPage';
-import AiPage from './pages/AiPage';
-import MediaPage from './pages/MediaPage';
-import DesignStudioPage from './pages/DesignStudioPage';
-import AccountPage from './pages/AccountPage';
-import OverviewPage from './pages/OverviewPage';
-import TestimonialsPage from './pages/TestimonialsPage';
-import ModerationPage from './pages/ModerationPage';
-import FormsPage from './pages/FormsPage';
-import ConnectPage from './pages/ConnectPage';
-import EmbedPage from './pages/EmbedPage';
-import TeamPage from './pages/TeamPage';
-import AuditPage from './pages/AuditPage';
-import PublicFormPage from './pages/PublicFormPage';
-import WallPage from './pages/WallPage';
 import NotFoundPage from './pages/NotFoundPage';
-import PlatformOverviewPage from './pages/platform/PlatformOverviewPage';
-import TenantsPage from './pages/platform/TenantsPage';
-import TenantDetailPage from './pages/platform/TenantDetailPage';
-import PlatformAuditPage from './pages/platform/PlatformAuditPage';
-import TemplatesPage from './pages/platform/TemplatesPage';
-import PlatformStaffPage from './pages/platform/PlatformStaffPage';
+
+// Every other route is code-split: a public wall visitor on a phone downloads
+// the wall chunk + shared runtime — not the whole admin console (charts,
+// studio, editors). Authed pages stream in behind the boot intro, so the
+// split is invisible except as a faster first load.
+const PublicFormPage = lazy(() => import('./pages/PublicFormPage'));
+const WallPage = lazy(() => import('./pages/WallPage'));
+const AppsHomePage = lazy(() => import('./pages/AppsHomePage'));
+const CompanyOverviewPage = lazy(() => import('./pages/CompanyOverviewPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const ThemePage = lazy(() => import('./pages/ThemePage'));
+const WidgetTemplatesPage = lazy(() => import('./pages/TemplatesPage'));
+const BuilderPage = lazy(() => import('./pages/BuilderPage'));
+const DesignsPage = lazy(() => import('./pages/DesignsPage'));
+const AiPage = lazy(() => import('./pages/AiPage'));
+const MediaPage = lazy(() => import('./pages/MediaPage'));
+const DesignStudioPage = lazy(() => import('./pages/DesignStudioPage'));
+const AccountPage = lazy(() => import('./pages/AccountPage'));
+const OverviewPage = lazy(() => import('./pages/OverviewPage'));
+const TestimonialsPage = lazy(() => import('./pages/TestimonialsPage'));
+const ModerationPage = lazy(() => import('./pages/ModerationPage'));
+const FormsPage = lazy(() => import('./pages/FormsPage'));
+const ConnectPage = lazy(() => import('./pages/ConnectPage'));
+const EmbedPage = lazy(() => import('./pages/EmbedPage'));
+const TeamPage = lazy(() => import('./pages/TeamPage'));
+const AuditPage = lazy(() => import('./pages/AuditPage'));
+const PlatformOverviewPage = lazy(() => import('./pages/platform/PlatformOverviewPage'));
+const TenantsPage = lazy(() => import('./pages/platform/TenantsPage'));
+const TenantDetailPage = lazy(() => import('./pages/platform/TenantDetailPage'));
+const PlatformAuditPage = lazy(() => import('./pages/platform/PlatformAuditPage'));
+const TemplatesPage = lazy(() => import('./pages/platform/TemplatesPage'));
+const PlatformStaffPage = lazy(() => import('./pages/platform/PlatformStaffPage'));
 
 export default function App() {
   // Boot intro: plays on every page load (tab open + hard refresh) and never
@@ -69,6 +78,9 @@ export default function App() {
       >
         <AppRoutes />
       </div>
+      {/* Global success/error feedback for actions whose result is otherwise
+          invisible — mounted above every route, page and modal. */}
+      <Toaster />
     </AuthProvider>
   );
 }
@@ -77,6 +89,7 @@ function AppRoutes() {
   const { pathname } = useLocation();
   return (
     <ErrorBoundary resetKey={pathname}>
+      <Suspense fallback={<RouteLoading />} >
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
@@ -142,6 +155,18 @@ function AppRoutes() {
         {/* Role-aware 404 with CTAs back to the right home */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </Suspense>
     </ErrorBoundary>
+  );
+}
+
+/** What shows while a route's chunk streams in (first uncached visit; the
+ *  boot intro usually covers it on authed loads). The Zojatech mark as a
+ *  looping trim-path outline — same drawing language as the boot intro. */
+function RouteLoading() {
+  return (
+    <div className="route-loading">
+      <LogoLoader size={104} label="Loading page" />
+    </div>
   );
 }

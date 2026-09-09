@@ -1,0 +1,19 @@
+{
+  "name": "testimonial-api-e2e",
+  "private": true,
+  "description": "Headless-browser layout & visual verification. No test framework \u2014 plain Node scripts that output FACTS and PROBLEMS lines an agent (or human) can read. See docs/visual-testing-guide.md.",
+  "scripts": {
+    "setup": "bash setup-browser.sh",
+    "verify:layout": "node verify-layout.js",
+    "verify:surfaces": "node verify-surfaces.js",
+    "verify:phone": "node verify-phone.js",
+    "verify:modals": "node verify-modals.js",
+    "verify:embed": "node verify-embed.js",
+    "shoot": "node shoot.js",
+    "css:check": "node css-check.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0",
+    "@sparticuz/chromium": "152.0.0"
+  }
+}

@@ -39,3 +39,7 @@ npm-debug.log*
 
 # GitHub App lacks workflows permission — keep CI config out of the pushed tree
 .github/
+
+# e2e visual-verification toolkit (see docs/visual-testing-guide.md)
+e2e/.browser/
+e2e/shots/

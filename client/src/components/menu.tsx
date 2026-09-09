@@ -188,8 +188,8 @@ export function ConfirmDialog({
           <Button variant="ghost" type="button" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="danger" type="button" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Working…' : (confirmLabel ?? 'Delete')}
+          <Button variant="danger" type="button" onClick={onConfirm} loading={busy} loadingLabel={confirmLabel ?? 'Working…'}>
+            {confirmLabel ?? 'Delete'}
           </Button>
         </div>
       </div>

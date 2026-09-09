@@ -4,8 +4,35 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 import { Link } from 'react-router-dom';
 import type { TestimonialStatus } from '../lib/types';
 
-export function Button({ variant = 'primary', className = '', ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' }) {
-  return <button className={`btn btn-${variant} ${className}`} {...rest} />;
+/**
+ * Button — the shared action button.
+ *
+ * `loading` is the canonical busy state: disables (no double-submit), sets
+ * aria-busy for assistive tech and shows a spinner before the label. Pages
+ * that only swap the label text ('Saving…') work too — this is the upgrade
+ * path, not a requirement.
+ */
+export function Button({
+  variant = 'primary',
+  className = '',
+  loading = false,
+  loadingLabel,
+  children,
+  disabled,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+  /** Shows a spinner, disables the button and announces it as busy. */
+  loading?: boolean;
+  /** Optional text shown while loading (defaults to the current children). */
+  loadingLabel?: string;
+}) {
+  return (
+    <button className={`btn btn-${variant} ${className}`} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+      {loading && <span className="spinner spinner-sm" aria-hidden="true" />}
+      {loading ? (loadingLabel ?? children) : children}
+    </button>
+  );
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -41,19 +68,26 @@ export function RatingStars({ value, onChange, size = 'md' }: { value?: number; 
   const interactive = Boolean(onChange);
   return (
     <span className={`stars stars-${size}${interactive ? ' stars-interactive' : ''}`} role={interactive ? 'radiogroup' : undefined} aria-label={`Rating: ${value ?? 0} of 5`}>
-      {stars.map((n) => (
-        <button
-          key={n}
-          type="button"
-          disabled={!interactive}
-          onClick={() => onChange?.(n)}
-          aria-checked={value === n}
-          role={interactive ? 'radio' : undefined}
-          className={n <= (value ?? 0) ? 'star on' : 'star'}
-        >
-          <IconStar />
-        </button>
-      ))}
+      {stars.map((n) =>
+        interactive ? (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange?.(n)}
+            aria-checked={value === n}
+            role="radio"
+            className={n <= (value ?? 0) ? 'star on' : 'star'}
+          >
+            <IconStar />
+          </button>
+        ) : (
+          // Display-only: plain glyphs, not fake disabled buttons — the wrapper's
+          // aria-label already reads the rating to assistive tech.
+          <span key={n} aria-hidden="true" className={n <= (value ?? 0) ? 'star on' : 'star'}>
+            <IconStar />
+          </span>
+        )
+      )}
     </span>
   );
 }

@@ -15,6 +15,7 @@ import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { ConfirmDialog } from '../components/menu';
 import Modal from '../components/Modal';
 import { IconSearch, IconX } from '../components/icons';
+import { toast } from '../components/Toast';
 import { Field, SelectField, TextInput } from '../components/fields';
 
 export default function TemplatesPage() {
@@ -23,7 +24,6 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<WidgetTemplateRow[] | null>(null);
   const [apps, setApps] = useState<AppSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [category, setCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState<WidgetTemplateRow | null>(null);
@@ -66,8 +66,7 @@ export default function TemplatesPage() {
   const product = apps.find((a) => a.id === productId) ?? null;
 
   function flash(msg: string): void {
-    setNotice(msg);
-    window.setTimeout(() => setNotice(null), 3200);
+    toast(msg);
   }
 
   /** Start an unpublished draft from the template and jump into the studio. */
@@ -113,11 +112,6 @@ export default function TemplatesPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && (
-        <div className="banner banner-ok" role="status">
-          {notice}
-        </div>
-      )}
 
       {/* Category pills + search */}
       <div className="market-toolbar">

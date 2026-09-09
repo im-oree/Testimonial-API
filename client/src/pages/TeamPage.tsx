@@ -17,6 +17,7 @@ import { Field, PasswordInput, SearchField, SelectField, TextInput } from '../co
 import { ConfirmDialog, KebabMenu } from '../components/menu';
 import { SkeletonTable } from '../components/Skeleton';
 import Modal from '../components/Modal';
+import { toast } from '../components/Toast';
 
 const ROLE_COLOR: Record<string, string> = { owner: 'navy', admin: 'teal', editor: 'lav', viewer: 'gray' };
 
@@ -94,7 +95,6 @@ export default function TeamPage() {
   const [rows, setRows] = useState<TeamMember[] | null>(null);
   const [templates, setTemplates] = useState<RoleTemplateSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedCreds | null>(null);
   const [q, setQ] = useState('');
 
@@ -149,11 +149,6 @@ export default function TeamPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && (
-        <div className="banner banner-ok">
-          <IconCheck size={13} /> {notice}
-        </div>
-      )}
       {created && (
         <div className="banner credential-box" role="status">
           <div className="small strong">Member added — sign-in credentials (shown once)</div>
@@ -287,7 +282,7 @@ export default function TeamPage() {
         canManage={canManage}
         onClose={() => setManaging(null)}
         onChanged={(message) => {
-          setNotice(message);
+          toast(message);
           setManaging(null);
           load();
         }}
@@ -300,7 +295,6 @@ export default function TeamPage() {
           onClose={() => setInviting(false)}
           onCreated={(creds) => {
             setCreated(creds);
-            setNotice(null);
             setInviting(false);
             load();
           }}

@@ -35,12 +35,20 @@
 
 html, body, #root { height: 100%; }
 
+/* Safety net: nothing anywhere may push the page sideways — the shell and the
+   public surfaces own their own scroll containers. */
+html, body { max-width: 100%; overflow-x: hidden; }
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased; /* crisp text on retina/HiDPI panels */
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent; /* we draw our own pressed states */
 }
 
 h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; color: var(--navy); }
@@ -373,8 +381,14 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .toolbar { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; }
-.search-form { flex: 0 0 auto; }
-.search-form .input { width: 240px; }
+.search-form { flex: 0 1 auto; min-width: 0; }
+/* 240px fixed overflowed next to filter chips on small screens — the field
+   now takes its cue from the space actually available. */
+.search-form .input { width: min(240px, 100%); }
+@media (max-width: 720px) {
+  .search-form { flex: 1 1 100%; }
+  .search-form .input { width: 100%; }
+}
 
 .segmented {
   display: inline-flex;
@@ -428,7 +442,8 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .toggle.on .toggle-knob { left: 20px; }
 
 .stars { display: inline-flex; gap: 2px; }
-.stars button.star {
+/* .star is a <button> when interactive, a <span> when display-only */
+.stars .star {
   border: none;
   background: none;
   padding: 0;
@@ -436,10 +451,10 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   font-size: 16px;
   cursor: default;
 }
-.stars button.star.on { color: var(--star); }
-.stars-interactive button.star { cursor: pointer; }
-.stars-lg button.star { font-size: 30px; }
-.stars-sm button.star { font-size: 13px; }
+.stars .star.on { color: var(--star); }
+.stars-interactive .star { cursor: pointer; }
+.stars-lg .star { font-size: 30px; }
+.stars-sm .star { font-size: 13px; }
 
 .banner {
   border-radius: 9px;
@@ -460,7 +475,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   gap: 12px;
   padding: 60px 20px;
 }
-.screen-center { min-height: 100vh; }
+/* 100dvh (not 100vh): on mobile browsers 100vh includes the collapsed URL
+   bar area, which pushed footers off-screen and caused double scrollbars. */
+.screen-center { min-height: 100vh; min-height: 100dvh; }
 
 .spinner {
   width: 26px;
@@ -471,6 +488,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   animation: spin 0.8s linear infinite;
 }
 .spinner-sm { width: 16px; height: 16px; border-width: 2px; }
+/* A spinner inside a button follows the button's own text color, so it is
+   visible on every variant (primary navy, danger red, ghost, outline). */
+.btn .spinner-sm { border-color: currentColor; border-top-color: transparent; opacity: 0.75; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .empty-state {
@@ -509,6 +529,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 
 .auth-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -524,6 +545,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   padding: 26px;
   box-shadow: 0 10px 30px rgba(16, 24, 40, 0.08);
 }
+/* Landscape phones / short windows: the card must never be clipped by the
+   flex centering — the shell still scrolls when the card is the taller. */
+.auth-shell { margin: auto; }
 .auth-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 16px; }
 .auth-card h1 { font-size: 19px; }
 .auth-card .banner { margin-top: 12px; }
@@ -555,6 +579,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 
 .public-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -570,6 +595,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   box-shadow: 0 14px 40px rgba(16, 24, 40, 0.12);
   border-top: 4px solid var(--brand);
 }
+/* Tall form on a small screen: the card scrolls inside the page instead of
+   being clipped by the flex centering. */
+.public-card { margin: auto; }
 .public-brand-row { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--muted); margin-bottom: 18px; font-size: 13px; }
 .public-card h1 { font-size: 22px; margin-bottom: 6px; }
 .public-form { margin-top: 18px; }
@@ -702,7 +730,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   gap: 12px; flex-wrap: wrap; padding: 12px 12px 4px 0;
 }
 .invite-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.invite-form .input { width: 220px; }
+.invite-form .input { width: min(220px, 100%); }
 
 .banner-ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
 
@@ -710,11 +738,17 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   position: fixed; inset: 0; background: rgba(22, 26, 46, 0.55);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 8vh 16px 16px; z-index: 60; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .modal {
   background: #fff; border-radius: 14px; box-shadow: 0 18px 50px rgba(22, 26, 46, 0.3);
   max-width: 520px; width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 10px;
 }
+/* Perfectly centered on every screen, still scrollable when taller: auto
+   margins absorb the free space (true vertical centering) and collapse to 0
+   when the dialog is taller than the viewport, so the backdrop scrolls
+   instead of clipping the dialog's top edge. */
+.modal { margin: auto; }
 .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-list li {
@@ -777,7 +811,7 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 .spinner-lg { width: 34px; height: 34px; }
 
 .wall {
-  min-height: 100vh; padding: 40px 16px 60px;
+  min-height: 100vh; min-height: 100dvh; padding: 40px 16px 60px;
   background:
     radial-gradient(1000px 420px at 15% -10%, rgba(155, 159, 234, 0.35), transparent 60%),
     radial-gradient(800px 380px at 110% 20%, rgba(14, 165, 160, 0.18), transparent 55%),
@@ -1074,11 +1108,9 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: block;
 }
 .wall-embed .widgets-root, .wall-embed > div { max-width: none; }
-/* The embed iframe is already sized to the schema canvas. Do not let the
-   flex wrapper shrink a fixed-size widget when the iframe is narrower than
-   the parent (the browser would otherwise render it offset and undersized). */
+/* The embed iframe is sized to the schema canvas, but a customer may make it
+   any width; FitWidget scales the fixed-size template to whatever it gets. */
 .wall-embed.wall-template { width: 100%; min-width: 0; justify-content: flex-start; }
-.wall-embed.wall-template > .tpl-widget { flex: 0 0 auto; }
 .wall-embed .wdg-hover { transition: box-shadow .18s ease, transform .18s ease; }
 
 /* Accessible visually-hidden text */
@@ -1683,8 +1715,11 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   .t-table .t-content { max-width: 260px; }
 }
 @media (max-width: 640px) {
-  .t-table th:nth-child(3), .t-table td:nth-child(3),
-  .t-table th:nth-child(7), .t-table td:nth-child(7) { display: none; }
+  /* Hide by MEANING, not position: the old nth-child(3/7) version also hit
+     OTHER .t-tables (the Forms table's kebab column is its 7th cell — every
+     row action vanished on phones). Rating + Received are the two columns a
+     phone can most afford to lose on this specific table. */
+  .t-table .t-col-rating, .t-table .t-col-received { display: none; }
   .t-table .t-content { max-width: 200px; }
 }
 
@@ -1822,25 +1857,43 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   opacity: 0; transition: opacity .18s ease;
 }
-.tpl-widget:hover .tpl-widget-nav { opacity: 1; }
+.tpl-widget:hover .tpl-widget-nav,
+.tpl-widget:focus-within .tpl-widget-nav { opacity: 1; }
+/* Touch devices have no hover — arrows must be permanently visible or the
+   widget cannot be browsed by hand. */
+@media (hover: none) {
+  .tpl-widget-nav { opacity: 1; }
+}
 .tpl-widget-prev { left: 8px; }
 .tpl-widget-next { right: 8px; }
 .tpl-widget-nav:hover { background: #fff; }
 .tpl-widget-dots {
   position: absolute; bottom: 8px; left: 0; right: 0; z-index: 20;
-  display: flex; gap: 5px; justify-content: center;
+  display: flex; gap: 1px; justify-content: center; flex-wrap: wrap; padding: 0 4px;
 }
+/* The visible dot is a 7px ::after inside a 24px invisible button, so the
+   tap target is finger-sized on every device (and keyboard-focusable). */
 .tpl-widget-dot {
-  width: 7px; height: 7px; border-radius: 999px; border: 0; padding: 0; cursor: pointer;
-  background: rgba(148, 163, 184, 0.55); transition: transform .15s ease, background .15s ease;
+  position: relative; width: 24px; height: 24px; border-radius: 999px;
+  border: 0; padding: 0; background: transparent; cursor: pointer; touch-action: manipulation;
 }
-.tpl-widget-dot.active { background: #1b2559; transform: scale(1.35); }
+.tpl-widget-dot::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px;
+  margin: -3.5px 0 0 -3.5px; border-radius: 999px; background: rgba(148, 163, 184, 0.55);
+  transition: transform .15s ease, background .15s ease;
+}
+.tpl-widget-dot.active::after { background: #1b2559; transform: scale(1.35); }
+.tpl-widget-dot:focus-visible { outline: 2px solid #1b2559; outline-offset: 1px; }
 .wall-template { display: flex; justify-content: center; }
 .wall-hero-widget { display: flex; justify-content: center; margin: 4px auto 18px; max-width: 100%; }
-.wall-hero-widget .tpl-widget { box-shadow: 0 12px 34px rgba(27, 37, 89, 0.14); border-radius: 14px; }
-@media (max-width: 720px) {
-  .wall-hero-widget { overflow-x: auto; justify-content: flex-start; }
-}
+/* FitWidget: the fixed-size template scales to its container instead of
+   being cropped — works for the public wall, its iframe embed and any
+   customer site width. The wrapper owns the radius + shadow so they stay
+   crisp at every scale. */
+.wall-fit { position: relative; width: 100%; max-width: 100%; overflow: hidden; border-radius: 14px; box-shadow: 0 12px 34px rgba(27, 37, 89, 0.14); }
+.wall-fit-inner { position: absolute; top: 0; left: 0; transform-origin: top left; }
+.wall-fit-inner > * { max-width: none; }
+.wall-embed .wall-fit { border-radius: 0; box-shadow: none; }
 
 /* fixed template size readout in the studio */
 .canvas-size-lock {
@@ -1994,11 +2047,15 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
 
 /* ---- Connect page ----------------------------------------------------------- */
 .connect-preview {
-  position: relative; display: flex; justify-content: center; overflow: hidden;
+  position: relative; display: flex; justify-content: flex-start; overflow: hidden;
   border-radius: 14px; background:
     radial-gradient(#d9dce8 1px, transparent 1px) 0 0 / 16px 16px, #eef0f6;
 }
-.connect-preview-inner { position: relative; flex: none; }
+/* The inner canvas is scaled from its top-left corner. Auto margins center it
+   when it fits and collapse to zero when it is wider than the frame — the
+   scaled preview stays fully visible instead of overflowing off the left
+   edge (which plain flex centering does when the widget is wide). */
+.connect-preview-inner { position: relative; flex: none; margin: auto; }
 .connect-empty { display: flex; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; }
 .connect-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 980px) { .connect-steps { grid-template-columns: 1fr; } }
@@ -2390,3 +2447,642 @@ a:focus-visible {
 
 /* ---- Kebab portal panel: body-level, above everything ------------------------ */
 .ctx-panel { z-index: 400; }
+
+/* ===========================================================================
+   RESPONSIVE & UX FOUNDATION — applies to every page and component.
+
+   Sections (each independently safe; all additive on the base styles above):
+     R1  Fluid grid guards (no grid may overflow a 280–320px screen)
+     R2  Text hygiene — wrapping, clamping, ellipsis where space runs out
+     R3  Focus visibility for every interactive element
+     R4  HiDPI / retina hairlines
+     R5  Touch ergonomics (44px+ targets, 16px inputs = no iOS focus-zoom)
+     R6  Mobile shell — bottom thumb-reach navigation bar
+     R7  Landscape phones (short viewports) — compact left rail instead
+     R8  Page-level mobile layout (headers, toolbars, tables, bulk bar)
+     R9  Design studio on phones — panels become bottom sheets
+     R10 Modals, kebab menus & popovers on phones
+     R11 Public surfaces (login, form, wall, error pages)
+     R12 Embeddable widget polish (touch, dots, arrows)
+     R13 Motion preferences (prefers-reduced-motion)
+     R14 Toasts (global success/error feedback)
+     R15 Extreme viewports: tiny 280px, ultra-wide 4K
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   R1 · Fluid grid guards — every auto-fit/auto-fill grid clamps its minimum
+   to the available width, so nothing overflows a Galaxy Fold (280px) or an
+   iPhone SE (320px). min(Npx, 100%) is ignored on wide screens entirely.
+   --------------------------------------------------------------------------- */
+.stat-grid      { grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); }
+.role-grid      { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
+.ids-box        { grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); }
+.product-grid   { grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); }
+.charts-grid    { grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); }
+.theme-presets  { grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr)); }
+.cat-grid       { grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); }
+.design-tiles   { grid-template-columns: repeat(auto-fill, minmax(min(185px, 100%), 1fr)); }
+.quick-grid     { grid-template-columns: repeat(auto-fit, minmax(min(172px, 100%), 1fr)); }
+.wall-sk-grid   { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); }
+.embed-grid     { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.ai-history     { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.media-grid     { grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); }
+.queue-list     { grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr)); }
+/* (.tpl-grid intentionally untouched: its later 3→2→1 column rules already
+   use minmax(0,1fr) and can never overflow a narrow screen.) */
+
+/* ---------------------------------------------------------------------------
+   R2 · Text hygiene — long words and API error strings wrap instead of
+   blowing out a card; chips truncate with an ellipsis when space runs out.
+   --------------------------------------------------------------------------- */
+h1, h2, h3, p, li, td, th, .wall-quote, .queue-content, .banner, .stat-value, .tpl-desc, .tpl-card-desc {
+  overflow-wrap: break-word;
+}
+.banner > span { min-width: 0; overflow-wrap: anywhere; }
+.banner { animation: banner-in .22s ease; }
+@keyframes banner-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.chip { max-width: 100%; overflow: hidden; }
+.link-copy { min-width: 0; }
+.link-copy code, .credential-box code, .id-code, .embed-card code { overflow-wrap: anywhere; }
+.audit-row .audit-main code { overflow-wrap: anywhere; }
+
+/* Sticky page header: the title block may not push the actions off-screen. */
+.page-header > div:first-child { min-width: 0; }
+.page-header h1 { overflow-wrap: anywhere; }
+
+::selection { background: rgba(0, 41, 134, 0.16); }
+
+/* The widget's "Paused" live-region announcements (TemplateWidget) were
+   missing their utility class and rendered as stray visible text. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   R3 · Focus visibility — every button, switch, tab, menu item and summary
+   gets the same clear ring for keyboard users. (.btn already carries its own
+   ring from the design-system layer; inputs have border + shadow focus.)
+   --------------------------------------------------------------------------- */
+button:focus-visible,
+[role='switch']:focus-visible,
+[role='tab']:focus-visible,
+[role='radio']:focus-visible,
+[role='menuitem']:focus-visible,
+summary:focus-visible,
+.tpl-app-row:focus-visible,
+.ai-history-pick:focus-visible,
+.t-content-toggle:focus-visible,
+.theme-preset:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+.btn:focus-visible { outline: none; /* keeps its box-shadow ring */ }
+.f-range input[type='range']:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 999px; }
+.f-color-picker:focus-within { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 999px; }
+
+/* Interactive elements: no 300ms double-tap-zoom delay on touch. */
+a, button, summary, label, [role='button'], [role='switch'], .chip-btn, .tpl-cat-pill { touch-action: manipulation; }
+
+/* ---------------------------------------------------------------------------
+   R4 · HiDPI / retina — 1px borders are two physical pixels on retina and
+   look heavy. Halved hairlines render as one crisp device pixel.
+   --------------------------------------------------------------------------- */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+  .card, .modal, .banner, .public-card, .wall-card, .auth-card, .table-card,
+  .te-section, .studio-panel, .settings-section, .tpl-card, .queue-card {
+    border-width: 0.5px;
+  }
+  .input, .f-input, .f-select, .f-area, .text-input { border-width: 0.5px; }
+  .table th, .table td { border-bottom-width: 0.5px; }
+  .table tr:last-child td { border-bottom-width: 0.5px; }
+}
+
+/* ---------------------------------------------------------------------------
+   R5 · Touch ergonomics — finger-sized targets everywhere (44px+ Apple HIG /
+   48dp Material), and 16px text-entry controls so iOS Safari never
+   auto-zooms the page when a field is focused. Applies to phones, tablets
+   and touch laptops; mouse users keep the compact desktop sizing.
+   --------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+  .btn-xs { min-height: 38px; padding: 7px 12px; }
+  .btn-lg { min-height: 50px; }
+
+  .input, .f-input, .f-select, .f-area, .text-input, .studio-area { font-size: 16px; min-height: 46px; }
+  .f-sm, .f-sm.f-input, .f-sm.f-select { font-size: 16px; min-height: 42px; }
+  .f-lg { min-height: 50px; }
+  .f-password .f-eye { padding: 10px; }
+  .search-box input { font-size: 16px; }
+
+  .toggle { width: 48px; height: 27px; }
+  .toggle-knob { width: 23px; height: 23px; }
+  .toggle.on .toggle-knob { left: 25px; }
+
+  .ctx-trigger { width: 40px; height: 40px; }
+  .ctx-item { padding: 13px 11px; }
+  .rail-toggle { min-height: 40px; }
+  .pager-num { min-width: 40px; height: 40px; }
+  .tpl-page-btn { min-width: 40px; height: 40px; }
+  .segment { padding: 10px 14px; }
+  .chip-btn, .tpl-cat-pill { padding: 10px 16px; }
+  .swatch { width: 30px; height: 30px; }
+  .f-color .swatch, .f-color .f-color-picker { width: 30px; height: 30px; }
+  .color-input { height: 44px; }
+  .t-check input[type='checkbox'] { width: 22px; height: 22px; }
+  .fq-req input { width: 20px; height: 20px; }
+
+  /* Interactive star rows: the visible star keeps its size; invisible
+     padding grows the tap area to a fingertip. */
+  .stars.stars-interactive { gap: 0; }
+  .stars.stars-interactive .star { padding: 8px 9px; }
+
+  .demo-access summary { padding: 15px 0; }
+  .studio-layer { padding: 11px 8px; }
+  .studio-el-btn { padding: 11px 10px; }
+  .tpl-app-row { padding: 12px 8px; }
+  .ai-history-item { padding: 14px 12px; }
+  .studio-zoom .ctx-trigger { width: 38px; height: 34px; }
+  .tpl-widget-nav { width: 38px; height: 38px; }
+}
+
+/* ---------------------------------------------------------------------------
+   R6 · Mobile shell — the sidebar becomes a bottom tab bar. Bottom-center is
+   the one zone reachable by BOTH left- and right-handed thumbs; the content
+   gets the full screen width back (the old 62px rail cost 20% of a phone).
+   Navigation scrolls horizontally when a product has many pages, labels
+   included. Requires the small matchMedia hook in layout.tsx (flattens nav
+   groups + never applies the rail class on phones).
+   --------------------------------------------------------------------------- */
+@media (max-width: 760px) and (min-height: 480px) {
+  .shell { flex-direction: column; }
+  .shell > .shell-main { order: 0; min-height: 0; }
+  .shell > .sidebar {
+    order: 1;
+    width: 100%;
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    flex-direction: row;
+    align-items: stretch;
+    border-right: 0;
+    border-top: 1px solid #ececf1;
+    background: #fff;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Never let a stored rail preference fight the phone layout. */
+  .shell > .sidebar.rail { width: 100%; flex: 0 0 auto; height: auto; }
+
+  .sidebar .sidebar-brand,
+  .sidebar .rail-toggle,
+  .sidebar .ws-identity,
+  .sidebar .sidebar-extra,
+  .sidebar .sidebar-account-link { display: none; }
+
+  .sidebar .sidebar-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sidebar .sidebar-nav::-webkit-scrollbar { display: none; }
+  .sidebar .nav-group,
+  .sidebar .nav-group-items { display: flex; flex-direction: row; align-items: center; flex: 0 0 auto; }
+  .sidebar .nav-group + .nav-group {
+    margin: 0 0 0 4px;
+    padding: 0 0 0 4px;
+    border-top: 0;
+    border-left: 1px solid #f0f0f5;
+  }
+  .sidebar .nav-group .nav-link { display: flex; align-items: center; }
+  .sidebar .nav-link {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 12px;
+    white-space: nowrap;
+    min-height: 48px;
+  }
+  .sidebar .nav-label {
+    display: inline;
+    white-space: nowrap;
+    overflow: visible;
+  }
+  /* Active pill: indicator moves to the top edge (it's a bottom bar now). */
+  .sidebar .nav-link.active::before {
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+  }
+  .sidebar .nav-link.active::after { display: none; }
+
+  .sidebar .sidebar-footer {
+    flex-direction: row;
+    align-items: center;
+    border-top: 0;
+    border-left: 1px solid #f0f0f5;
+    padding: 4px 6px;
+    gap: 6px;
+  }
+  .sidebar .sidebar-user { display: none; }
+  .sidebar .sidebar-footer .btn-block { width: auto; padding: 9px 12px; white-space: nowrap; }
+
+  /* The immersive studio owns the whole phone screen; its own toolbar's ✕
+     button is the way out, so the tab bar steps aside. */
+  .shell-immersive > .sidebar { display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   R7 · Landscape phones (short, narrow-ish viewports): a bottom bar would eat
+   a third of the height, so the shell collapses to a compact icon rail.
+   Real landscape phones are 667–932px wide, hence the 932px cap.
+   --------------------------------------------------------------------------- */
+@media (max-width: 932px) and (max-height: 479px) {
+  .shell { flex-direction: row; }
+  .shell > .sidebar { order: 0; width: 62px; flex: 0 0 62px; height: 100%; flex-direction: column; border-top: 0; border-right: 1px solid #ececf1; }
+  .sidebar .nav-label,
+  .sidebar .sidebar-section-label,
+  .sidebar .ws-identity-text,
+  .sidebar .sidebar-user-text,
+  .sidebar .sidebar-extra { display: none; }
+  .sidebar .sidebar-brand { justify-content: center; padding: 10px 0 6px; }
+  .sidebar .rail-toggle { display: none; }
+  .sidebar .nav-link { justify-content: center; gap: 0; padding: 11px 0; }
+  .sidebar .nav-group + .nav-group { border-left: 0; margin: 0; padding: 0; }
+  .sidebar .ws-identity { justify-content: center; padding: 8px 0 4px; }
+  .sidebar .sidebar-footer { flex-direction: column; border-left: 0; border-top: 1px solid #f0f0f5; padding: 8px; }
+  .sidebar .sidebar-footer .btn-block { width: 40px; padding: 8px 0; }
+  .shell-immersive > .sidebar { display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   R8 · Page-level mobile layout.
+   --------------------------------------------------------------------------- */
+
+/* Topbar: drop the email on small screens (it's in Account), keep identity. */
+@media (max-width: 900px) {
+  .topbar-user .muted.small { display: none; }
+}
+.topbar-scope { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-scope-sub { white-space: nowrap; }
+@media (max-width: 560px) {
+  .topbar { padding: 0 12px; }
+  .topbar-scope-sub { display: none; }
+  .topbar-user .chip { max-width: 42vw; }
+  .impersonate-banner { padding: 8px 12px; }
+}
+
+/* Page headers: actions wrap under the title and share the row equally. */
+@media (max-width: 560px) {
+  .page-header-actions { width: 100%; flex-wrap: wrap; }
+  .page-header-actions .btn { flex: 1 1 auto; }
+}
+
+/* Toolbars (filters + search): filters become an even-width row, the search
+   field takes the full width below them — both in primary thumb space. */
+@media (max-width: 720px) {
+  .toolbar, .queue-toolbar { align-items: stretch; }
+  .toolbar .segmented, .queue-toolbar .segmented { width: 100%; }
+  .toolbar .segment, .queue-toolbar .segment { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; padding: 8px 4px; }
+}
+
+/* Marketplace toolbar: search moves under the category pills. */
+@media (max-width: 720px) {
+  .market-toolbar { align-items: stretch; }
+  .market-search { margin-left: 0; flex: 1 1 100%; min-width: 0; }
+}
+
+/* Tables: the card is always a horizontal scroll container (no scrollbar
+   appears when the table fits) and cells size to their content — wide data
+   tables swipe inside their card instead of being clipped by the page. */
+.table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 720px) {
+  .table-card > .table { width: max-content; min-width: 100%; }
+  .t-table .t-content { min-width: 0; max-width: 200px; }
+}
+
+/* Bulk action bar floats over the list while rows are selected — always in
+   reach instead of scrolling away with the toolbar. */
+@media (max-width: 760px) {
+  .bulk-bar { position: sticky; bottom: 10px; z-index: 24; box-shadow: 0 12px 32px rgba(22, 26, 46, 0.22); }
+}
+
+/* Moderation queue: decisions become full-width buttons at the card foot. */
+@media (max-width: 640px) {
+  .queue-actions { flex-direction: column; align-items: stretch; }
+  .queue-actions .btn { width: 100%; }
+  .reject-row { flex-wrap: wrap; }
+  .queue-card { padding: 14px; }
+}
+
+/* Wizard steps wrap without their connector lines; builder steps scroll. */
+@media (max-width: 560px) {
+  .steps { flex-wrap: wrap; row-gap: 8px; }
+  .step:not(:last-child)::after { display: none; }
+}
+@media (max-width: 640px) {
+  .builder-step-indicator { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .builder-step-indicator::-webkit-scrollbar { display: none; }
+  .builder-step-indicator li { flex: 0 0 auto; }
+}
+
+/* Card action rows: two half-width buttons don't fit long labels on a 280px
+   screen — stack them full-width instead of truncating the label. */
+@media (max-width: 480px) {
+  .tpl-card-actions, .tpl-actions { flex-direction: column; }
+  .tpl-card-actions .btn, .tpl-actions .btn { width: 100%; white-space: normal; }
+  .tpl-actions .btn-sm { padding: 9px 12px; }
+}
+
+/* Audit rows: timestamp wraps under the entry instead of squeezing the text. */
+@media (max-width: 640px) {
+  .audit-row { flex-wrap: wrap; }
+  .audit-time { width: 100%; order: 3; padding: 0 0 0 22px; }
+}
+
+/* Settings forms + section headers: the save action spans the row. */
+@media (max-width: 560px) {
+  .settings-form-actions { justify-content: stretch; }
+  .settings-form-actions .btn { flex: 1; }
+  .settings-brand-row { align-items: flex-start; }
+  .theme-savebar .btn { flex: 1 1 auto; }
+  .theme-actions { width: 100%; align-items: stretch; }
+}
+
+/* Media library preview rows wrap their metadata. */
+.media-add-preview { flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------------------
+   R9 · Design studio on phones — the floating side panels become bottom
+   sheets (max 2/3 of the screen, scrollable inside), the hint bar hides,
+   and the toolbar condenses. The canvas keeps the remaining space above.
+   --------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .studio-ov {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(66dvh, 560px);
+    border-radius: 16px 16px 0 0;
+    border-bottom: 0;
+    z-index: 96;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -14px 44px rgba(22, 26, 46, 0.24);
+  }
+  .studio-ov.is-hidden { transform: translateY(115%) !important; }
+  .studio-ov-body { -webkit-overflow-scrolling: touch; }
+  .studio-canvas-hint { display: none; } /* gestures are natural on touch */
+  .studio-toolbar { padding: 8px 10px; gap: 6px; }
+  .studio-name-input { min-width: 90px; max-width: 42vw; }
+  .studio-previewbar { padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)); }
+  .studio-draft-note { font-size: 12px; }
+  .studio-viewport { min-height: 0; }
+}
+@media (max-width: 640px) {
+  /* The fixed-dimensions readout duplicates the properties panel — drop it
+     from the already-dense phone toolbar. Status chips stay. */
+  .studio-tb-right > .chip { display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   R10 · Modals, kebab menus & popovers on phones.
+   --------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+  .modal-backdrop { padding: 12px 10px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .modal { padding: 16px 14px; border-radius: 16px; }
+  /* Stacked actions keep DOM order — this codebase ends with the primary
+     action, so it lands at the bottom, in the thumb's natural zone. */
+  .modal-actions { flex-direction: column; }
+  .modal-actions .btn { width: 100%; }
+  .modal-actions .btn:first-child { margin-right: 0; }
+  /* Destructive confirms are the exception (iOS action-sheet convention):
+     Cancel — DOM-first — sits at the bottom where thumbs land, the Delete
+     action moves up, away from a reflex tap. */
+  .confirm-actions { flex-direction: column-reverse; }
+  .confirm-actions .btn { width: 100%; }
+  .confirm-actions .btn:first-child { margin-right: 0; }
+  .t-edit-body { max-height: 56dvh; }
+}
+
+/* Kebab menus become iOS-style bottom action sheets on phones: no clipping,
+   no precise aiming — and the destructive item is far from where the finger
+   landed (it was tapped at the top of the screen). */
+@media (max-width: 640px) {
+  .ctx-panel {
+    position: fixed !important;
+    top: auto !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 -10px 44px rgba(22, 26, 46, 0.28);
+    animation: sheet-up .2s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .studio-add-pop {
+    top: auto !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    width: auto !important;
+    border-radius: 14px;
+    animation: sheet-up .2s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+}
+@keyframes sheet-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------------------
+   R11 · Public surfaces — login, form, wall, error pages.
+   --------------------------------------------------------------------------- */
+
+/* Login: tighter card on small screens; mode switch shares the row evenly. */
+@media (max-width: 460px) {
+  .auth-card { padding: 22px 18px; }
+  .auth-card .segmented { width: 100%; }
+  .auth-card .segment { flex: 1 1 0; min-width: 0; justify-content: center; padding: 8px 6px; font-size: 12.5px; }
+}
+/* Landscape phones: minimise chrome so the card fits the short viewport. */
+@media (max-height: 520px) {
+  .auth-page { padding: 12px; }
+  .auth-card { padding: 18px 20px; }
+  .demo-access summary { padding: 8px 0; }
+}
+
+/* Public form: the submit CTA is the one action — full width on phones. */
+@media (max-width: 560px) {
+  .public-page { padding: 16px 12px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .public-card { padding: 22px 16px; }
+  .public-form .btn-lg { width: 100%; }
+  .public-actions { flex-direction: column; }
+  .public-actions .btn { width: 100%; }
+}
+
+/* Wall: calmer paddings, the CTA stacks above the stats, footer wraps. */
+@media (max-width: 560px) {
+  .wall { padding: 24px 12px calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .wall-card { padding: 22px 16px 16px; }
+  .wall-head h1 { font-size: 24px; }
+  .wall-actions { flex-direction: column; align-items: stretch; text-align: center; gap: 8px; }
+  .wall-actions .btn { width: 100%; }
+  .wall-foot { flex-wrap: wrap; }
+}
+
+/* Error / 404 pages: stack the recovery CTAs full-width. */
+@media (max-width: 560px) {
+  .error-page { margin: 24px auto; padding: 30px 20px; }
+  .error-code { font-size: 38px; }
+  .error-actions { flex-direction: column; width: 100%; }
+  .error-actions .btn { width: 100%; }
+}
+
+/* Empty states breathe a little less on phones. */
+@media (max-width: 560px) {
+  .empty-state { padding: 40px 16px; }
+}
+
+/* ---------------------------------------------------------------------------
+   R12 · Embeddable widget — runs on customers' websites at fixed dimensions.
+   Arrows are always visible on touch (no hover), dots are finger-sized, and
+   the marquee degrades to a scrollable strip under reduced motion (R13).
+   --------------------------------------------------------------------------- */
+.tpl-widget-nav:focus-visible { outline: 2px solid #1b2559; outline-offset: 2px; }
+.tpl-widget { -webkit-tap-highlight-color: transparent; }
+
+/* ---------------------------------------------------------------------------
+   R13 · Motion preferences — users who ask for less motion get still pages:
+   shimmer, transitions and the boot scale settle instantly; infinite
+   marquees stop and become swipeable strips; spinners keep spinning (they
+   communicate progress, not decoration).
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .spinner, .spinner-sm { animation: spin 0.9s linear infinite !important; }
+  .sk { animation: none !important; }
+  .tpl-marquee-track, .wdg-marquee-track { animation: none !important; }
+  .tpl-widget-marquee, .wdg-marquee { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tpl-tilt-card, .tpl-coverflow-scene, .tpl-wheel-scene { transform: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   R14 · Toasts — global success/error feedback for actions whose result
+   isn't otherwise visible (see components/Toast.tsx). Bottom-center on
+   desktop; above the mobile tab bar; above the keyboard-safe area.
+   --------------------------------------------------------------------------- */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 20px));
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(92vw, 440px);
+  pointer-events: none;
+}
+.toast {
+  max-width: 100%;
+  background: #101332;
+  color: #fff;
+  border-radius: 12px;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 14px 38px rgba(16, 19, 50, 0.38);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  animation: toast-in .24s cubic-bezier(0.22, 0.61, 0.36, 1);
+  overflow-wrap: anywhere;
+}
+.toast-error { background: #b91c1c; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .toast-stack { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------------------------------------------------------------------------
+   R15 · Extreme viewports — Galaxy Fold (280px) and 4K desktops.
+   --------------------------------------------------------------------------- */
+@media (max-width: 380px) {
+  .content > div { padding: 10px; }
+  .card { padding: 13px; }
+  h1 { font-size: 21px; }
+  .stat-value { font-size: 22px; }
+  .modal { padding: 13px 11px; }
+  .public-card { padding: 18px 13px; }
+  .wall-card { padding: 18px 12px 12px; }
+  .auth-card { padding: 18px 14px; }
+  .btn { padding: 8px 12px; }
+}
+/* Ultra-wide: a little more measure so 1120px doesn't feel cramped at 2560px. */
+@media (min-width: 1800px) {
+  .content > div { max-width: 1280px; }
+}
+
+/* Route-level code splitting: what shows while a lazy route's chunk streams
+   in (first uncached visit). Centered in the content area, no layout shift. */
+.route-loading {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* LogoLoader — the Zojatech mark as a looping trim-path outline (see
+   components/brand/LogoLoader.tsx). pathLength="1" on the SVG path
+   normalises the dash units, so the pattern period is exactly 1 and the
+   offset animation loops seamlessly. Used for indefinite loading states
+   (route-chunk fallback) — the boot intro keeps its own one-shot
+   draw-then-fill sequence in AppIntro.tsx. */
+.logo-loader { display: block; color: var(--navy); }
+.logo-loader .logo-loader-base,
+.logo-loader .logo-loader-trim {
+  stroke: currentColor;
+  stroke-width: 7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.logo-loader .logo-loader-base { opacity: 0.14; }
+.logo-loader .logo-loader-trim {
+  /* the drawn segment covers most of the contour; the gap behind it is the
+     "end back a bit". Animating dashoffset by exactly one period (−1) walks
+     the gap around the mark forever. */
+  stroke-dasharray: 0.82 0.18;
+  animation: logo-trim 1.7s linear infinite;
+}
+@keyframes logo-trim {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-loader .logo-loader-trim { animation: none; stroke-dasharray: none; }
+  .logo-loader .logo-loader-base { display: none; }
+}

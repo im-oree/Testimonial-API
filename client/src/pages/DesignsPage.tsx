@@ -18,6 +18,7 @@ import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { ConfirmDialog, KebabMenu, type MenuAction } from '../components/menu';
 import Modal from '../components/Modal';
 import { IconEdit, IconLayers, IconPlus, IconStar } from '../components/icons';
+import { toast } from '../components/Toast';
 
 export default function DesignsPage() {
   const navigate = useNavigate();
@@ -25,7 +26,6 @@ export default function DesignsPage() {
   const [apps, setApps] = useState<AppSummary[] | null>(null);
   const [schemas, setSchemas] = useState<Record<string, StudioSchema | null>>({});
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<AppSummary | null>(null);
@@ -59,8 +59,7 @@ export default function DesignsPage() {
   }, [load]);
 
   function flash(msg: string): void {
-    setNotice(msg);
-    window.setTimeout(() => setNotice(null), 3200);
+    toast(msg);
   }
 
   async function publishDraft(app: AppSummary): Promise<void> {
@@ -119,11 +118,6 @@ export default function DesignsPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {notice && (
-        <div className="banner banner-ok" role="status">
-          {notice}
-        </div>
-      )}
 
       {!apps && (
         <div className="tpl-grid" aria-busy="true">

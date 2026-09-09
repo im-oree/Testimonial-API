@@ -20,6 +20,7 @@ import type { AppSummary, WidgetTemplateRow } from '../lib/types';
 import { TemplatePreview } from '../components/TemplatePreview';
 import { Breadcrumbs, Button, ErrorBanner, PageHeader } from '../components/ui';
 import { ConfirmDialog } from '../components/menu';
+import { toast } from '../components/Toast';
 
 export default function ConnectPage() {
   const { appId = '' } = useParams();
@@ -29,7 +30,6 @@ export default function ConnectPage() {
   const [templates, setTemplates] = useState<WidgetTemplateRow[] | null>(null);
   const [app, setApp] = useState<AppSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState<WidgetTemplateRow | null>(null);
   const [page, setPage] = useState(1);
@@ -52,8 +52,7 @@ export default function ConnectPage() {
   }, [load]);
 
   function flash(msg: string): void {
-    setNote(msg);
-    window.setTimeout(() => setNote((cur) => (cur === msg ? null : cur)), 2600);
+    toast(msg);
   }
 
   async function applyTemplate(t: WidgetTemplateRow): Promise<void> {
@@ -150,13 +149,6 @@ export default function ConnectPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={load} />}
-      {note && (
-        <div className="banner banner-ok" role="status">
-          <span>
-            <IconCheck size={13} /> {note}
-          </span>
-        </div>
-      )}
 
       {app?.designDraft && (
         <div className="draft-banner" role="status">
