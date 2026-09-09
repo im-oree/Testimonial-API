@@ -4,7 +4,7 @@
  * frontend only ever talks to /v1/... paths.
  */
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import './env';
@@ -85,8 +85,17 @@ export function createApp(): express.Express {
   });
 
   // Production: serve the built web app (client/dist) same-origin.
-  const webDist = join(fileURLToPath(new URL('../..', import.meta.url)), 'client', 'dist');
-  if (existsSync(webDist)) {
+  // Resolve the SPA from both the repository root and the server directory.
+  // Hosting providers do not all start the process with the same cwd, and a
+  // missed dist directory makes every client-side deep link look like a 404.
+  const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
+  const webDistCandidates = [
+    resolve(process.cwd(), 'client', 'dist'),
+    resolve(process.cwd(), '..', 'client', 'dist'),
+    join(repositoryRoot, 'client', 'dist'),
+  ];
+  const webDist = webDistCandidates.find((candidate) => existsSync(join(candidate, 'index.html')));
+  if (webDist) {
     app.use(
       express.static(webDist, {
         setHeaders: (res, filePath) => {

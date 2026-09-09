@@ -1074,6 +1074,11 @@ a.linklike:hover, button.linklike:hover { text-decoration: underline; }
   display: block;
 }
 .wall-embed .widgets-root, .wall-embed > div { max-width: none; }
+/* The embed iframe is already sized to the schema canvas. Do not let the
+   flex wrapper shrink a fixed-size widget when the iframe is narrower than
+   the parent (the browser would otherwise render it offset and undersized). */
+.wall-embed.wall-template { width: 100%; min-width: 0; justify-content: flex-start; }
+.wall-embed.wall-template > .tpl-widget { flex: 0 0 auto; }
 .wall-embed .wdg-hover { transition: box-shadow .18s ease, transform .18s ease; }
 
 /* Accessible visually-hidden text */
