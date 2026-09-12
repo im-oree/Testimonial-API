@@ -2,7 +2,7 @@
   <img src="client/public/zojatech-logo.svg" alt="Zojatech" width="220" />
 </p>
 
-<h1 align="center">Testimonial API · by Zojatech</h1>
+<h1 align="center">Testimonial API · for Zojatech</h1>
 
 <p align="center">
   Collect, moderate, design and embed customer testimonials — end to end.<br />
